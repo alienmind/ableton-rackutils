@@ -19,8 +19,8 @@ Do not write code or comments with detectable LLM tells. Concretely:
   "cutting-edge") used as filler rather than as a specific claim.
 - No listy comment blocks that restate the obvious structure of the code below
   them.
-- Match the terse, plain style already in this repo's docs (see `doc/PLAN.md`,
-  `KICKOFF.md`): direct statements, concrete facts, no hedging.
+- Match the terse, plain style already in this repo's docs (see
+  `doc/PLAN.md`): direct statements, concrete facts, no hedging.
 
 - Comments say what the code cannot: a constraint, a trap, a fact measured
   against real Ableton behavior. Not what the next line does. State it plainly,

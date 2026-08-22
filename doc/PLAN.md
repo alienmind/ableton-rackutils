@@ -16,11 +16,51 @@ is meant to lock the toolkit to macro remapping only; `adg-codec` and
 surface, not a rewrite.
 
 Companion docs:
-- `KICKOFF.md` - short version, current state, what to do next.
 - `packages/adg-codec/SCHEMA.md` - the empty schema log that gates all codec work.
 - `.github/workflows/` - the pipeline described in Phase 4.2.
 
 Handoff document. Written so another agent can pick this up cold. Read the Constraints section before writing any code, several intuitive designs are ruled out by facts about Ableton's API that are not obvious.
+
+---
+
+## Current state and next steps
+
+Scaffolded, one working preview, nothing else functional yet.
+
+- `.github/workflows/` - CI, Pages deploy, device release. Adapted from
+  `alienmind/trackster`.
+- `packages/adg-codec/src/gzip.ts` - done, works.
+- `packages/adg-codec/src/normalize.ts` - done, works.
+- `packages/adg-codec/SCHEMA.md` - **empty template, this is the blocker.**
+- `tools/adg-inspect/` - done, the tool for filling in SCHEMA.md.
+- `apps/site/` - runs (`pnpm dev`). Drag-and-drop a `.adg`, decompresses it,
+  shows a raw XML tree. No macro model, no mutations, that is blocked on
+  SCHEMA.md same as the codec.
+- Everything else - not started.
+
+Do this next, in order:
+
+1. **Fill in SCHEMA.md (blocks everything).** Nobody has Ableton's `.adg`
+   schema memorized well enough to write mutation code from memory.
+   `SCHEMA.md` has nine questions and the diff procedure. Answer them against
+   three real racks before writing `parse.ts` or `mutate.ts`. Read
+   `alienmind/patchbay`'s `doc/ARCHITECTURE.md` and `doc/SCHEMA.md` first, it
+   documents much of this for Live 12.4.3. Then verify, don't assume.
+2. **Build the codec.** `parse.ts`, `mutate.ts`, `model.ts`, per Phase 2 below.
+3. **Site, then device.** Site first, per Phase 4. It is the product and it
+   de-risks everything else.
+
+Until the codec is proven against real racks, default to a read-only or
+simulated mode rather than writing files, following `trackster`'s precedent
+for a tool that rewrites user files in place.
+
+### Prior art, all by the same author
+
+- `alienmind/patchbay` - Python DSL for authoring racks. Has the schema work.
+- `alienmind/m4l-jweb` - the framework the device is built on.
+- `alienmind/m4l-strudel` - proves a full web app bundles offline into an
+  `.amxd`.
+- `alienmind/trackster` - the CI/CD and offline-first patterns copied here.
 
 ---
 
