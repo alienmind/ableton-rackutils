@@ -1,0 +1,112 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+  background: #14151a;
+  color: #e8e8ea;
+}
+
+.app {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 1rem 4rem;
+}
+
+header h1 {
+  margin-bottom: 0.25rem;
+}
+
+.badge {
+  font-size: 0.6em;
+  font-weight: 600;
+  color: #ff9f45;
+  border: 1px solid #ff9f45;
+  border-radius: 4px;
+  padding: 0.1em 0.4em;
+  vertical-align: middle;
+}
+
+.tagline {
+  color: #9a9aa5;
+  margin-top: 0;
+}
+
+.dropzone {
+  border: 2px dashed #444650;
+  border-radius: 8px;
+  padding: 2rem;
+  text-align: center;
+  margin: 1.5rem 0;
+  transition: border-color 0.1s ease;
+}
+
+.dropzone-active {
+  border-color: #6ea8ff;
+  background: #1b2333;
+}
+
+.file-input-label {
+  display: inline-block;
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid #444650;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.file-input-label input {
+  display: none;
+}
+
+.error {
+  color: #ff6b6b;
+}
+
+.note {
+  color: #9a9aa5;
+  font-size: 0.9rem;
+}
+
+.rack-view {
+  margin-top: 2rem;
+}
+
+.tree,
+.tree ul {
+  list-style: none;
+  padding-left: 1.1rem;
+  margin: 0.2rem 0;
+}
+
+.tree {
+  padding-left: 0;
+}
+
+.tag {
+  font-family: ui-monospace, monospace;
+  background: none;
+  border: none;
+  color: #6ea8ff;
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.9rem;
+}
+
+.tag.leaf {
+  color: #7fcf8a;
+  cursor: default;
+}
+
+.headline {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+  color: #d0d0d6;
+}
+
+.child-count {
+  color: #6a6a75;
+  font-size: 0.8rem;
+}
