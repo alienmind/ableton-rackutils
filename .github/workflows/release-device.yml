@@ -43,7 +43,7 @@ jobs:
 
       - name: Guard against absolute asset paths in the embedded bundle
         run: |
-          if grep -rEn '(src|href)="/[^/]' apps/device/patcher/web/index.html; then
+          if grep -rEn '(src|href)="/[^/]' packages/device/patcher/web/index.html; then
             echo "::error::Absolute asset path in embedded bundle. VITE_BASE must be './'."
             exit 1
           fi
@@ -51,5 +51,5 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          files: apps/device/dist/*.amxd
+          files: packages/device/dist/*.amxd
           generate_release_notes: true

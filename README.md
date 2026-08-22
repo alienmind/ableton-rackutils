@@ -47,8 +47,8 @@ may not share this constraint - check before assuming.
 ```
 packages/adg-codec/   parse, mutate, serialize .adg. No UI deps.
 packages/editor-ui/   shared React components. No Ableton deps.
+packages/device/      optional companion .amxd, built with m4l-jweb.
 apps/site/            the product. Static, deployed to GitHub Pages.
-apps/device/          optional companion .amxd, built with m4l-jweb.
 tools/adg-inspect/    CLI for the schema investigation. Start here.
 ```
 
