@@ -187,9 +187,9 @@ ableton-rackutils/
     adg-codec/          # parse, mutate, serialize .adg. Zero UI deps.
     editor-ui/          # shared React components. Zero Ableton deps.
     bridge-protocol/    # shared message types for site <-> companion
+    device/             # optional companion .amxd, built with m4l-jweb
   apps/
     site/               # the product. Static, deployed to GitHub Pages.
-    device/             # optional companion .amxd, built with m4l-jweb
   tools/
     adg-inspect/        # CLI for the Phase 1 schema investigation
 ```
@@ -198,7 +198,7 @@ Rules that keep the tiers honest:
 
 - `adg-codec` must not import React, and must run identically in Node (for tests) and browser.
 - `editor-ui` must not import anything from `@m4l-jweb`. It receives live data as plain props, so it renders the same whether the companion is present or absent.
-- `apps/site` must never import from `apps/device`. The site has to build and deploy with the device removed entirely.
+- `apps/site` must never import from `packages/device`. The site has to build and deploy with the device removed entirely.
 - `bridge-protocol` is types only, no runtime dependency on either side, so the two can be versioned independently (Phase 5.5).
 
 The build must stay a pure static build. No server-side rendering, no API routes, nothing that assumes a Node process at runtime.
@@ -318,6 +318,16 @@ Undo/redo becomes a stack of clones, which is honest about the cost rather than 
 
 ### 2.2 Types
 
+**Correction, from `SCHEMA.md` Q1/Q2 (borrowed from `alienmind/patchbay`,
+pending our own confirming diff):** a mapping is not id-addressed. It is a
+`KeyMidi` element inserted as a CHILD of the target parameter itself; the
+macro index lives on that `KeyMidi`'s `NoteOrController`. There is no id, no
+pointer, no path string anywhere in the mapping. `Binding.targetId` below is
+therefore wrong and should not be implemented as written - drop it, and note
+that `moveMapping` becomes correspondingly simpler: it edits `NoteOrController`
+on the existing `KeyMidi` in place, it does not relocate any node or
+reconcile any id. See `SCHEMA.md` Q1-Q4 before implementing this section.
+
 ```typescript
 export interface Macro {
   index: number;                 // 0-based slot
@@ -327,11 +337,10 @@ export interface Macro {
 }
 
 export interface Binding {
-  targetId: string;              // how the file references the target, per Phase 1 Q2
-  targetPath: string;            // human-readable, for UI display
+  targetPath: string;            // locates the target element (it owns the KeyMidi) and displays in the UI
   rangeMin: number;
   rangeMax: number;
-  inverted: boolean;             // per Phase 1 Q4, may be expressed as min > max
+  inverted: boolean;             // Min > Max on MidiControllerRange; Live honours it (SCHEMA.md Q4)
 }
 
 export interface Chain {
@@ -488,7 +497,7 @@ test("moveMapping transfers the binding", () => {
   const rack = Rack.parse(readFileSync("fixtures/simple.adg"));
   const before = rack.macros[1].binding!;
   moveMapping(rack, 1, 2);
-  expect(rack.macros[2].binding).toMatchObject({ targetId: before.targetId });
+  expect(rack.macros[2].binding).toMatchObject({ targetPath: before.targetPath });
   expect(rack.macros[1].binding).toBeNull();
 });
 
@@ -914,7 +923,7 @@ Backed by `song.view.selected_track.view.selected_device`, which is observable. 
 ### 5.2 Device definition
 
 ```javascript
-// apps/device/patcher/devices.mjs
+// packages/device/patcher/devices.mjs
 export default [{
   name: "rack-editor",
   type: "audio",
@@ -924,7 +933,7 @@ export default [{
 ```
 
 ```typescript
-// apps/device/src/surface.ts
+// packages/device/src/surface.ts
 export default defineSurface({
   params: {},                 // a tool, not an instrument, no automatable params
   windows: {
@@ -995,7 +1004,7 @@ This is the main packaging step, and it is well-trodden ground: m4l-strudel ship
 Build once, ship twice. The same `apps/site/dist` output is both the Pages artifact and the device payload:
 
 ```javascript
-// apps/device/build.mjs
+// packages/device/build.mjs
 import { cp } from "node:fs/promises";
 
 // Site must be built with VITE_BASE="./" for the device copy. An absolute
