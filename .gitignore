@@ -4,5 +4,8 @@ dist-relative/
 *.tsbuildinfo
 .DS_Store
 
+# Scratch work: spikes, one-off scripts, files read once. Never commit here.
+tmp/
+
 # Real racks stay local. They are personal project data and can be large.
 packages/adg-codec/tests/fixtures/*.adg
