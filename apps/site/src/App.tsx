@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { decompress, isGzip } from '@rackutils/adg-codec';
 import { RackTree } from './RackTree';
+import logoUrl from './assets/logo.jpg';
 
 interface LoadedRack {
   fileName: string;
@@ -58,6 +59,7 @@ export default function App() {
   return (
     <div className="app">
       <header>
+        <img src={logoUrl} alt="ableton-rackutils" className="logo" />
         <h1>
           ableton-rackutils <span className="badge">v0.0.1 pre-alpha</span>
         </h1>

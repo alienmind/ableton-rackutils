@@ -1,3 +1,5 @@
+![ableton-rackutils](doc/logo.jpg)
+
 # ableton-rackutils
 
 **v0.0.1 - pre-alpha. Does not work as a rack editor yet.** See status below.
@@ -12,7 +14,8 @@ built to host more rack-editing tools as they're added, not just this one.
 **Status: pre-alpha, v0.0.1, early scaffold.** The site runs and can load a `.adg`, decompress it,
 and show its raw XML structure. It does not yet understand macros or mappings,
 that part is blocked on `packages/adg-codec/SCHEMA.md`. See
-[`KICKOFF.md`](KICKOFF.md) for current state and next steps.
+[`doc/PLAN.md`](doc/PLAN.md#current-state-and-next-steps) for current state and
+next steps.
 
 > **Data loss warning.** This tool rewrites rack preset files. Bugs can produce
 > a file that loads in Live without complaint and behaves incorrectly, including
@@ -53,8 +56,7 @@ Everything needed to continue is in the repo.
 
 | File | What it is |
 |---|---|
-| [`KICKOFF.md`](KICKOFF.md) | Current state, next steps, the constraints that rule out obvious designs |
-| [`doc/PLAN.md`](doc/PLAN.md) | Full implementation plan, phase by phase, with code |
+| [`doc/PLAN.md`](doc/PLAN.md) | Full implementation plan, phase by phase, with code. Opens with current state, next steps, and the constraints that rule out obvious designs. |
 | [`packages/adg-codec/SCHEMA.md`](packages/adg-codec/SCHEMA.md) | Empty schema log. **Blocks all codec work.** |
 
 ## Getting started
