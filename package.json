@@ -1,0 +1,22 @@
+{
+  "name": "ableton-macrowizard",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "dev": "pnpm --filter @macrowizard/site dev",
+    "build": "pnpm --filter @macrowizard/site build",
+    "lint": "eslint .",
+    "typecheck": "tsc -b",
+    "test": "pnpm -r test",
+    "adg-inspect": "tsx tools/adg-inspect/src/index.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.12.4",
+    "eslint": "^10.4.0",
+    "prettier": "^3.8.3",
+    "tsx": "^4.19.2",
+    "typescript": "~6.0.2",
+    "vitest": "^3.0.0"
+  }
+}

@@ -1,0 +1,53 @@
+# Adapted from alienmind/trackster's deploy.yml. Kept: the VITE_BASE +
+# repository.name pattern, pnpm/action-setup@v4, node 22, the pages
+# permissions/concurrency block. Added: the codec test gate, and a filtered
+# build since this is a workspace with multiple apps.
+
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+
+      # Codec tests gate the deploy. A broken codec silently corrupts racks,
+      # which is worse than being down.
+      - run: pnpm --filter @macrowizard/adg-codec test
+
+      - name: Build site
+        run: pnpm --filter @macrowizard/site build
+        env:
+          VITE_BASE: /${{ github.event.repository.name }}/
+
+      - uses: actions/configure-pages@v4
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: './apps/site/dist'
+      - id: deployment
+        uses: actions/deploy-pages@v4

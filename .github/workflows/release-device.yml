@@ -1,0 +1,57 @@
+# Publishes the companion .amxd as a release asset.
+# The site's download button reads the latest release via the GitHub API,
+# so shipping a device update does not require redeploying the site.
+name: Release companion device
+
+on:
+  push:
+    tags: ['device-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    # macOS on the assumption that the m4l-jweb device build needs a local Max
+    # toolchain. VERIFY THIS: if `pnpm --filter device build` is pure Node,
+    # switch to ubuntu-latest. macOS runners bill at roughly 10x Linux.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @macrowizard/adg-codec test
+
+      # Relative asset paths for the embedded copy. The bundle is loaded from
+      # disk inside jweb, where an absolute /repo-name/ path resolves against
+      # the filesystem root and 404s into a blank window. This is the single
+      # most likely device-side failure, so it is also asserted below.
+      - name: Build site for embedding
+        run: pnpm --filter @macrowizard/site build
+        env:
+          VITE_BASE: './'
+          VITE_EMBED: '1'
+
+      - name: Build device
+        run: pnpm --filter @macrowizard/device build
+
+      - name: Guard against absolute asset paths in the embedded bundle
+        run: |
+          if grep -rEn '(src|href)="/[^/]' apps/device/patcher/web/index.html; then
+            echo "::error::Absolute asset path in embedded bundle. VITE_BASE must be './'."
+            exit 1
+          fi
+          echo "Embedded bundle uses relative paths."
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: apps/device/dist/*.amxd
+          generate_release_notes: true
