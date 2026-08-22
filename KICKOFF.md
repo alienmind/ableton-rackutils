@@ -1,6 +1,7 @@
 # macrowizard: kickoff
 
-Continuation doc. The full plan lives in `doc/PLAN.md`. This is the short
+Continuation doc. The full plan lives in `doc/PLAN.md`, in this repo.
+The repo is self-contained: no external doc is required to continue. This is the short
 version plus what to do next.
 
 ## What this is

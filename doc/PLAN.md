@@ -1,4 +1,12 @@
-# Ableton Rack Editor: Implementation Plan (v3)
+# macrowizard: Implementation Plan (v4)
+
+Canonical plan for `ableton-macrowizard`. Lives in the repo so the project is
+self-contained: clone it and everything needed to continue is here.
+
+Companion docs:
+- `KICKOFF.md` — short version, current state, what to do next.
+- `packages/adg-codec/SCHEMA.md` — the empty schema log that gates all codec work.
+- `.github/workflows/` — the pipeline described in Phase 4.2.
 
 Handoff document. Written so another agent can pick this up cold. Read the Constraints section before writing any code, several intuitive designs are ruled out by facts about Ableton's API that are not obvious.
 
@@ -122,7 +130,7 @@ Constraints 1 and 2 are well established. Constraints 3, 4, 5 follow from docume
 Monorepo, pnpm workspaces.
 
 ```
-rack-editor/
+ableton-macrowizard/
   packages/
     adg-codec/          # parse, mutate, serialize .adg. Zero UI deps.
     editor-ui/          # shared React components. Zero Ableton deps.
@@ -658,54 +666,105 @@ function downloadFile(bytes: Uint8Array, name: string) {
 
 ### 4.2 Static build for GitHub Pages
 
+Adapted from `alienmind/trackster`, which already solves this. The key idea is
+that `base` comes from an env var rather than being hardcoded or sniffed from
+`GITHUB_ACTIONS`, so the same config serves three cases: local dev (`/`), Pages
+(`/<repo>/`), and the device bundle (`./`).
+
 ```typescript
 // apps/site/vite.config.ts
 export default defineConfig({
-  // Project pages serve from /<repo>/, not /. Getting this wrong yields a blank
-  // page with 404s on every asset, the classic GH Pages failure.
-  base: process.env.GITHUB_ACTIONS ? "/rack-editor/" : "/",
-  build: { outDir: "dist", target: "es2022" },
+  base: process.env.VITE_BASE || '/',
+  plugins: [
+    react(),
+    tailwindcss(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      scope: process.env.VITE_BASE || '/',
+      manifest: {
+        start_url: process.env.VITE_BASE || '/',
+        name: 'macrowizard',
+        display: 'standalone',
+      },
+      workbox: {
+        maximumFileSizeToCacheInBytes: 5_000_000,
+        // Do not let the SPA fallback swallow non-HTML assets.
+        navigateFallbackDenylist: [/.*\.(adg|als|md|zip)$/i],
+      },
+    }),
+  ],
 });
 ```
 
-```yaml
-# .github/workflows/deploy.yml
-name: deploy
-on:
-  push: { branches: [main] }
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: pnpm }
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter adg-codec test        # never deploy a failing codec
-      - run: pnpm --filter site build
-      - uses: actions/upload-pages-artifact@v3
-        with: { path: apps/site/dist }
-  deploy:
-    needs: build
-    permissions: { pages: write, id-token: write }
-    environment: github-pages
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/deploy-pages@v4
-```
+The workflows are committed at `.github/workflows/`. Three of them:
+
+- `ci.yml` — lint, typecheck, codec tests, on every PR.
+- `deploy.yml` — Pages, with `VITE_BASE: /${{ github.event.repository.name }}/`
+  so it is repo-name agnostic. Codec tests gate the deploy: a broken codec
+  corrupts racks silently, which is worse than the site being down.
+- `release-device.yml` — on `device-v*` tags, builds the embedded bundle with
+  `VITE_BASE: './'`, builds the `.amxd`, and publishes it as a release asset.
+  Includes a grep guard that fails the build if absolute asset paths leak into
+  the bundle, since that is the top device-side failure mode.
+
+Two open questions in `release-device.yml`, both marked in the file: whether the
+`m4l-jweb` device build needs macOS and a Max toolchain (currently assumed, and
+macOS runners bill roughly 10x Linux), and the exact output paths for the
+`.amxd` and the embedded web directory.
 
 Gotchas specific to this host:
 
-- Add `.nojekyll` to the artifact root, or files and folders starting with an underscore get silently dropped.
-- If client-side routing is ever added, copy `index.html` to `404.html`, since Pages has no rewrite rules. Better: do not add routing, a single page is enough here.
-- Pages is HTTPS only. That is what makes the companion connection interesting, see Phase 5.5.
+- Add `.nojekyll` to the artifact root, or files and folders starting with an
+  underscore get silently dropped.
+- If client-side routing is ever added, copy `index.html` to `404.html`, since
+  Pages has no rewrite rules. Better: do not add routing, one page is enough.
+- Pages is HTTPS only, which is what made the companion bridge awkward before
+  bundling removed the need for it.
 
 ### 4.3 Offline
 
-The app is pure computation over a local file, so it should keep working with no network. A minimal service worker precaching the built assets is enough, no runtime caching strategy needed since there are no API calls to cache.
+`vite-plugin-pwa` with `registerType: 'autoUpdate'`, configured above. Trackster
+uses exactly this to run "even in the most isolated techno bunker", which is the
+same requirement here: someone mid-session with a DAW open should not be blocked
+by a flaky connection.
 
-Worth doing because the use case is someone mid-session with a DAW open, and a flaky connection should not stand between them and their own file.
+Skip the PWA plugin entirely in the device build. Bundling already solves
+offline, and a service worker there only adds a caching layer that can serve
+stale UI after a device update.
+
+### 4.3b File System Access API
+
+Trackster uses this, and it is a better fit than the download-a-copy flow this
+plan originally assumed.
+
+`showOpenFilePicker()` returns a handle that can be written back through
+`createWritable()`, so the site can save the modified `.adg` directly over the
+original file. No downloads folder, no manual move, no companion device needed.
+
+```typescript
+const [handle] = await window.showOpenFilePicker({
+  types: [{ description: 'Ableton Device Group', accept: { 'application/gzip': ['.adg'] } }],
+});
+const rack = Rack.parse(new Uint8Array(await (await handle.getFile()).arrayBuffer()));
+
+// ...edit...
+
+const writable = await handle.createWritable();
+await writable.write(rack.serialize());
+await writable.close();
+```
+
+Consequences:
+
+- Save-in-place moves from Tier 1 to Tier 0. The companion is now purely about
+  targeting and live values.
+- Reuse trackster's `src/types/file-system-access.d.ts` rather than rewriting it.
+- Firefox and Safari support is weaker than Chromium's, so keep the
+  `<input type="file">` plus download path as an automatic fallback, and detect
+  rather than assume.
+- Writing over the user's original file raises the stakes on Constraint 4.
+  Follow trackster's precedent and default to a read-only or simulated mode,
+  requiring an explicit opt-in before any destructive write.
 
 ### 4.4 Landing page
 
@@ -723,7 +782,7 @@ The `.amxd` is a release asset, not a file in the repo, so the site is not rebui
 
 ```typescript
 // apps/site/src/companion/download.ts
-const RELEASES = "https://api.github.com/repos/<owner>/rack-editor/releases/latest";
+const RELEASES = "https://api.github.com/repos/alienmind/ableton-macrowizard/releases/latest";
 
 export async function latestCompanion(): Promise<{ url: string; version: string } | null> {
   try {
@@ -887,21 +946,16 @@ Build once, ship twice. The same `apps/site/dist` output is both the Pages artif
 // apps/device/build.mjs
 import { cp } from "node:fs/promises";
 
-// Site must be built with base: "./" for the device copy. Absolute "/rack-editor/"
-// paths resolve against the filesystem root when loaded from disk and 404.
-await cp("../site/dist-relative", "./patcher/web", { recursive: true });
+// Site must be built with VITE_BASE="./" for the device copy. An absolute
+// "/ableton-macrowizard/" path resolves against the filesystem root when
+// loaded from disk inside jweb and 404s into a blank window.
+await cp("../site/dist", "./patcher/web", { recursive: true });
 ```
 
-Two build modes for the site, differing only in `base`:
-
-```typescript
-// apps/site/vite.config.ts
-const target = process.env.BUILD_TARGET ?? "pages";
-export default defineConfig({
-  base: target === "device" ? "./" : "/rack-editor/",
-  build: { outDir: target === "device" ? "dist-relative" : "dist" },
-});
-```
+Both build modes come from the single `VITE_BASE` env var wired up in Phase 4.2,
+so there is no separate device config to keep in sync. `release-device.yml`
+passes `VITE_BASE: './'` and `VITE_EMBED: '1'`, then asserts no absolute asset
+paths survived into the bundle.
 
 Checklist for the device build, most of which the site already satisfies because it was designed backend-free:
 
