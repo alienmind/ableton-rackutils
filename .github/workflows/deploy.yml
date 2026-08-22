@@ -38,10 +38,10 @@ jobs:
 
       # Codec tests gate the deploy. A broken codec silently corrupts racks,
       # which is worse than being down.
-      - run: pnpm --filter @macrowizard/adg-codec test
+      - run: pnpm --filter @rackutils/adg-codec test
 
       - name: Build site
-        run: pnpm --filter @macrowizard/site build
+        run: pnpm --filter @rackutils/site build
         env:
           VITE_BASE: /${{ github.event.repository.name }}/
 

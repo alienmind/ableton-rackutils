@@ -21,4 +21,4 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       # The codec gate. Nothing merges if a rack cannot survive a round trip.
-      - run: pnpm --filter @macrowizard/adg-codec test
+      - run: pnpm --filter @rackutils/adg-codec test

@@ -28,20 +28,20 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm --filter @macrowizard/adg-codec test
+      - run: pnpm --filter @rackutils/adg-codec test
 
       # Relative asset paths for the embedded copy. The bundle is loaded from
       # disk inside jweb, where an absolute /repo-name/ path resolves against
       # the filesystem root and 404s into a blank window. This is the single
       # most likely device-side failure, so it is also asserted below.
       - name: Build site for embedding
-        run: pnpm --filter @macrowizard/site build
+        run: pnpm --filter @rackutils/site build
         env:
           VITE_BASE: './'
           VITE_EMBED: '1'
 
       - name: Build device
-        run: pnpm --filter @macrowizard/device build
+        run: pnpm --filter @rackutils/device build
 
       - name: Guard against absolute asset paths in the embedded bundle
         run: |

@@ -1,11 +1,12 @@
 {
-  "name": "ableton-macrowizard",
+  "name": "ableton-rackutils",
+  "version": "0.0.1",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.0.0",
   "scripts": {
-    "dev": "pnpm --filter @macrowizard/site dev",
-    "build": "pnpm --filter @macrowizard/site build",
+    "dev": "pnpm --filter @rackutils/site dev",
+    "build": "pnpm --filter @rackutils/site build",
     "lint": "eslint .",
     "typecheck": "tsc -b",
     "test": "pnpm -r test",
