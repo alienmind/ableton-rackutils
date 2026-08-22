@@ -28,9 +28,9 @@ readable. Use `unpack --raw` when you specifically need to see them.
 
 Three structurally different racks, all answers verified against each:
 
-- [ ] `simple.adg` — instrument rack, a few mapped macros, no variations
-- [ ] `with-variations.adg` — same, plus at least 3 Macro Variations
-- [ ] `drum-nested.adg` — drum rack, pad rack, Pitch, engine rack (3 levels)
+- [ ] `simple.adg` - instrument rack, a few mapped macros, no variations
+- [ ] `with-variations.adg` - same, plus at least 3 Macro Variations
+- [ ] `drum-nested.adg` - drum rack, pad rack, Pitch, engine rack (3 levels)
 
 Fixtures are gitignored. Keep them in a local `tests/fixtures/`.
 

@@ -1,12 +1,24 @@
-# macrowizard: Implementation Plan (v4)
+# ableton-rackutils: Implementation Plan (v4)
 
-Canonical plan for `ableton-macrowizard`. Lives in the repo so the project is
-self-contained: clone it and everything needed to continue is here.
+**Product status: v0.0.1, pre-alpha, does not work yet.**
+
+Canonical plan for `ableton-rackutils`, a Swiss-army toolkit for Ableton rack
+preset (`.adg`) files. Lives in the repo so the project is self-contained:
+clone it and everything needed to continue is here.
+
+This plan currently describes the first tool built on the toolkit - a macro
+mapping editor - end to end, because it's the one concrete enough to plan in
+detail and it proves out the codec, the app shell, and the companion device
+pattern that later tools reuse. Where the text below says "the product" or
+"macrowizard," read it as "the first tool in ableton-rackutils." Nothing here
+is meant to lock the toolkit to macro remapping only; `adg-codec` and
+`editor-ui` are structured so a second rack-editing tool is an additional
+surface, not a rewrite.
 
 Companion docs:
-- `KICKOFF.md` — short version, current state, what to do next.
-- `packages/adg-codec/SCHEMA.md` — the empty schema log that gates all codec work.
-- `.github/workflows/` — the pipeline described in Phase 4.2.
+- `KICKOFF.md` - short version, current state, what to do next.
+- `packages/adg-codec/SCHEMA.md` - the empty schema log that gates all codec work.
+- `.github/workflows/` - the pipeline described in Phase 4.2.
 
 Handoff document. Written so another agent can pick this up cold. Read the Constraints section before writing any code, several intuitive designs are ruled out by facts about Ableton's API that are not obvious.
 
@@ -130,7 +142,7 @@ Constraints 1 and 2 are well established. Constraints 3, 4, 5 follow from docume
 Monorepo, pnpm workspaces.
 
 ```
-ableton-macrowizard/
+ableton-rackutils/
   packages/
     adg-codec/          # parse, mutate, serialize .adg. Zero UI deps.
     editor-ui/          # shared React components. Zero Ableton deps.
@@ -683,7 +695,7 @@ export default defineConfig({
       scope: process.env.VITE_BASE || '/',
       manifest: {
         start_url: process.env.VITE_BASE || '/',
-        name: 'macrowizard',
+        name: 'rackutils',
         display: 'standalone',
       },
       workbox: {
@@ -698,11 +710,11 @@ export default defineConfig({
 
 The workflows are committed at `.github/workflows/`. Three of them:
 
-- `ci.yml` — lint, typecheck, codec tests, on every PR.
-- `deploy.yml` — Pages, with `VITE_BASE: /${{ github.event.repository.name }}/`
+- `ci.yml` - lint, typecheck, codec tests, on every PR.
+- `deploy.yml` - Pages, with `VITE_BASE: /${{ github.event.repository.name }}/`
   so it is repo-name agnostic. Codec tests gate the deploy: a broken codec
   corrupts racks silently, which is worse than the site being down.
-- `release-device.yml` — on `device-v*` tags, builds the embedded bundle with
+- `release-device.yml` - on `device-v*` tags, builds the embedded bundle with
   `VITE_BASE: './'`, builds the `.amxd`, and publishes it as a release asset.
   Includes a grep guard that fails the build if absolute asset paths leak into
   the bundle, since that is the top device-side failure mode.
@@ -782,7 +794,7 @@ The `.amxd` is a release asset, not a file in the repo, so the site is not rebui
 
 ```typescript
 // apps/site/src/companion/download.ts
-const RELEASES = "https://api.github.com/repos/alienmind/ableton-macrowizard/releases/latest";
+const RELEASES = "https://api.github.com/repos/alienmind/ableton-rackutils/releases/latest";
 
 export async function latestCompanion(): Promise<{ url: string; version: string } | null> {
   try {
@@ -947,7 +959,7 @@ Build once, ship twice. The same `apps/site/dist` output is both the Pages artif
 import { cp } from "node:fs/promises";
 
 // Site must be built with VITE_BASE="./" for the device copy. An absolute
-// "/ableton-macrowizard/" path resolves against the filesystem root when
+// "/ableton-rackutils/" path resolves against the filesystem root when
 // loaded from disk inside jweb and 404s into a blank window.
 await cp("../site/dist", "./patcher/web", { recursive: true });
 ```

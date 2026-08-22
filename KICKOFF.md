@@ -1,4 +1,6 @@
-# macrowizard: kickoff
+# ableton-rackutils: kickoff
+
+**v0.0.1 - pre-alpha. Does not work as a rack editor yet.**
 
 Continuation doc. The full plan lives in `doc/PLAN.md`, in this repo.
 The repo is self-contained: no external doc is required to continue. This is the short
@@ -6,25 +8,34 @@ version plus what to do next.
 
 ## What this is
 
-A static website that loads an Ableton rack preset (`.adg`), shows its macros
-and device tree, lets you drag a mapping from one macro knob to another, and
-saves the modified file. Deployed to GitHub Pages. No backend, ever: the file
-is parsed and rebuilt in the browser tab and never leaves the machine.
+A Swiss-army toolkit for Ableton rack preset (`.adg`) files, shipped as a
+static website with an optional Max for Live companion. The first tool built
+on it: load a rack, see its macros and device tree, drag a mapping from one
+macro knob to another, save the modified file. Deployed to GitHub Pages. No
+backend, ever: the file is parsed and rebuilt in the browser tab and never
+leaves the machine.
+
+The macro remapper is the first capability, not the whole product. The codec
+and app shell (Parts 1 and 3 of `doc/PLAN.md`) are deliberately generic about
+"a rack-editing tool," so more utilities can land on the same foundation later.
 
 An optional Max for Live companion device ships the same UI bundled offline and
-adds device targeting plus live macro values.
+adds device targeting plus live parameter values.
 
 ## Current state
 
 Scaffolded only. Nothing is functional yet.
 
-- `.github/workflows/` — CI, Pages deploy, device release. Adapted from
+- `.github/workflows/` - CI, Pages deploy, device release. Adapted from
   `alienmind/trackster`.
-- `packages/adg-codec/src/gzip.ts` — done, works.
-- `packages/adg-codec/src/normalize.ts` — done, works.
-- `packages/adg-codec/SCHEMA.md` — **empty template, this is the blocker.**
-- `tools/adg-inspect/` — done, the tool for filling in SCHEMA.md.
-- Everything else — not started.
+- `packages/adg-codec/src/gzip.ts` - done, works.
+- `packages/adg-codec/src/normalize.ts` - done, works.
+- `packages/adg-codec/SCHEMA.md` - **empty template, this is the blocker.**
+- `tools/adg-inspect/` - done, the tool for filling in SCHEMA.md.
+- `apps/site/` - runs (`pnpm dev`). Drag-and-drop a `.adg`, decompresses it,
+  shows a raw XML tree. No macro model, no mutations, that is blocked on
+  SCHEMA.md same as the codec.
+- Everything else - not started.
 
 ## Do this next, in order
 
@@ -88,8 +99,8 @@ Site first. It is the product and it de-risks everything else.
 
 ## Prior art, all by the same author
 
-- `alienmind/patchbay` — Python DSL for authoring racks. Has the schema work.
-- `alienmind/m4l-jweb` — the framework the device is built on.
-- `alienmind/m4l-strudel` — proves a full web app bundles offline into an
+- `alienmind/patchbay` - Python DSL for authoring racks. Has the schema work.
+- `alienmind/m4l-jweb` - the framework the device is built on.
+- `alienmind/m4l-strudel` - proves a full web app bundles offline into an
   `.amxd`.
-- `alienmind/trackster` — the CI/CD and offline-first patterns copied here.
+- `alienmind/trackster` - the CI/CD and offline-first patterns copied here.

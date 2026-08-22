@@ -1,10 +1,18 @@
-# macrowizard
+# ableton-rackutils
 
-Rearrange Ableton rack macro mappings. Move the mapping on knob 2 over to knob
-3, rebuild the `.adg`, reload it in Live.
+**v0.0.1 - pre-alpha. Does not work as a rack editor yet.** See status below.
 
-**Status: scaffold. Not yet functional.** See [`KICKOFF.md`](KICKOFF.md) for
-current state and next steps.
+A Swiss-army toolkit for Ableton rack (`.adg`) files: a growing set of
+utilities for inspecting and editing racks, from the browser or optionally from
+inside Live via Max for Live. The first capability is a macro remapper -
+rearrange rack macro mappings, move the mapping on knob 2 over to knob 3,
+rebuild the `.adg`, reload it in Live - but the codec and the app shell are
+built to host more rack-editing tools as they're added, not just this one.
+
+**Status: pre-alpha, v0.0.1, early scaffold.** The site runs and can load a `.adg`, decompress it,
+and show its raw XML structure. It does not yet understand macros or mappings,
+that part is blocked on `packages/adg-codec/SCHEMA.md`. See
+[`KICKOFF.md`](KICKOFF.md) for current state and next steps.
 
 > **Data loss warning.** This tool rewrites rack preset files. Bugs can produce
 > a file that loads in Live without complaint and behaves incorrectly, including
@@ -18,14 +26,16 @@ edited, and rebuilt in the browser tab and never leaves your machine, because
 there is no server for it to go to.
 
 An optional Max for Live companion device bundles the same UI offline inside an
-`.amxd` and adds device targeting plus live macro values.
+`.amxd` and adds device targeting plus live parameter values.
 
 ## Why a file editor and not a live plugin
 
-The Live Object Model exposes a macro's current *value*, but never which
-parameter that macro drives. Not through Max's `LiveAPI`, not through a Python
-Remote Script. So creating or moving a mapping is necessarily a file operation.
-This constraint shapes the entire design. See `doc/PLAN.md` Part 2.
+For the macro remap tool specifically: the Live Object Model exposes a macro's
+current *value*, but never which parameter that macro drives. Not through Max's
+`LiveAPI`, not through a Python Remote Script. So creating or moving a mapping
+is necessarily a file operation. This constraint shapes the current design. See
+`doc/PLAN.md` Part 2. Future rack-editing tools built on the same codec may or
+may not share this constraint - check before assuming.
 
 ## Repo layout
 
@@ -49,16 +59,45 @@ Everything needed to continue is in the repo.
 
 ## Getting started
 
+Requires Node 20+ and pnpm 10.
+
 ```bash
 pnpm install
+```
 
+### Run the web app
+
+```bash
+pnpm dev
+```
+
+Opens the site at `http://localhost:5173`. Drag a `.adg` file onto the page,
+or use the file picker. It decompresses the file in the browser and shows the
+raw XML tree, collapsed by default, click a node to expand it. Nothing is
+uploaded, there is no server side to this at all.
+
+This is a raw structure viewer, not the macro editor yet. Dragging a mapping
+from one macro to another is not implemented: that needs `adg-codec` to know
+what a macro and a mapping actually look like in the file, and
+`packages/adg-codec/SCHEMA.md` is still empty.
+
+To build a static production bundle:
+
+```bash
+pnpm build       # writes apps/site/dist
+```
+
+### Establish the .adg schema (blocks the macro editor)
+
+```bash
 # Phase 1: establish the XML schema before writing any codec code.
 pnpm adg-inspect unpack ~/path/to/rack.adg > rack.xml
 pnpm adg-inspect diff before.adg after.adg
 ```
 
-Then fill in `packages/adg-codec/SCHEMA.md`. Nothing else should be written
-until it is complete: guessing element names produces silently corrupt files.
+Then fill in `packages/adg-codec/SCHEMA.md`. Nothing in `adg-codec` should
+model macros or mappings until it is complete: guessing element names produces
+files that load in Live without complaint and silently corrupt.
 
 ## Pipeline
 
@@ -73,17 +112,17 @@ worse than the site being down.
 
 ## Prior art
 
-All by the same author, all load-bearing here:
+Other previous projects that I've been working on in the past, heavily reused for this one
 
-- [`patchbay`](https://github.com/alienmind/patchbay) — Python DSL for authoring
+- [`patchbay`](https://github.com/alienmind/patchbay) - Python DSL for authoring
   racks. Its `doc/SCHEMA.md` is the head start for Phase 1.
-- [`m4l-jweb`](https://github.com/alienmind/m4l-jweb) — the framework the
+- [`m4l-jweb`](https://github.com/alienmind/m4l-jweb) - the framework the
   companion device is built on.
-- [`m4l-strudel`](https://github.com/alienmind/m4l-strudel) — proves a full web
+- [`m4l-strudel`](https://github.com/alienmind/m4l-strudel) - proves a full web
   app bundles offline into an `.amxd`.
-- [`trackster`](https://github.com/alienmind/trackster) — the CI/CD, PWA, and
+- [`trackster`](https://github.com/alienmind/trackster) - the CI/CD, PWA, and
   File System Access patterns copied here.
 
 ## License
 
-TBD.
+[MIT](LICENSE)
