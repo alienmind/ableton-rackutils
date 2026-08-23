@@ -27,15 +27,21 @@ Handoff document. Written so another agent can pick this up cold. Read the Const
 
 Scaffolded, one working preview, nothing else functional yet.
 
-- `.github/workflows/` - CI, Pages deploy, device release. Adapted from
-  `alienmind/trackster`.
+- `.github/workflows/` - CI, Pages deploy, device release. All three green.
 - `packages/adg-codec/src/gzip.ts` - done, works.
 - `packages/adg-codec/src/normalize.ts` - done, works.
-- `packages/adg-codec/SCHEMA.md` - **empty template, this is the blocker.**
+- `packages/adg-codec/SCHEMA.md` - **Q1-Q8 answered, borrowed from
+  `alienmind/patchbay`'s Live 12.4.3 findings, not yet independently
+  re-verified against our own fixtures.** `parse.ts`/`mutate.ts` still block
+  on that re-verification, per this doc's own rule.
 - `tools/adg-inspect/` - done, the tool for filling in SCHEMA.md.
-- `apps/site/` - runs (`pnpm dev`). Drag-and-drop a `.adg`, decompresses it,
-  shows a raw XML tree. No macro model, no mutations, that is blocked on
-  SCHEMA.md same as the codec.
+- `apps/site/` - runs (`pnpm dev`), deployed to GitHub Pages. Drag-and-drop a
+  `.adg`, decompresses it, shows a raw XML tree. No macro model, no
+  mutations, that is blocked on SCHEMA.md re-verification same as the codec.
+- `packages/m4l-device/` - scaffolded with `m4l-jweb init`, builds a real
+  `rack-editor.amxd` (`pnpm build:device`). Audio effect, passthrough chain,
+  no params. Device view only confirms the bridge is alive - no editor UI, no
+  device targeting yet, that's Phase 5 work.
 - Everything else - not started.
 
 Do this next, in order:
@@ -187,7 +193,7 @@ ableton-rackutils/
     adg-codec/          # parse, mutate, serialize .adg. Zero UI deps.
     editor-ui/          # shared React components. Zero Ableton deps.
     bridge-protocol/    # shared message types for site <-> companion
-    device/             # optional companion .amxd, built with m4l-jweb
+    m4l-device/         # optional companion .amxd, built with m4l-jweb
   apps/
     site/               # the product. Static, deployed to GitHub Pages.
   tools/
@@ -198,7 +204,7 @@ Rules that keep the tiers honest:
 
 - `adg-codec` must not import React, and must run identically in Node (for tests) and browser.
 - `editor-ui` must not import anything from `@m4l-jweb`. It receives live data as plain props, so it renders the same whether the companion is present or absent.
-- `apps/site` must never import from `packages/device`. The site has to build and deploy with the device removed entirely.
+- `apps/site` must never import from `packages/m4l-device`. The site has to build and deploy with the device removed entirely.
 - `bridge-protocol` is types only, no runtime dependency on either side, so the two can be versioned independently (Phase 5.5).
 
 The build must stay a pure static build. No server-side rendering, no API routes, nothing that assumes a Node process at runtime.
@@ -923,7 +929,7 @@ Backed by `song.view.selected_track.view.selected_device`, which is observable. 
 ### 5.2 Device definition
 
 ```javascript
-// packages/device/patcher/devices.mjs
+// packages/m4l-device/patcher/devices.mjs
 export default [{
   name: "rack-editor",
   type: "audio",
@@ -933,7 +939,7 @@ export default [{
 ```
 
 ```typescript
-// packages/device/src/surface.ts
+// packages/m4l-device/src/surface.ts
 export default defineSurface({
   params: {},                 // a tool, not an instrument, no automatable params
   windows: {
@@ -1004,7 +1010,7 @@ This is the main packaging step, and it is well-trodden ground: m4l-strudel ship
 Build once, ship twice. The same `apps/site/dist` output is both the Pages artifact and the device payload:
 
 ```javascript
-// packages/device/build.mjs
+// packages/m4l-device/build.mjs
 import { cp } from "node:fs/promises";
 
 // Site must be built with VITE_BASE="./" for the device copy. An absolute
