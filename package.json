@@ -6,9 +6,11 @@
   "packageManager": "pnpm@10.0.0",
   "scripts": {
     "dev": "pnpm --filter @rackutils/site dev",
+    "dev:device": "pnpm --filter @rackutils/m4l-device dev",
     "build": "pnpm --filter @rackutils/site build",
+    "build:device": "pnpm --filter @rackutils/m4l-device build",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit -p packages/adg-codec && tsc --noEmit -p apps/site && tsc --noEmit -p tools/adg-inspect",
+    "typecheck": "tsc --noEmit -p packages/adg-codec && tsc --noEmit -p apps/site && tsc --noEmit -p tools/adg-inspect && pnpm --filter @rackutils/m4l-device exec tsc -b",
     "test": "pnpm -r test",
     "adg-inspect": "tsx tools/adg-inspect/src/index.ts"
   },
@@ -20,5 +22,10 @@
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.67.0",
     "vitest": "^3.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }
