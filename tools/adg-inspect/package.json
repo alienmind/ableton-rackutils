@@ -1,0 +1,13 @@
+{
+  "name": "@rackutils/adg-inspect",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "dependencies": {
+    "@rackutils/adg-codec": "workspace:*",
+    "jsdom": "^25.0.0"
+  },
+  "devDependencies": {
+    "@types/jsdom": "^21.1.7"
+  }
+}

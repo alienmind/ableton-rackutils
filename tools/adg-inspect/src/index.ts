@@ -1,13 +1,32 @@
 #!/usr/bin/env node
 /**
- * adg-inspect: Phase 1 tooling. Unpack and diff .adg files to establish the
- * XML schema empirically before any codec code is written.
+ * adg-inspect: schema investigation, plus a CLI harness for the codec.
  *
  *   adg-inspect unpack rack.adg [--raw] > rack.xml
  *   adg-inspect diff A.adg B.adg
+ *   adg-inspect mappings rack.adg
+ *   adg-inspect move rack.adg <from> <to> out.adg
+ *
+ * `unpack`/`diff` predate the codec and stay independent of it deliberately
+ * (Node's own zlib, a regex strip) - they're what SCHEMA.md itself was built
+ * with, and should keep working even if the codec has a bug. `mappings`/`move`
+ * are the opposite: a way to exercise @rackutils/adg-codec directly against a
+ * real file without needing the site UI, useful for testing `mutate.ts`
+ * end to end (parse -> mutate -> write -> load the result in Live).
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
+import { JSDOM } from 'jsdom';
+
+// The codec expects a global DOMParser/XMLSerializer, same as the browser
+// build provides natively and vitest.config.ts provides via jsdom for tests.
+// A plain Node CLI is a third environment that needs to supply the same
+// thing - the codec itself has no Node-only branch.
+const { window } = new JSDOM();
+globalThis.DOMParser = window.DOMParser as unknown as typeof DOMParser;
+globalThis.XMLSerializer = window.XMLSerializer as unknown as typeof XMLSerializer;
+
+const { Rack, moveMapping } = await import('@rackutils/adg-codec');
 
 const VOLATILE = ['Id', 'PointeeId', 'LomId', 'LomIdView'];
 
@@ -55,7 +74,34 @@ if (cmd === 'unpack') {
   const setA = new Set(la);
   for (const l of la) if (!setB.has(l)) console.log(`- ${l}`);
   for (const l of lb) if (!setA.has(l)) console.log(`+ ${l}`);
+} else if (cmd === 'mappings') {
+  const [file] = args;
+  if (!file) throw new Error('usage: adg-inspect mappings <file.adg>');
+  const rack = Rack.parse(new Uint8Array(readFileSync(file)));
+  console.log(`${rack.name} - ${rack.macroCount} visible macros`);
+  for (const macro of rack.macros) {
+    if (!macro.binding) continue;
+    const { targetName, rangeMin, rangeMax, inverted } = macro.binding;
+    console.log(`  Macro ${macro.index + 1} (${macro.name}) -> ${targetName}  [${rangeMin}..${rangeMax}]${inverted ? ' inverted' : ''}`);
+  }
+  if (rack.variations.length) {
+    console.log(`${rack.variations.length} variation(s): ${rack.variations.map((v) => v.name).join(', ')}`);
+  }
+} else if (cmd === 'move') {
+  const [file, fromStr, toStr, outFile] = args;
+  if (!file || !fromStr || !toStr || !outFile) {
+    throw new Error('usage: adg-inspect move <file.adg> <from-macro-1-based> <to-macro-1-based> <out.adg>');
+  }
+  const rack = Rack.parse(new Uint8Array(readFileSync(file)));
+  const result = moveMapping(rack, Number(fromStr) - 1, Number(toStr) - 1);
+  for (const w of result.warnings) console.warn(`warning: ${w}`);
+  if (!result.ok) {
+    console.error('move failed');
+    process.exit(1);
+  }
+  writeFileSync(outFile, rack.serialize());
+  console.log(`wrote ${outFile} - macro ${fromStr} moved to macro ${toStr}`);
 } else {
-  console.error('usage: adg-inspect <unpack|diff> ...');
+  console.error('usage: adg-inspect <unpack|diff|mappings|move> ...');
   process.exit(2);
 }
