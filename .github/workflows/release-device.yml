@@ -29,7 +29,7 @@ jobs:
       - run: pnpm --filter @rackutils/adg-codec test
 
       # NOT YET: bundling apps/site's UI into the device (doc/PLAN.md Phase
-      # 5.5) is unimplemented. packages/m4l-device builds its OWN placeholder
+      # 5.5) is unimplemented. apps/m4l-device builds its OWN placeholder
       # UI (src/app/rack-editor/App.tsx) via its own vite config, entirely
       # separate from apps/site right now. When 5.5 lands, this step gains a
       # "build site with VITE_BASE=./" step feeding the device build, plus the
@@ -40,5 +40,5 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          files: packages/m4l-device/dist/@rackutils/m4l-device/*.amxd
+          files: apps/m4l-device/dist/@rackutils/m4l-device/*.amxd
           generate_release_notes: true

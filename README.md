@@ -45,11 +45,11 @@ may not share this constraint - check before assuming.
 ## Repo layout
 
 ```
-packages/adg-codec/    parse, mutate, serialize .adg. No UI deps.
-packages/editor-ui/    shared React components. No Ableton deps.
-packages/m4l-device/   optional companion .amxd, built with m4l-jweb.
-apps/site/             the product. Static, deployed to GitHub Pages.
-tools/adg-inspect/     CLI for the schema investigation. Start here.
+packages/adg-codec/   parse, mutate, serialize .adg. No UI deps.
+packages/editor-ui/   shared React components. No Ableton deps.
+apps/m4l-device/      optional companion .amxd, built with m4l-jweb.
+apps/site/            the product. Static, deployed to GitHub Pages.
+tools/adg-inspect/    CLI for the schema investigation. Start here.
 ```
 
 ## Docs
@@ -95,11 +95,11 @@ pnpm build       # writes apps/site/dist
 
 ```bash
 pnpm dev:device      # the device in a browser, mocked Live beside it
-pnpm build:device    # writes packages/m4l-device/dist/@rackutils/m4l-device/rack-editor.amxd
+pnpm build:device    # writes apps/m4l-device/dist/@rackutils/m4l-device/rack-editor.amxd
 ```
 
 No Max install needed for either. This is a scaffold: the device confirms the
-bridge is alive and nothing else. See `packages/m4l-device/README.md`.
+bridge is alive and nothing else. See `apps/m4l-device/README.md`.
 
 ### Establish the .adg schema (blocks the macro editor)
 
