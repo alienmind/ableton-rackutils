@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { decompress, isGzip } from '@rackutils/adg-codec';
 import { RackTree } from './RackTree';
+import { CompanionDownload } from './companion/CompanionDownload';
 import logoUrl from './assets/logo.jpg';
 
 interface LoadedRack {
@@ -67,6 +68,7 @@ export default function App() {
           Drag in a rack (.adg) to inspect it. Nothing leaves this tab: the file is
           parsed entirely in the browser.
         </p>
+        <CompanionDownload />
       </header>
 
       <div

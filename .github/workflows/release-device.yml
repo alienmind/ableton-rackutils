@@ -1,11 +1,14 @@
-# Publishes the companion .amxd as a release asset.
-# The site's download button reads the latest release via the GitHub API,
-# so shipping a device update does not require redeploying the site.
+# Publishes the companion .amxd as a release asset, automatically, on every
+# push to main - not gated behind a manual tag. It always updates the SAME
+# rolling release (tag `latest-device`), since there's no real versioning
+# scheme yet (the whole project is v0.0.1 pre-alpha). The site's download
+# button reads this exact tag via the GitHub API, so shipping a device update
+# does not require redeploying the site.
 name: Release companion device
 
 on:
   push:
-    tags: ['device-v*']
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -40,5 +43,12 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: latest-device
+          name: 'Companion device (latest build)'
+          body: |
+            Auto-built from `main` at ${{ github.sha }}. Not a versioned
+            release - this tag is overwritten on every push. Scaffold status:
+            see doc/PLAN.md Phase 5. Install via the site's download button,
+            or drag `rack-editor.amxd` onto a track in Live 12.
+          prerelease: true
           files: apps/m4l-device/dist/@rackutils/m4l-device/*.amxd
-          generate_release_notes: true
