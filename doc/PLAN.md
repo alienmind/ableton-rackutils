@@ -25,40 +25,52 @@ Handoff document. Written so another agent can pick this up cold. Read the Const
 
 ## Current state and next steps
 
-Scaffolded, one working preview, nothing else functional yet.
+Scaffolded, two working previews, SCHEMA.md confirmed against real fixtures.
+Codec implementation (`parse.ts`/`mutate.ts`) is the next real work.
 
 - `.github/workflows/` - CI, Pages deploy, device release. All three green.
 - `packages/adg-codec/src/gzip.ts` - done, works.
 - `packages/adg-codec/src/normalize.ts` - done, works.
-- `packages/adg-codec/SCHEMA.md` - **Q1-Q8 answered, borrowed from
-  `alienmind/patchbay`'s Live 12.4.3 findings, not yet independently
-  re-verified against our own fixtures.** `parse.ts`/`mutate.ts` still block
-  on that re-verification, per this doc's own rule.
-- `tools/adg-inspect/` - done, the tool for filling in SCHEMA.md.
-- `apps/site/` - runs (`pnpm dev`), deployed to GitHub Pages. Drag-and-drop a
-  `.adg`, decompresses it, shows a raw XML tree. No macro model, no
-  mutations, that is blocked on SCHEMA.md re-verification same as the codec.
+- `packages/adg-codec/SCHEMA.md` - **Q1, Q2, Q4, Q5, Q7, Q8 independently
+  confirmed against 3 real fixtures** (`simplerack.adg`, `withvariations.adg`,
+  `drum-nested.adg`, all in `tests/fixtures/`, gitignored). Q3 holds by
+  structural inference, low risk. Q6 (variations during a mapping move) is
+  the one open question, downgraded from blocking spike to
+  "verify by loading `mutate.ts`'s own output in Live" - see SCHEMA.md Q6 for
+  why that's sound. **Nothing here blocks starting Phase 2.**
+- `tools/adg-inspect/` - done, the tool used to confirm SCHEMA.md above.
+- `apps/site/` - runs (`pnpm dev`), deployed to GitHub Pages, confirmed
+  working on a real 4000+ element rack ("Multi FX Rack.adg loaded, 4051
+  elements", tree renders correctly). Raw XML tree only - no macro model, no
+  mutations yet, that's Phase 2.
 - `apps/m4l-device/` - scaffolded with `m4l-jweb init`, builds a real
-  `rack-editor.amxd` (`pnpm build:device`). Audio effect, passthrough chain,
-  no params. Device view only confirms the bridge is alive - no editor UI, no
-  device targeting yet, that's Phase 5 work.
+  `rack-editor.amxd` (`pnpm build:device` / `install:device`), confirmed
+  installed and running in real Live: bridge alive, transport ticking. Audio
+  effect, passthrough chain, no params, no editor UI wired in - Phase 5 work.
 - Everything else - not started.
 
 Do this next, in order:
 
-1. **Fill in SCHEMA.md (blocks everything).** Nobody has Ableton's `.adg`
-   schema memorized well enough to write mutation code from memory.
-   `SCHEMA.md` has nine questions and the diff procedure. Answer them against
-   three real racks before writing `parse.ts` or `mutate.ts`. Read
-   `alienmind/patchbay`'s `doc/ARCHITECTURE.md` and `doc/SCHEMA.md` first, it
-   documents much of this for Live 12.4.3. Then verify, don't assume.
-2. **Build the codec.** `parse.ts`, `mutate.ts`, `model.ts`, per Phase 2 below.
-3. **Site, then device.** Site first, per Phase 4. It is the product and it
-   de-risks everything else.
+1. **Build the codec.** `parse.ts`, `mutate.ts`, `model.ts`, per Phase 2
+   below. Unblocked - SCHEMA.md Q1-Q8 above are the specification. The
+   `Timeable`-wrapper detail in SCHEMA.md Q1 and the corrected containment
+   model in Phase 2.2's note both matter for `parse.ts`'s traversal; read
+   both before writing it.
+2. **Wire `mutate.ts` into `editor-ui`/`apps/site`.** Phase 3-4. Turns the
+   current raw-tree viewer into the actual macro editor: drag one macro onto
+   another, moves the mapping for real.
+3. **Verify Q6 for real**, per SCHEMA.md's note there, once `moveMapping`
+   exists: run it on `withvariations.adg`, load the result in Live, check the
+   variations by hand. If it doesn't hold up, that's the one remaining
+   from-scratch spike (move a mapping by hand in Live on a rack with
+   variations, diff, save as `move-after-live.adg`).
+4. **Device editor UI** (Phase 5.3-5.4) is lower priority than the above -
+   the site is the product, the device is a convenience layered on the same
+   codec later.
 
-Until the codec is proven against real racks, default to a read-only or
-simulated mode rather than writing files, following `trackster`'s precedent
-for a tool that rewrites user files in place.
+Default to a read-only or simulated mode in the UI until `mutate.ts` has
+round-tripped real racks cleanly, following `trackster`'s precedent for a
+tool that rewrites user files in place.
 
 ### Prior art, all by the same author
 

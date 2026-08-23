@@ -14,8 +14,10 @@ rebuild the `.adg`, reload it in Live - but the codec and the app shell are
 built to host more rack-editing tools as they're added, not just this one.
 
 **Status: pre-alpha, v0.0.1, early scaffold.** The site runs and can load a `.adg`, decompress it,
-and show its raw XML structure. It does not yet understand macros or mappings,
-that part is blocked on `packages/adg-codec/SCHEMA.md`. See
+and show its raw XML structure - confirmed against a real 4000+ element rack.
+It does not yet understand macros or mappings: the schema for that is
+confirmed (`packages/adg-codec/SCHEMA.md`), the codec that reads and writes it
+isn't built yet. See
 [`doc/PLAN.md`](doc/PLAN.md#current-state-and-next-steps) for current state and
 next steps.
 
@@ -81,9 +83,10 @@ raw XML tree, collapsed by default, click a node to expand it. Nothing is
 uploaded, there is no server side to this at all.
 
 This is a raw structure viewer, not the macro editor yet. Dragging a mapping
-from one macro to another is not implemented: that needs `adg-codec` to know
-what a macro and a mapping actually look like in the file, and
-`packages/adg-codec/SCHEMA.md` is still empty.
+from one macro to another is not implemented: `adg-codec` doesn't have
+`parse.ts`/`mutate.ts` yet. `packages/adg-codec/SCHEMA.md` (the schema that
+work is specified against) is filled in and confirmed against real fixtures,
+so this is unblocked - it just isn't built yet.
 
 To build a static production bundle:
 
@@ -102,17 +105,19 @@ pnpm install:device   # copies it into Ableton's User Library
 No Max install needed for the first two. This is a scaffold: the device
 confirms the bridge is alive and nothing else. See `apps/m4l-device/README.md`.
 
-### Establish the .adg schema (blocks the macro editor)
+### Inspecting `.adg` schema by hand
 
 ```bash
-# Phase 1: establish the XML schema before writing any codec code.
 pnpm adg-inspect unpack ~/path/to/rack.adg > rack.xml
 pnpm adg-inspect diff before.adg after.adg
 ```
 
-Then fill in `packages/adg-codec/SCHEMA.md`. Nothing in `adg-codec` should
-model macros or mappings until it is complete: guessing element names produces
-files that load in Live without complaint and silently corrupt.
+The tool used to fill in `packages/adg-codec/SCHEMA.md` in the first place -
+useful again any time a new question comes up (a rack type, a field, an
+inversion) that the current findings don't cover. Nothing in `adg-codec`
+should model macros or mappings that aren't traceable to a diff recorded
+there: guessing element names produces files that load in Live without
+complaint and silently corrupt.
 
 ## Pipeline
 
