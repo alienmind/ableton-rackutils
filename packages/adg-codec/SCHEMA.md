@@ -1,10 +1,11 @@
 # .adg Schema Findings
 
-**Status: Q1-Q8 answered, borrowed from `alienmind/patchbay`'s own schema work
-(Live 12.4.3, extensively verified there with real Live saves). Not yet
-independently re-verified against our own fixtures - do that before trusting
-this for anything destructive. Q9 (LOM parameter index) is still open, it is
-not a file-schema question.**
+**Status: Q1, Q2, Q4, Q5, Q7, Q8 independently confirmed against our own three
+fixtures (see below). Q3 holds by structural inference from Q1/Q2, not from a
+direct before/after move diff - low risk, see Q3's note. Q6 is genuinely
+unresolved, downgraded from "blocking spike" to "verify by loading our own
+`mutate.ts` output in Live" - see Q6. Nothing here blocks starting Phase 2.
+Q9 (LOM parameter index) is still open and is not a file-schema question.**
 
 Every element name in the codec must be traceable to a diff recorded here.
 Guessing element names produces files that open in Live without complaint and
@@ -36,11 +37,16 @@ readable. Use `unpack --raw` when you specifically need to see them.
 
 Three structurally different racks, all answers verified against each:
 
-- [ ] `simple.adg` - instrument rack, a few mapped macros, no variations
-- [ ] `with-variations.adg` - same, plus at least 3 Macro Variations
-- [ ] `drum-nested.adg` - drum rack, pad rack, Pitch, engine rack (3 levels)
+- [x] `simplerack.adg` - Ableton's "Analog" instrument rack, 3 macros mapped
+  (Drive, Cutoff, Resonance), no variations
+- [x] `withvariations.adg` - same rack, 3 Macro Variations added
+- [x] `drum-nested.adg` - Drum Rack -> pad rack -> engine rack, 3 levels of
+  `GroupDevicePreset`/`InstrumentGroupDevice` nesting, no macros mapped
 
-Fixtures are gitignored. Keep them in a local `tests/fixtures/`.
+Still missing: a **move-mapping-with-variations** before/after pair (Q6). Not
+currently blocking - see Q6's note on why.
+
+Fixtures are gitignored. Kept in `tests/fixtures/`.
 
 ---
 
@@ -77,6 +83,44 @@ Live implements macros as MIDI CC on a virtual channel: `Channel` is always
 `IsNote` is `false`, `ControllerMapMode` is `0` (absolute), `PersistentKeyString`
 is empty. `NoteOrController` is the payload, see Q2.
 
+**Confirmed against `simplerack.adg` (Ableton's "Analog"), with one refinement
+patchbay's simplified example didn't show:** on an ordinary device parameter
+(`MxDFloatParameter`, `MxDEnumParameter` - Ableton's own element names for a
+typed, automatable parameter, used by native devices too, not just Max
+devices), `LomId`/`KeyMidi`/`Manual`/`MidiControllerRange`/`AutomationTarget`/
+`ModulationTarget` are ALL wrapped one level deeper, inside a `<Timeable>`
+child of the parameter:
+
+```xml
+<MxDFloatParameter>
+  <Index Value="11" />
+  <Name Value="Filter Drive Amount" />
+  <ShortName Value="Drive" />
+  <MinValue Value="0" /><MaxValue Value="100" />
+  ...
+  <Timeable>
+    <LomId Value="0" />
+    <KeyMidi>
+      <NoteOrController Value="0" />
+      ...
+    </KeyMidi>
+    <Manual Value="0" />
+    <MidiControllerRange><Min Value="0" /><Max Value="100" /></MidiControllerRange>
+    <AutomationTarget><LockEnvelope Value="0" /></AutomationTarget>
+    <ModulationTarget><LockEnvelope Value="0" /></ModulationTarget>
+  </Timeable>
+</MxDFloatParameter>
+```
+
+**`MacroControls.N` (the macro itself) has NO `Timeable` wrapper** - its
+`LomId`/`Manual`/`MidiControllerRange`/`AutomationTarget`/`ModulationTarget`
+are direct children, matching patchbay's description exactly. So the wrapper
+is specific to ordinary parameters, not universal.
+
+Practical consequence for `parse.ts`: don't assume `KeyMidi` is always a
+direct child of the parameter element. Query for it as a descendant
+(`querySelector('KeyMidi')` scoped to the parameter), not `children`.
+
 ## Q2. How is the mapping target identified?
 
 By id reference, by path string, or both? Determines whether moving a mapping
@@ -102,8 +146,12 @@ Part 2.2 there.
 Which RACK owns "Macro N" is not stored either; it is resolved structurally
 (walk up to the nearest `BranchPresets`, then that parent's `Device`/`*GroupDevice`
 - patchbay `ARCHITECTURE.md` §3). Our tool only needs this if it ever has to
-say "this KeyMidi's Macro 3 belongs to rack X" for nested racks; confirm
-against our own fixture before relying on it.
+say "this KeyMidi's Macro 3 belongs to rack X" for nested racks.
+
+**Confirmed against `simplerack.adg`:** no id, no pointer, no path string on
+any of the 3 mappings found. `NoteOrController` values `0`, `1`, `2` matched
+macros 1, 2, 3 exactly, each pointing at a different `MxDFloatParameter` by
+plain containment (Drive, Cutoff, Resonance respectively).
 
 ## Q3. What changes when a mapping moves from macro 2 to macro 3?
 
@@ -115,11 +163,14 @@ parameter; only its `NoteOrController` value changes, `1` -> `2`. No id
 reconciliation, no element relocation. `moveMapping` in `mutate.ts` should be
 close to `keyMidi.querySelector('NoteOrController').setAttribute('Value', to)`.
 
-Not yet confirmed against our own fixture: whether Live additionally rewrites
-anything else on that save (patchbay's own `MacroDefaults` investigation found
-several one-save-lag fields nearby - see Q6/`MacroDefaults.N` below). Verify
-with a real before/after diff before trusting this is the *complete* set of
-changes.
+**Not independently confirmed by a direct move diff** - our fixtures are all
+single saves, not a before/after pair with a mapping moved in between. Low
+risk to proceed on anyway: Q1/Q2's containment model leaves no other place for
+the macro index to live, so there is nowhere else a "move" could act on. The
+one thing this doesn't rule out is patchbay's own caveat - Live rewriting
+unrelated one-save-lag fields nearby (`MacroDefaults.N`, see Q6) - which
+doesn't affect correctness of `moveMapping` itself, only cosmetic fields
+this tool already ignores (see `SAVE_NOISE`-style filtering, `normalize.ts`).
 
 ## Q4. Where are range and inversion stored?
 
@@ -145,6 +196,12 @@ macro = (value - Min) / (Max - Min) * 127
 ```
 
 Macro values are **continuous** (e.g. `63.5`), not integer CC steps.
+
+**Confirmed against `simplerack.adg`:** all 3 mapped parameters carry their
+own `MidiControllerRange` (`0..100` for Drive and Resonance, `0..100` for
+Cutoff), non-inverted. No inverted range observed in our fixtures - patchbay's
+Q26 (Live 12.4.3) remains the only direct evidence for inversion; worth a
+dedicated spike later if `bindParameter` needs to support authoring one.
 
 ## Q5. Where are variations stored, and how are they keyed?
 
@@ -178,6 +235,13 @@ visible macro count:
   file through its own writer and diffed **zero facts** against Live's
   original.
 
+**Confirmed against `withvariations.adg`:** 3 `MacroSnapshot` elements
+(`Variation 1`/`2`/`3`), each with all 16 `MacroValues.N`/`MacroHasValue.N`.
+Slots 0-2 (the 3 mapped macros) carry `true`/absolute values matching that
+macro's position at the moment each variation was created (e.g. Variation 1's
+`MacroValues.1 = 25.3999996`, matching `MacroControls.1/Manual` exactly);
+slots 3-15 (unmapped) carry `false`/`-1`. Exactly as documented.
+
 ## Q6. What does Live do to variations when IT moves a mapping?
 
 Repeat Q3 on a rack that has variations. **This defines correct behavior.**
@@ -187,19 +251,41 @@ default, or is the entry removed?
 This answers `DEFAULT_MACRO_VALUE` in `mutate.ts`. Getting it wrong silently
 breaks every variation in every rack the tool touches.
 
-**Not answered by patchbay - this is the one real gap.** Its dataset never
-combined "rack has saved variations" with "a mapping's macro slot changes";
-S3b's macro moves happened before any variations existed on that rack. Still
-open, still needs our own before/after diff. What Q2/Q3 do establish: since
-moving a mapping only edits `NoteOrController` on the target's `KeyMidi` and
-never touches `MacroSnapshot` at all, an existing snapshot's `MacroValues.1`/
-`MacroValues.2` are **not automatically rewritten by the move itself** - which
-is exactly Constraint 4's danger (stale value lands on the wrong slot) and
-confirms it's real, but doesn't say what Live's UI additionally does to
-compensate, if anything. Test directly.
+**Not answered by patchbay, and our own fixtures don't cover it either** -
+`withvariations.adg` has variations but no macro was moved after they were
+created. Still genuinely open as a question about what LIVE does.
 
-Save the resulting file as `tests/fixtures/move-after-live.adg`. The strongest
-test available is asserting our output matches Live's own for the same edit.
+**Downgraded from blocking spike to post-implementation verification,
+reasoning:** the question "what does Live's own move-a-mapping gesture do to
+existing variations" matters for *matching Live's output byte-for-byte*, but
+it does not gate writing `mutate.ts` at all. `moveMapping` is a file operation
+this tool performs - it isn't reproducing a Live UI gesture, it's producing a
+correct file directly. What Q1/Q2/Q3 already establish is enough to write it
+correctly by construction:
+
+- Moving a `KeyMidi`'s `NoteOrController` from macro 2 to macro 3 does **not**
+  touch `MacroSnapshot` on its own (confirmed: it's a different subtree, per
+  Q1/Q2's containment model).
+- So `mutate.ts`'s `moveMapping` must explicitly permute `MacroValues.N`/
+  `MacroHasValue.N` in lockstep across every snapshot - copy the old macro-2
+  entry into slot 3, and clear slot 2 (`MacroHasValue.2 = false`,
+  `MacroValues.2 = -1`, the confirmed unset sentinel from Q5). This was
+  already the plan (`doc/PLAN.md` Constraint 4, `permuteVariations`); Q5
+  confirms the exact sentinel and field names to write.
+- The open question - whether Live's OWN move gesture does something subtly
+  different - only matters for the "byte-for-byte matches Live" test
+  (`doc/PLAN.md` §2.6, "matches Live's own output for the same edit"), which
+  is a nice-to-have, not `moveMapping`'s correctness bar. Correctness bar is:
+  the file loads in Live and the variations show the right values, which is
+  directly testable once `mutate.ts` exists, by running it and loading the
+  result in Live.
+
+**Do this once `mutate.ts`'s `moveMapping` exists, not before:** run it on
+`withvariations.adg`, load the output in Live, click through the 3
+variations, confirm the moved macro's value follows correctly and the
+vacated slot doesn't drive anything stale. If it doesn't, THIS is the spike to
+come back and do for real (move a mapping by hand in Live on a rack with
+variations, diff, save as `move-after-live.adg`).
 
 ## Q7. Where is the macro count stored?
 
@@ -218,6 +304,10 @@ Note the UI/XML vocabulary split: the UI says "Variations", the XML family is
 `ExcludeMacroFromSnapshots`/`MacroSnapshots`. Grepping the UI word finds
 nothing.
 
+**Confirmed against `simplerack.adg`:** `NumVisibleMacroControls Value="8"`,
+and all 16 `MacroDisplayNames.N` present (`"Macro 1"` through `"Macro 16"`)
+regardless. Exactly as documented.
+
 ## Q8. How is nesting represented?
 
 Drum Rack, pad rack, Pitch, engine rack. Is the recursion uniform at each
@@ -235,6 +325,16 @@ real file.
 Drum racks specifically are covered in more depth in patchbay `SCHEMA.md` S9
 and `ARCHITECTURE.md` §12 (pad-to-note mapping, return chains, sends) - read
 those directly if `editor-ui`'s device tree needs to special-case drum pads.
+
+**Confirmed against `drum-nested.adg`:** exactly 3 levels of
+`GroupDevicePreset`/`*GroupDevice` nesting - `DrumGroupDevice` (outer Drum
+Rack) containing a `GroupDevicePreset`/`InstrumentGroupDevice` (pad rack)
+containing another `GroupDevicePreset`/`InstrumentGroupDevice` (engine rack).
+No macros were mapped in this fixture, so the macro-to-macro cross-level case
+specifically (patchbay S4) is not independently re-confirmed here - the
+structural nesting is, which is what this question asked. Low priority to
+re-test the macro-to-macro case; patchbay's S4 evidence plus Q1/Q2's
+containment model (which doesn't care about depth at all) covers it.
 
 ---
 
