@@ -82,17 +82,30 @@ or use the file picker. It decompresses the file in the browser and shows the
 raw XML tree, collapsed by default, click a node to expand it. Nothing is
 uploaded, there is no server side to this at all.
 
-This is a raw structure viewer, not the macro editor yet. Dragging a mapping
-from one macro to another is not implemented: `adg-codec` doesn't have
-`parse.ts`/`mutate.ts` yet. `packages/adg-codec/SCHEMA.md` (the schema that
-work is specified against) is filled in and confirmed against real fixtures,
-so this is unblocked - it just isn't built yet.
+This is a raw structure viewer, not the macro editor yet. The codec that
+would power it (`packages/adg-codec`: parse a rack, move/swap/bind macro
+mappings, all traced to `SCHEMA.md`) is built and tested - see "Testing the
+codec" below - it just isn't wired into this page's UI yet.
 
 To build a static production bundle:
 
 ```bash
 pnpm build       # writes apps/site/dist
 ```
+
+### Testing the codec
+
+No UI needed - `packages/adg-codec` is usable on its own right now:
+
+```bash
+pnpm --filter @rackutils/adg-codec test         # 35 tests
+pnpm adg-inspect mappings your-rack.adg         # list what's bound to what
+pnpm adg-inspect move your-rack.adg 1 5 out.adg # move macro 1 -> macro 5
+```
+
+Drag `out.adg` into Live afterward to confirm the move actually holds up
+there - see `doc/PLAN.md`'s "How to test the codec right now" for what to
+look for, especially on a rack with Macro Variations.
 
 ### Run the companion Max for Live device (optional, scaffold only)
 

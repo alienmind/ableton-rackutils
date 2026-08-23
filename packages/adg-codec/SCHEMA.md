@@ -1,11 +1,15 @@
 # .adg Schema Findings
 
-**Status: Q1, Q2, Q4, Q5, Q7, Q8 independently confirmed against our own three
-fixtures (see below). Q3 holds by structural inference from Q1/Q2, not from a
-direct before/after move diff - low risk, see Q3's note. Q6 is genuinely
-unresolved, downgraded from "blocking spike" to "verify by loading our own
-`mutate.ts` output in Live" - see Q6. Nothing here blocks starting Phase 2.
-Q9 (LOM parameter index) is still open and is not a file-schema question.**
+**Status: Phase 2 built** (`packages/adg-codec/src/model.ts`, `mutate.ts`).
+Q1, Q2, Q4, Q5, Q7, Q8 independently confirmed against our own three fixtures
+(see below), and again by the codec's own test suite (35 tests, 6 of them
+against these real files). Q3 holds by structural inference from Q1/Q2, not
+from a direct before/after move diff - low risk, see Q3's note. Q6 is
+exercised by `moveMapping`'s permutation logic and tested against a real rack
+with variations, but the true confirmation - a human loading the output in
+Live and checking the variations by eye - hasn't happened yet, see Q6 and
+`doc/PLAN.md`'s "How to test" section. Q9 (LOM parameter index) is still open
+and is not a file-schema question.
 
 Every element name in the codec must be traceable to a diff recorded here.
 Guessing element names produces files that open in Live without complaint and
@@ -43,8 +47,11 @@ Three structurally different racks, all answers verified against each:
 - [x] `drum-nested.adg` - Drum Rack -> pad rack -> engine rack, 3 levels of
   `GroupDevicePreset`/`InstrumentGroupDevice` nesting, no macros mapped
 
-Still missing: a **move-mapping-with-variations** before/after pair (Q6). Not
-currently blocking - see Q6's note on why.
+Still missing: a **move-mapping-with-variations pair produced BY LIVE ITSELF**
+(Q6) - `mutate.ts`'s own `moveMapping` has been run on `withvariations.adg`
+and tested (see `tests/real-fixtures.test.ts`), but nobody has yet loaded that
+output back into Live to confirm by eye. Not currently blocking - see Q6's
+note on why.
 
 Fixtures are gitignored. Kept in `tests/fixtures/`.
 

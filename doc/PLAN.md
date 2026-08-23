@@ -25,24 +25,34 @@ Handoff document. Written so another agent can pick this up cold. Read the Const
 
 ## Current state and next steps
 
-Scaffolded, two working previews, SCHEMA.md confirmed against real fixtures.
-Codec implementation (`parse.ts`/`mutate.ts`) is the next real work.
+Scaffolded, two working previews, SCHEMA.md confirmed, and the codec itself
+(`model.ts`/`mutate.ts`) is now built and tested. Wiring it into the site's UI
+is the next real work.
 
 - `.github/workflows/` - CI, Pages deploy, device release. All three green.
 - `packages/adg-codec/src/gzip.ts` - done, works.
 - `packages/adg-codec/src/normalize.ts` - done, works.
-- `packages/adg-codec/SCHEMA.md` - **Q1, Q2, Q4, Q5, Q7, Q8 independently
-  confirmed against 3 real fixtures** (`simplerack.adg`, `withvariations.adg`,
-  `drum-nested.adg`, all in `tests/fixtures/`, gitignored). Q3 holds by
-  structural inference, low risk. Q6 (variations during a mapping move) is
-  the one open question, downgraded from blocking spike to
-  "verify by loading `mutate.ts`'s own output in Live" - see SCHEMA.md Q6 for
-  why that's sound. **Nothing here blocks starting Phase 2.**
-- `tools/adg-inspect/` - done, the tool used to confirm SCHEMA.md above.
+- `packages/adg-codec/SCHEMA.md` - Q1, Q2, Q4, Q5, Q7, Q8 independently
+  confirmed against 3 real fixtures. Q3 holds by structural inference. Q6
+  (variations during a mapping move) is exercised by `moveMapping`'s own
+  permutation logic and tested against a real rack with variations
+  (`withvariations.adg`), but the true confirmation - loading the result back
+  in Live and checking by eye - is still on you, see "How to test" below.
+- **`packages/adg-codec/src/model.ts` and `mutate.ts` - built.** `Rack.parse`/
+  `.clone`/`.serialize`, `macros`/`variations`/`chains` (full device tree,
+  including nested racks), and `moveMapping`/`swapMacros`/`bindParameter`/
+  `unbindMacro`/`renameMacro`. 35 tests (`packages/adg-codec/tests/`): 29
+  synthetic (always run), 6 against the real fixtures (skip cleanly in CI,
+  run locally). All confirmed against `simplerack.adg`, `withvariations.adg`,
+  `drum-nested.adg` - not just the synthetic fixture.
+- `tools/adg-inspect/` - `unpack`/`diff` as before, plus two new commands
+  that exercise the codec directly against a real file without needing the
+  site UI: `adg-inspect mappings <file.adg>` (list what's bound) and
+  `adg-inspect move <file.adg> <from> <to> <out.adg>` (run `moveMapping`,
+  write the result). See "How to test" below.
 - `apps/site/` - runs (`pnpm dev`), deployed to GitHub Pages, confirmed
-  working on a real 4000+ element rack ("Multi FX Rack.adg loaded, 4051
-  elements", tree renders correctly). Raw XML tree only - no macro model, no
-  mutations yet, that's Phase 2.
+  working on a real 4000+ element rack. Still the raw XML tree viewer only -
+  not wired to the codec yet, that's next.
 - `apps/m4l-device/` - scaffolded with `m4l-jweb init`, builds a real
   `rack-editor.amxd` (`pnpm build:device` / `install:device`), confirmed
   installed and running in real Live: bridge alive, transport ticking. Audio
@@ -51,26 +61,41 @@ Codec implementation (`parse.ts`/`mutate.ts`) is the next real work.
 
 Do this next, in order:
 
-1. **Build the codec.** `parse.ts`, `mutate.ts`, `model.ts`, per Phase 2
-   below. Unblocked - SCHEMA.md Q1-Q8 above are the specification. The
-   `Timeable`-wrapper detail in SCHEMA.md Q1 and the corrected containment
-   model in Phase 2.2's note both matter for `parse.ts`'s traversal; read
-   both before writing it.
-2. **Wire `mutate.ts` into `editor-ui`/`apps/site`.** Phase 3-4. Turns the
-   current raw-tree viewer into the actual macro editor: drag one macro onto
-   another, moves the mapping for real.
-3. **Verify Q6 for real**, per SCHEMA.md's note there, once `moveMapping`
-   exists: run it on `withvariations.adg`, load the result in Live, check the
-   variations by hand. If it doesn't hold up, that's the one remaining
-   from-scratch spike (move a mapping by hand in Live on a rack with
-   variations, diff, save as `move-after-live.adg`).
-4. **Device editor UI** (Phase 5.3-5.4) is lower priority than the above -
+1. **Wire the codec into `apps/site`.** Phase 3-4. Turns the current raw-tree
+   viewer into the actual macro editor: `Rack.parse` instead of raw
+   `DOMParser`, a macro bank UI, drag one macro onto another calls
+   `moveMapping` for real. `editor-ui` as its own package is optional -
+   folding it directly into `apps/site` is a reasonable simplification for
+   now, split it out only if the device UI (Phase 5) genuinely needs to share
+   components later.
+2. **Device editor UI** (Phase 5.3-5.4) is lower priority than the above -
    the site is the product, the device is a convenience layered on the same
    codec later.
 
-Default to a read-only or simulated mode in the UI until `mutate.ts` has
-round-tripped real racks cleanly, following `trackster`'s precedent for a
-tool that rewrites user files in place.
+Default to a read-only or simulated mode in the UI until real-world use has
+exercised `mutate.ts` on a range of racks beyond the 3 current fixtures,
+following `trackster`'s precedent for a tool that rewrites user files in
+place.
+
+### How to test the codec right now
+
+No UI needed yet - two ways, both exercise the real code:
+
+```bash
+pnpm --filter @rackutils/adg-codec test   # 35 tests: parsing, all 5 mutations,
+                                           # confirmed against real racks too
+                                           # if tests/fixtures/*.adg are present
+
+pnpm adg-inspect mappings your-rack.adg           # list what's bound to what
+pnpm adg-inspect move your-rack.adg 1 5 out.adg   # move macro 1 -> macro 5, write out.adg
+```
+
+The strongest test available: run `move`, then **drag `out.adg` into Live**
+and check the moved macro still drives the right parameter, and - the one
+thing this project can't verify by itself - that a rack with Macro Variations
+still behaves correctly after the move (SCHEMA.md Q6). If it doesn't, that's
+the one remaining from-scratch spike: move a mapping by hand in Live on a
+rack with variations, diff before/after, save as `move-after-live.adg`.
 
 ### Prior art, all by the same author
 
@@ -301,6 +326,16 @@ Record answers in `packages/adg-codec/SCHEMA.md`, each with the diff output that
 ---
 
 ## Phase 2: `adg-codec`
+
+**Built.** The design decision below (2.1) held up. The type/API sketches in
+2.2/2.3 were written before SCHEMA.md was confirmed and are pre-implementation
+guesses, superseded in a few concrete ways by what's actually in
+`packages/adg-codec/src/model.ts` and `mutate.ts` - notably `Binding` has no
+`targetId` (SCHEMA.md Q1/Q2: mappings are containment-addressed, not id-
+addressed), and `DeviceNode`/`ParamRef` use a `path` (an index-chain relative
+to the rack's `BranchPresets`, see `dom.ts`'s `pathOf`/`resolvePath`) rather
+than an opaque `id`. Read the source for the real shape; treat what follows as
+historical design reasoning, not a spec to match exactly.
 
 ### 2.1 Design decision: the DOM is the source of truth
 
