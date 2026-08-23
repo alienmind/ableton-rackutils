@@ -94,12 +94,13 @@ pnpm build       # writes apps/site/dist
 ### Run the companion Max for Live device (optional, scaffold only)
 
 ```bash
-pnpm dev:device      # the device in a browser, mocked Live beside it
-pnpm build:device    # writes apps/m4l-device/dist/@rackutils/m4l-device/rack-editor.amxd
+pnpm dev:device       # the device in a browser, mocked Live beside it
+pnpm build:device     # writes apps/m4l-device/dist/@rackutils/m4l-device/rack-editor.amxd
+pnpm install:device   # copies it into Ableton's User Library
 ```
 
-No Max install needed for either. This is a scaffold: the device confirms the
-bridge is alive and nothing else. See `apps/m4l-device/README.md`.
+No Max install needed for the first two. This is a scaffold: the device
+confirms the bridge is alive and nothing else. See `apps/m4l-device/README.md`.
 
 ### Establish the .adg schema (blocks the macro editor)
 
