@@ -57,6 +57,9 @@ is the next real work.
   `rack-editor.amxd` (`pnpm build:device` / `install:device`), confirmed
   installed and running in real Live: bridge alive, transport ticking. Audio
   effect, passthrough chain, no params, no editor UI wired in - Phase 5 work.
+  Now also built and published automatically on every push to `main`
+  (`release-device.yml`, Phase 4.5), and the site has a working
+  "download companion device" link reading that release live.
 - Everything else - not started.
 
 Do this next, in order:
@@ -892,19 +895,27 @@ Then, below: **Download companion device (optional)**, clearly marked as an enha
 
 ### 4.5 Shipping the companion from the site
 
-The `.amxd` is a release asset, not a file in the repo, so the site is not rebuilt to ship a device update.
+**Built** (`apps/site/src/companion/download.ts`, `CompanionDownload.tsx`),
+with one change from the sketch below: `release-device.yml` now runs on every
+push to `main` (not a manual `device-vX` tag - there's no real versioning
+scheme yet), always overwriting the same rolling release at a fixed tag,
+`latest-device`, marked `prerelease: true`. That means the site can't use
+`/releases/latest` - GitHub's own docs say that endpoint excludes prereleases
+and drafts - it fetches `/releases/tags/latest-device` instead. The `.amxd`
+is a release asset either way, not a file in the repo, so the site is not
+rebuilt to ship a device update.
 
 ```typescript
 // apps/site/src/companion/download.ts
-const RELEASES = "https://api.github.com/repos/alienmind/ableton-rackutils/releases/latest";
+const RELEASE_TAG_URL = "https://api.github.com/repos/alienmind/ableton-rackutils/releases/tags/latest-device";
 
-export async function latestCompanion(): Promise<{ url: string; version: string } | null> {
+export async function latestCompanion(): Promise<{ url: string; builtAt: string } | null> {
   try {
-    const res = await fetch(RELEASES);
+    const res = await fetch(RELEASE_TAG_URL);
     if (!res.ok) return null;
     const release = await res.json();
     const asset = release.assets.find((a: any) => a.name.endsWith(".amxd"));
-    return asset ? { url: asset.browser_download_url, version: release.tag_name } : null;
+    return asset ? { url: asset.browser_download_url, builtAt: release.published_at } : null;
   } catch {
     return null;   // offline, rate-limited, whatever. Fall back to a static link.
   }
@@ -912,6 +923,11 @@ export async function latestCompanion(): Promise<{ url: string; version: string 
 ```
 
 Always render a hardcoded fallback link if this returns null. GitHub's unauthenticated API is rate-limited per IP and will occasionally fail for reasons having nothing to do with the user.
+
+Once the codec's own versioning matures enough for real `device-vX` releases
+to make sense, revisit: either the site should prefer a real tagged release
+over the rolling one, or the rolling-build concept should retire entirely in
+favor of tagged releases only.
 
 This matches how m4l-strudel distributes: a zip of devices on GitHub Releases, with a maxforlive.com listing pointing at it. Worth listing there too once stable, it is where people actually look for devices, and it costs one form submission. Note that maxforlive lists a single device file, so if this ever grows to multiple devices, ship a zip bundle like m4l-strudel does rather than fighting the form.
 

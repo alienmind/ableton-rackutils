@@ -138,10 +138,12 @@ complaint and silently corrupt.
 |---|---|---|
 | `ci.yml` | PR, push to main | lint, typecheck, codec tests |
 | `deploy.yml` | push to main | codec tests, then build and deploy to Pages |
-| `release-device.yml` | `device-v*` tag | build embedded bundle and `.amxd`, publish as release asset |
+| `release-device.yml` | push to main | build `rack-editor.amxd`, publish to the `latest-device` release (overwritten each push, no versioning yet) |
 
 Codec tests gate the deploy. A broken codec corrupts racks silently, which is
-worse than the site being down.
+worse than the site being down. The site's "download companion device"
+button reads `release-device.yml`'s output live via the GitHub API - see
+`doc/PLAN.md` Phase 4.5.
 
 ## Prior art
 
