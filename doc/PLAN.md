@@ -45,14 +45,14 @@ is the next real work.
 - **`packages/adg-codec/src/model.ts` and `mutate.ts` - built.** `Rack.parse`/
   `.clone`/`.serialize`, `macros`/`variations`/`chains` (full device tree,
   including nested racks), and `moveMapping`/`swapMacros`/`bindParameter`/
-  `unbindMacro`/`renameMacro`. 35 tests (`packages/adg-codec/tests/`): 29
+  `unbindMacro`/`renameMacro`. 38 tests (`packages/adg-codec/tests/`): 32
   synthetic (always run), 6 against the real fixtures (skip cleanly in CI,
   run locally). All confirmed against `simplerack.adg`, `withvariations.adg`,
   `drum-nested.adg` - not just the synthetic fixture.
-- `tools/adg-inspect/` - `unpack`/`diff` as before, plus two new commands
+- `tools/adg-tool/` - `unpack`/`diff` as before, plus two new commands
   that exercise the codec directly against a real file without needing the
-  site UI: `adg-inspect mappings <file.adg>` (list what's bound) and
-  `adg-inspect move <file.adg> <from> <to> <out.adg>` (run `moveMapping`,
+  site UI: `adg-tool mappings <file.adg>` (list what's bound) and
+  `adg-tool move <file.adg> <from> <to> <out.adg>` (run `moveMapping`,
   write the result). See "How to test" below.
 - `apps/site/` - runs (`pnpm dev`), deployed to GitHub Pages, confirmed
   working on a real 4000+ element rack. Still the raw XML tree viewer only -
@@ -90,12 +90,12 @@ place.
 No UI needed yet - two ways, both exercise the real code:
 
 ```bash
-pnpm --filter @rackutils/adg-codec test   # 35 tests: parsing, all 5 mutations,
+pnpm --filter @rackutils/adg-codec test   # 38 tests: parsing, all 5 mutations,
                                            # confirmed against real racks too
                                            # if tests/fixtures/*.adg are present
 
-pnpm adg-inspect mappings your-rack.adg           # list what's bound to what
-pnpm adg-inspect move your-rack.adg 1 5 out.adg   # move macro 1 -> macro 5, write out.adg
+pnpm adg-tool mappings your-rack.adg           # list what's bound to what
+pnpm adg-tool move your-rack.adg 1 5 out.adg   # move macro 1 -> macro 5, write out.adg
 ```
 
 The strongest test available: run `move`, then **drag `out.adg` into Live**
@@ -286,7 +286,7 @@ ableton-rackutils/
     site/               # the product. Static, deployed to GitHub Pages.
     m4l-device/         # optional companion .amxd, built with m4l-jweb
   tools/
-    adg-inspect/        # CLI for the Phase 1 schema investigation
+    adg-tool/        # CLI for the Phase 1 schema investigation
 ```
 
 Rules that keep the tiers honest:
@@ -311,7 +311,7 @@ Patchbay (`github.com/alienmind/patchbay`) documents much of this already in `do
 ### 1.1 Inspection CLI
 
 ```typescript
-// tools/adg-inspect/src/index.ts
+// tools/adg-tool/src/index.ts
 import { gunzipSync } from "zlib";
 import { readFileSync } from "fs";
 import * as prettier from "prettier";
@@ -322,7 +322,7 @@ export function unpack(path: string): string {
   return prettier.format(xml, { parser: "html", printWidth: 120 });
 }
 
-// CLI: adg-inspect unpack rack.adg > rack.xml
+// CLI: adg-tool unpack rack.adg > rack.xml
 ```
 
 ### 1.2 The diff procedure
@@ -333,15 +333,15 @@ For each question below, produce two files differing in exactly one way, then di
 # 1. Save a rack as A.adg
 # 2. In Live, make exactly one change
 # 3. Save as B.adg
-adg-inspect unpack A.adg > A.xml
-adg-inspect unpack B.adg > B.xml
+adg-tool unpack A.adg > A.xml
+adg-tool unpack B.adg > B.xml
 diff A.xml B.xml
 ```
 
 Ableton regenerates `Id`, `PointeeId`, `LomId`, and `LomIdView` on every save, so raw diffs are noisy. Filter them:
 
 ```typescript
-// tools/adg-inspect/src/normalize.ts
+// tools/adg-tool/src/normalize.ts
 const VOLATILE = new Set(["Id", "PointeeId", "LomId", "LomIdView"]);
 
 export function normalize(doc: Document): Document {

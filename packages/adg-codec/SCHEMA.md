@@ -39,8 +39,8 @@ findings transfer directly - they still need our own confirming diff before
 # 1. Save a rack as A.adg
 # 2. In Live, make exactly ONE change
 # 3. Save as B.adg
-pnpm adg-inspect unpack A.adg > A.xml
-pnpm adg-inspect unpack B.adg > B.xml
+pnpm adg-tool unpack A.adg > A.xml
+pnpm adg-tool unpack B.adg > B.xml
 diff A.xml B.xml
 ```
 

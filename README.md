@@ -13,11 +13,12 @@ rearrange rack macro mappings, move the mapping on knob 2 over to knob 3,
 rebuild the `.adg`, reload it in Live - but the codec and the app shell are
 built to host more rack-editing tools as they're added, not just this one.
 
-**Status: pre-alpha, v0.0.1, early scaffold.** The site runs and can load a `.adg`, decompress it,
-and show its raw XML structure - confirmed against a real 4000+ element rack.
-It does not yet understand macros or mappings: the schema for that is
-confirmed (`packages/adg-codec/SCHEMA.md`), the codec that reads and writes it
-isn't built yet. See
+**Status: pre-alpha, v0.0.1.** The site runs and can load a `.adg`, decompress
+it, and show its raw XML structure - confirmed against a real 4000+ element
+rack. The codec that understands macros and mappings (`packages/adg-codec`:
+parse, move, swap, bind - confirmed against real racks, two real bugs found
+and fixed) is built and tested, but not wired into this page's UI yet - see
+"Testing the codec" below to use it without the UI. See
 [`doc/PLAN.md`](doc/PLAN.md#current-state-and-next-steps) for current state and
 next steps.
 
@@ -51,7 +52,7 @@ packages/adg-codec/   parse, mutate, serialize .adg. No UI deps.
 packages/editor-ui/   shared React components. No Ableton deps.
 apps/m4l-device/      optional companion .amxd, built with m4l-jweb.
 apps/site/            the product. Static, deployed to GitHub Pages.
-tools/adg-inspect/    CLI for the schema investigation. Start here.
+tools/adg-tool/       CLI: unpack/diff a rack, or exercise the codec directly.
 ```
 
 ## Docs
@@ -61,7 +62,8 @@ Everything needed to continue is in the repo.
 | File | What it is |
 |---|---|
 | [`doc/PLAN.md`](doc/PLAN.md) | Full implementation plan, phase by phase, with code. Opens with current state, next steps, and the constraints that rule out obvious designs. |
-| [`packages/adg-codec/SCHEMA.md`](packages/adg-codec/SCHEMA.md) | Empty schema log. **Blocks all codec work.** |
+| [`packages/adg-codec/SCHEMA.md`](packages/adg-codec/SCHEMA.md) | Schema findings, confirmed against real racks. The codec's spec. |
+| [`doc/UI-PLAN.md`](doc/UI-PLAN.md) | Web UI overhaul plan (Ableton-matching macro panel). Planning only, not started. |
 
 ## Getting started
 
@@ -98,9 +100,9 @@ pnpm build       # writes apps/site/dist
 No UI needed - `packages/adg-codec` is usable on its own right now:
 
 ```bash
-pnpm --filter @rackutils/adg-codec test         # 35 tests
-pnpm adg-inspect mappings your-rack.adg         # list what's bound to what
-pnpm adg-inspect move your-rack.adg 1 5 out.adg # move macro 1 -> macro 5
+pnpm --filter @rackutils/adg-codec test        # 38 tests
+pnpm adg-tool mappings your-rack.adg           # list what's bound to what
+pnpm adg-tool move your-rack.adg 1 5 out.adg   # move macro 1 -> macro 5
 ```
 
 Drag `out.adg` into Live afterward to confirm the move actually holds up
@@ -121,8 +123,8 @@ confirms the bridge is alive and nothing else. See `apps/m4l-device/README.md`.
 ### Inspecting `.adg` schema by hand
 
 ```bash
-pnpm adg-inspect unpack ~/path/to/rack.adg > rack.xml
-pnpm adg-inspect diff before.adg after.adg
+pnpm adg-tool unpack ~/path/to/rack.adg > rack.xml
+pnpm adg-tool diff before.adg after.adg
 ```
 
 The tool used to fill in `packages/adg-codec/SCHEMA.md` in the first place -
