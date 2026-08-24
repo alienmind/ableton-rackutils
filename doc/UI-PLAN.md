@@ -335,7 +335,34 @@ needs a **per-binding unbind**, not per-macro. `unbindMacro` as it exists
 today is the wrong primitive for this gesture - Part 4.5 specs the
 narrower one this needs.
 
-### 2.6 Nested racks
+### 2.6 Nested racks, drum pads, and how far down to render
+
+**Decided by the project owner, not an open question any more.** The rule, in
+one sentence: render every level of the rack the way Ableton draws it, and
+fall back to a generic parameter list only at the point where the tool has no
+idea what it is looking at.
+
+Concretely, three cases:
+
+1. **A rack inside a rack renders as a rack** - its own header, its own macro
+   bank, its own chains, recursively. Not just a device row with a device
+   tree hanging off it. A nested rack's macros are first-class: they are what
+   an outer macro is usually mapped TO.
+2. **A drum rack renders as its pads** (`SCHEMA.md` Q10). Bundling several
+   functions into one rack and routing them through pads is a standard way to
+   organise a rack, so the pad layout is information the user put there and
+   the UI should keep. Each pad is a chain, usually holding its own nested
+   rack, which then renders per rule 1.
+3. **Anything below that - a device this tool has no specific rendering for -
+   falls back to the device tree**: the mapped/"more" parameter split from 2.5.
+   That is the floor, and it is fine. This tool never edits an Operator's
+   oscillator or a Saturator's curve; it only needs to name their parameters
+   so one can be mapped to a macro.
+
+This also simplifies the recursion rather than complicating it: the top-level
+rack is not a special case, it is just the outermost application of rule 1.
+
+### 2.6b Nested racks, mechanics
 
 A `DeviceNode` with `isRack: true` renders as a **collapsed-by-default**
 panel (matches `PLAN.md` Phase 3.2's existing rationale: a drum rack with
@@ -729,16 +756,25 @@ function NestedRackPanel({ device, armed, onArm }: { device: DeviceNode; armed: 
 }
 ```
 
-A nested rack's OWN macro bank (its `MacroControls.N` family) is not shown
-by this recursion as currently sketched - `NestedRackPanel` only recurses
-into `device.chains`, which walks the nested rack's device tree, not its
-own macro knobs. Decide during implementation whether nested racks need
-their own visible `MacroBank` too (probably yes, for a Drum Rack's pad-level
-racks specifically, matching the user's own example structure in
-`SCHEMA.md`'s `drum-nested.adg`), or whether outer-macro-to-inner-macro
-chaining is enough that a nested `MacroBank` is redundant. This is a real
-open design question, not an oversight - flag it for the project owner
-rather than guessing.
+The `NestedRackPanel` sketched above is **wrong as written** and is kept only
+to show what was superseded: it recurses into `device.chains` alone, so a
+nested rack renders as a device tree with no macro knobs of its own. Part 2.6
+settles this - a nested rack renders as a rack, macro bank included. Two
+consequences for the components:
+
+- `RackEditor`'s body (header + `MacroBank` + `ChainList`) becomes a reusable
+  `RackPanel` that takes a rack-shaped node, and `RackEditor` becomes the
+  outermost caller of it plus the toolbar and undo stack. `NestedRackPanel` is
+  then just a collapsed `RackPanel` with a disclosure header.
+- That needs a nested rack's macros as `Macro[]`, which `DeviceNode` does not
+  currently carry - the codec exposes `macros` only on the root `Rack`. See
+  Part 4.6.
+
+`DrumPadGrid` is the third renderer (Part 2.6 rule 2), selected when a
+`DeviceNode`'s type is `DrumGroupDevice`. Each pad is a chain plus its
+`ReceivingNote`; the note is not in the model yet either (Part 4.6), and the
+grid geometry is explicitly unconfirmed (`SCHEMA.md` Q10) - sort by note and
+do not claim to reproduce Live's scroll window until that is diffed.
 
 ---
 
@@ -818,6 +854,27 @@ actually belongs to `macroIndex` before removing it (defensive - a caller
 passing a mismatched pair is a bug worth surfacing, not silently doing the
 wrong thing).
 
+### 4.6 Model additions the recursive rendering needs (NOT BUILT)
+
+Read-side model work rather than mutations, but the same discipline applies -
+trace every element name to `SCHEMA.md`. Required by Part 2.6's decision that
+nested racks render as racks and drum racks render as pads:
+
+- `DeviceNode.macros: Macro[]` and `macroCount` for `isRack` nodes. The parsing
+  logic exists in `Rack` already but is bound to the root device; it needs
+  lifting to work on any `*GroupDevice` element.
+- Mutations currently take a `Rack` and act on its root device, so they cannot
+  target a nested rack's macros at all. Either they grow a "which rack"
+  argument, or `Rack` grows a way to produce a sub-rack view over a nested
+  `GroupDevicePreset`. The second looks cleaner - every mutation then stays
+  written exactly as it is - and `collectMacroBindings`'s owning-rack walk
+  already does the hard part of telling a nested rack's macros from the root's.
+  Decide when implementing.
+- `Chain.receivingNote: number | null`, plus `sendingNote` and `chokeGroup`,
+  for drum branches (`SCHEMA.md` Q10).
+- A fuller drum rack fixture. `drum-nested.adg` has exactly one pad, so
+  ordering, gaps, and return chains are all unexercised.
+
 ---
 
 ## Build order
@@ -825,14 +882,16 @@ wrong thing).
 1. Part 1 (SVG + palette extraction) - **on hold, do not start until told**.
 2. ~~Part 4 (new mutations)~~ - **done**, tested against the real fixtures
    per the existing pattern (`packages/adg-codec/tests/real-fixtures.test.ts`).
-3. Part 3 minus real SVG (use Part 3.2's placeholder shapes) - get the
+3. Part 4.6 (model additions: nested-rack macros, drum pad notes) - needed
+   before Part 3 can render rules 1 and 2 of Part 2.6 at all.
+4. Part 3 minus real SVG (use Part 3.2's placeholder shapes) - get the
    component tree, drag-reorder, arm/bind, and mapped/"more" logic working
    end to end against the synthetic fixture and `apps/site`'s dev server,
    without waiting on Part 1.
-4. Swap in Part 1's real SVG/palette once ready - should be a localized
+5. Swap in Part 1's real SVG/palette once ready - should be a localized
    change to `MacroKnob.tsx` and `editor.css`, not a structural one, if
    Part 3 was built against the placeholder cleanly.
-5. Wire `apps/m4l-device`'s `App.tsx` to the same `RackEditor` from
+6. Wire `apps/m4l-device`'s `App.tsx` to the same `RackEditor` from
    `packages/editor-ui`, per `PLAN.md` Phase 5.4.
 
 Test each stage the same way the codec was tested: against real racks

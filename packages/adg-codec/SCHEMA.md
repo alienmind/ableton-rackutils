@@ -355,6 +355,57 @@ containment model (which doesn't care about depth at all) covers it.
 
 ---
 
+## Q10. How is a drum rack's pad grid represented?
+
+Asked because the UI renders drum racks as their pad grid rather than as a
+generic chain list (`doc/UI-PLAN.md` Part 2.6) - a drum rack used as a bundle
+of functions routed per pad is a normal organising pattern, and a flat chain
+list throws away the layout the user built.
+
+**Answer, confirmed against `drum-nested.adg`:** a drum rack is a
+`DrumGroupDevice`, and its chains sit in the same `BranchPresets` as any other
+rack's, but each one is a `DrumBranchPreset` instead of an
+`InstrumentBranchPreset`. The pad's note assignment lives in a `ZoneSettings`
+child of that branch preset:
+
+```xml
+<DrumBranchPreset Id="0">
+  <Name Value="" />
+  <IsSoloed Value="false" />
+  <DevicePresets>...</DevicePresets>
+  <ZoneSettings>
+    <ReceivingNote Value="92" />
+    <SendingNote Value="60" />
+    <ChokeGroup Value="0" />
+  </ZoneSettings>
+</DrumBranchPreset>
+```
+
+- `ReceivingNote` is the MIDI note the pad answers to - the pad's identity, and
+  what a grid position has to be derived from.
+- `SendingNote` is what the chain's instrument receives (Simpler's own note),
+  `ChokeGroup` is 0 for none.
+- The rack element itself carries `ArePadsVisible` and `PadScrollPosition`
+  (`19` in this fixture), plus `DrumPadsListWrapper`/`VisibleDrumPadsListWrapper`
+  and `ShowsZonesInsteadOfNoteNames`.
+
+**Not confirmed: the grid geometry.** `PadScrollPosition = 19` against a
+`ReceivingNote` of 92 does not fit the obvious reading (rows of 4 counted from
+note 0 would put the visible window at 76..91, one short of 92), so do not
+derive row/column from it by arithmetic that has not been tested. Read
+patchbay `SCHEMA.md` S9 and `ARCHITECTURE.md` §12, which cover pad-to-note
+mapping and return chains in depth, then confirm with a diff: scroll a real
+drum rack's pad view, save, and see what moves. Until then a pad grid can be
+rendered by sorting on `ReceivingNote` without claiming to match Live's exact
+scroll window.
+
+Only one pad exists in `drum-nested.adg`, so the multi-pad case (ordering,
+gaps where a note has no chain, return chains in `ReturnBranchPresets`) is
+unexercised. A fuller drum rack fixture is worth adding before the pad grid is
+built.
+
+---
+
 ## Q9 (LOM, not file). Macro slot to parameter index
 
 Not answered by diffing. Needed for the companion device's live overlay.
