@@ -22,8 +22,9 @@ Companion docs:
 - `packages/adg-codec/SCHEMA.md` - the schema findings log, confirmed against
   real fixtures, that all codec code must trace to.
 - `doc/UI-PLAN.md` - the web UI overhaul plan (Ableton-matching macro panel,
-  SVG extraction, drag-and-drop, the mapped/"more" parameter split). Planning
-  only, not started - see its own status line.
+  SVG extraction, drag-and-drop, the mapped/"more" parameter split). Its Part 4
+  (codec mutations and model additions) is built; the components and the SVG
+  work are not - see its own status line.
 - `.github/workflows/` - the pipeline described in Phase 4.2.
 
 Handoff document. Written so another agent can pick this up cold. Read the Constraints section before writing any code, several intuitive designs are ruled out by facts about Ableton's API that are not obvious.
@@ -50,7 +51,10 @@ is the next real work.
   including nested racks), and ten mutations: `moveMapping`/`swapMacros`/
   `bindParameter`/`unbindMacro`/`renameMacro`, plus `UI-PLAN.md` Part 4's
   `reorderMacro`/`setMacroCount`/`renameRack`/`setMacroColor`/`unbindOne`.
-  61 tests (`packages/adg-codec/tests/`): 51 synthetic (always run), 10
+  `Rack.subRack(devicePath)` exposes any nested rack as a `Rack` of its own
+  over the same document, so every mutation reaches nested macros unmodified,
+  and drum pads carry their `ReceivingNote` (SCHEMA.md Q10).
+  73 tests (`packages/adg-codec/tests/`): 60 synthetic (always run), 13
   against the real fixtures (skip cleanly in CI, run locally). All confirmed
   against `simplerack.adg`, `withvariations.adg`, `drum-nested.adg` - not
   just the synthetic fixture.
@@ -95,7 +99,7 @@ place.
 No UI needed yet - two ways, both exercise the real code:
 
 ```bash
-pnpm --filter @rackutils/adg-codec test   # 61 tests: parsing, all 10 mutations,
+pnpm --filter @rackutils/adg-codec test   # 73 tests: parsing, all 10 mutations,
                                            # confirmed against real racks too
                                            # if tests/fixtures/*.adg are present
 

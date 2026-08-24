@@ -82,10 +82,10 @@ Run all four of `lint`, `typecheck`, `test`, `build` clean before committing.
 ## Testing the codec
 
 ```bash
-pnpm --filter @rackutils/adg-codec test    # 61 tests
+pnpm --filter @rackutils/adg-codec test    # 73 tests
 ```
 
-51 are synthetic and always run. 10 run against real Ableton-saved racks in
+60 are synthetic and always run. 13 run against real Ableton-saved racks in
 `packages/adg-codec/tests/fixtures/*.adg`, which are gitignored - they skip
 cleanly when absent (so, in CI) and run locally once you drop the three files
 `SCHEMA.md` asks for there.

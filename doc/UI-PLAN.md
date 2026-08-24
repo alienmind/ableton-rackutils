@@ -6,9 +6,10 @@ XML tree viewer with a UI that looks and behaves like Ableton's own rack
 macro panel, built on the same components the embedded M4L device UI reuses
 later (Phase 5.4 in `PLAN.md`).
 
-**Status: Part 4 built, the rest is still planning.** All five new mutations
-exist in `packages/adg-codec/src/mutate.ts` and are tested against the real
-fixtures. Parts 1, 2 and 3 are unimplemented. Do not start on the
+**Status: Part 4 built (mutations and model additions), the rest is still
+planning.** The five new mutations are in `packages/adg-codec/src/mutate.ts`,
+and Part 4.6's `Rack.subRack` plus the drum pad note fields are in `model.ts`,
+all tested against the real fixtures. Parts 1, 2 and 3 are unimplemented. Do not start on the
 reference-image work (Part 1) until explicitly asked - that instruction came
 directly from the project owner and still holds until someone says otherwise.
 
@@ -49,11 +50,20 @@ And these mutations, all tested against real racks (`packages/adg-codec/src/muta
 
 ```typescript
 moveMapping(rack, from, to)              // relocate ALL of a macro's bindings
-swapMacros(rack, a, b)                   // exchange bindings, name, color, value, variations
+reorderMacro(rack, from, to)             // move a WHOLE macro, sliding the ones it passes
+swapMacros(rack, a, b)                   // exchange every per-slot field between two slots
 bindParameter(rack, macroIndex, target)  // adds a target, does not clear the macro's others
 unbindMacro(rack, macroIndex)            // clears ALL of a macro's bindings
+unbindOne(rack, macroIndex, targetPath)  // clears exactly one of them
 renameMacro(rack, macroIndex, name)
+renameRack(rack, name)
+setMacroCount(rack, count)               // 1..16
+setMacroColor(rack, macroIndex, colorIndex)
 ```
+
+Plus `rack.subRack(devicePath)`, which returns any nested rack as a `Rack` of
+its own over the same document - that is how every mutation above reaches a
+nested rack's macros (Part 4.6).
 
 `apps/site/src/App.tsx` currently does none of this - it decompresses a
 `.adg`, parses it with a bare `DOMParser`, and renders `RackTree.tsx`, a
@@ -854,26 +864,41 @@ actually belongs to `macroIndex` before removing it (defensive - a caller
 passing a mismatched pair is a bug worth surfacing, not silently doing the
 wrong thing).
 
-### 4.6 Model additions the recursive rendering needs (NOT BUILT)
+### 4.6 Model additions the recursive rendering needs
 
-Read-side model work rather than mutations, but the same discipline applies -
-trace every element name to `SCHEMA.md`. Required by Part 2.6's decision that
-nested racks render as racks and drum racks render as pads:
+**Built**, and the sub-rack option won: `Rack.subRack(devicePath)` returns a
+view of a nested rack over the SAME document, so all ten mutations work on a
+nested rack unmodified. Nothing grew a "which rack" argument, and
+`DeviceNode` did not grow a `macros` field - the UI calls `subRack` with an
+`isRack` node's path and gets a full `Rack` back.
 
-- `DeviceNode.macros: Macro[]` and `macroCount` for `isRack` nodes. The parsing
-  logic exists in `Rack` already but is bound to the root device; it needs
-  lifting to work on any `*GroupDevice` element.
-- Mutations currently take a `Rack` and act on its root device, so they cannot
-  target a nested rack's macros at all. Either they grow a "which rack"
-  argument, or `Rack` grows a way to produce a sub-rack view over a nested
-  `GroupDevicePreset`. The second looks cleaner - every mutation then stays
-  written exactly as it is - and `collectMacroBindings`'s owning-rack walk
-  already does the hard part of telling a nested rack's macros from the root's.
-  Decide when implementing.
-- `Chain.receivingNote: number | null`, plus `sendingNote` and `chokeGroup`,
-  for drum branches (`SCHEMA.md` Q10).
-- A fuller drum rack fixture. `drum-nested.adg` has exactly one pad, so
-  ordering, gaps, and return chains are all unexercised.
+This works because a nested rack is structurally identical to the root one
+(`SCHEMA.md` Q8): a `GroupDevicePreset` with `Device` and `BranchPresets`
+siblings. `Rack` was already written entirely against those two elements
+relative to its own root, so pointing it at a different root was the whole
+change.
+
+Three things to know when using it:
+
+- **Paths are relative to the rack they came from.** A `ParamRef` or device
+  path read from a sub-rack resolves only against that sub-rack. Keep a path
+  and the handle it came from together; mixing a nested path with the root
+  handle resolves to the wrong element or to nothing, silently.
+- **Serializing any handle writes the whole file**, not the fragment. Editing
+  a nested rack then serializing the root is the normal flow.
+- **`clone()` on a sub-rack view stays pointed at the nested rack** in the
+  copy - it records its root's document path and re-resolves it after the
+  reparse, so undo stacks work at any depth.
+
+Also built: `Chain.receivingNote`/`sendingNote`/`chokeGroup`, null on any
+branch that is not a drum pad (`SCHEMA.md` Q10). A drum rack is identified by
+`rack.deviceEl.tagName === 'DrumGroupDevice'`.
+
+Still open: **a fuller drum rack fixture.** `drum-nested.adg` has exactly one
+pad, so pad ordering, gaps where a note has no chain, and return chains are
+unexercised against a real file. `buildDrumFixtureBytes()` in
+`tests/fixture.ts` is a 3-pad synthetic stand-in with deliberately unsorted
+notes, which is not the same evidence.
 
 ---
 
@@ -882,8 +907,8 @@ nested racks render as racks and drum racks render as pads:
 1. Part 1 (SVG + palette extraction) - **on hold, do not start until told**.
 2. ~~Part 4 (new mutations)~~ - **done**, tested against the real fixtures
    per the existing pattern (`packages/adg-codec/tests/real-fixtures.test.ts`).
-3. Part 4.6 (model additions: nested-rack macros, drum pad notes) - needed
-   before Part 3 can render rules 1 and 2 of Part 2.6 at all.
+3. ~~Part 4.6 (model additions: nested-rack macros, drum pad notes)~~ -
+   **done**, via `Rack.subRack` plus the pad note fields on `Chain`.
 4. Part 3 minus real SVG (use Part 3.2's placeholder shapes) - get the
    component tree, drag-reorder, arm/bind, and mapped/"more" logic working
    end to end against the synthetic fixture and `apps/site`'s dev server,
