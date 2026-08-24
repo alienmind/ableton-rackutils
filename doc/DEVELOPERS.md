@@ -18,7 +18,7 @@ Everything needed to continue is in the repo.
 
 ```
 packages/adg-codec/   parse, mutate, serialize .adg. No UI deps.
-packages/editor-ui/   shared React components. No Ableton deps. Not built yet.
+packages/editor-ui/   shared React components. No Ableton deps.
 apps/m4l-device/      optional companion .amxd, built with m4l-jweb.
 apps/site/            the product. Static, deployed to GitHub Pages.
 tools/adg-tool/       CLI: unpack/diff a rack, or exercise the codec directly.
@@ -60,9 +60,10 @@ pointer back to the file it came from, so the user must pick the file).
 
 ## Current state
 
-Pre-alpha. The codec is built and tested; the site still shows a raw XML tree
-and is not wired to it. Full detail, and what to do next, is in
-[`PLAN.md`](PLAN.md#current-state-and-next-steps).
+Pre-alpha. The codec is built and tested, and the site now renders the macro
+editor through `packages/editor-ui`. Nobody has loaded an edited file back
+into Live from the UI yet, which is the test that matters. Full detail, and
+what to do next, is in [`PLAN.md`](PLAN.md#current-state-and-next-steps).
 
 ## Setup
 
@@ -82,7 +83,9 @@ Run all four of `lint`, `typecheck`, `test`, `build` clean before committing.
 ## Testing the codec
 
 ```bash
-pnpm --filter @rackutils/adg-codec test    # 78 tests
+pnpm test                                  # everything, 89 tests
+pnpm --filter @rackutils/adg-codec test    # 78 codec tests
+pnpm --filter @rackutils/editor-ui test    # 11 render tests
 ```
 
 60 are synthetic and always run. 18 run against real Ableton-saved racks in

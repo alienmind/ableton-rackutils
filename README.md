@@ -8,9 +8,10 @@ page, or from the command line.
 
 **Live site:** https://alienmind.github.io/ableton-rackutils/
 
-> **v0.0.1, pre-alpha. Not usable as a rack editor yet.** The web page can open
-> a rack and show you what is inside it, but the editing UI is not wired up.
-> The command line tools below do work today. See [What works today](#what-works-today).
+> **v0.0.1, pre-alpha.** The macro editor now works in the browser, but nobody
+> has round-tripped an edited file back into Live from it yet. Treat it as
+> something to try on copies, not something to trust. See
+> [What works today](#what-works-today).
 
 > **Keep backups.** This tool rewrites rack files, and a bug here can produce a
 > rack that loads fine and misbehaves quietly - a broken Macro Variation, say.
@@ -41,8 +42,8 @@ What that means in practice:
 
 | | Status |
 |---|---|
-| Open a rack in the browser and inspect its structure | works |
-| Edit macros in the browser | not yet - the UI is being built |
+| Open a rack in the browser and see its macros, chains and drum pads | works |
+| Rearrange, rename, recolour and rebind macros in the browser | works, untested in Live |
 | Inspect and rearrange macros from the command line | works |
 | Companion Max for Live device | downloadable, but a scaffold - it confirms it is talking to Live and nothing more |
 
@@ -93,8 +94,17 @@ behind, `move-mapping` takes the same arguments and does that instead.
 Open https://alienmind.github.io/ableton-rackutils/ and drag a `.adg` onto the
 page. It works offline once loaded, and on a machine with no Ableton installed.
 
-For now it just shows you what is inside the rack. The macro editing described
-above is the next thing being built for it.
+You get the rack's macro knobs and, under them, its chains - with nested racks
+drawn as racks with their own knobs, and drum racks drawn as their pads. Drag a
+knob onto another to move that macro; hold Shift while dropping to swap two.
+Double-click a name to rename it. Click a parameter, then click a knob in the
+same rack, to bind it.
+
+The knobs are placeholder shapes and the colours are not Live's real palette
+yet.
+
+Saving downloads a copy with `-edited` on the end. Your original file is never
+touched.
 
 ## The companion device (optional)
 

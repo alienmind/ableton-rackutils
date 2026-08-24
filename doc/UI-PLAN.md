@@ -6,10 +6,12 @@ XML tree viewer with a UI that looks and behaves like Ableton's own rack
 macro panel, built on the same components the embedded M4L device UI reuses
 later (Phase 5.4 in `PLAN.md`).
 
-**Status: Part 4 built (mutations and model additions), the rest is still
-planning.** The five new mutations are in `packages/adg-codec/src/mutate.ts`,
-and Part 4.6's `Rack.subRack` plus the drum pad note fields are in `model.ts`,
-all tested against the real fixtures. Parts 1, 2 and 3 are unimplemented. Do not start on the
+**Status: Parts 2, 3 and 4 built. Part 1 not started.** `packages/editor-ui`
+exists and `apps/site` renders through it: recursive rack panels, drag to
+reorder or shift-drop to swap, double-click rename, colour swatches,
+arm-and-bind with the mapped/"more" split, and drum pads. 11 render tests,
+four of them against the real `drum-pads.adg`. The knob SVG and the colour
+palette are placeholders until Part 1. Do not start on the
 reference-image work (Part 1) until explicitly asked - that instruction came
 directly from the project owner and still holds until someone says otherwise.
 
@@ -902,6 +904,44 @@ notes, which is not the same evidence.
 
 ---
 
+## What Part 3 actually built, where it differs from the sketches above
+
+The component list in 3.0 held up; three things came out differently, all
+driven by Part 2.6's rendering decision landing after those sketches were
+written.
+
+1. **`RackPanel` is the recursive unit, not `RackEditor`.** `RackEditor` keeps
+   the undo stack, the armed parameter and the warning list, then renders
+   exactly one `RackPanel` for the root. A nested rack is the same component
+   one level down, so the root is not a special case. `NestedRackPanel` from
+   3.9 is gone - it resolved a sub-rack and rendered a device tree, which is
+   the behaviour Part 2.6 rejected.
+2. **Rack identity travels as a path, never as a handle.** Every mutation
+   replaces the root `Rack` (that is how React learns to re-render), so a
+   handle captured in state goes stale immediately. Panels take a `RackPath`
+   (the chain of device paths from the root) and resolve it against the
+   current root when they act. The armed parameter carries its rack's path for
+   the same reason - a `ParamRef.path` only resolves against its own rack.
+3. **Binding is confined to one rack level, deliberately.** A `KeyMidi` always
+   belongs to the nearest enclosing rack (SCHEMA.md Q2's owning-rack walk), so
+   a macro cannot drive a parameter inside a nested rack. Clicking an outer
+   macro while a nested parameter is armed does nothing rather than producing
+   a mapping the file cannot express; reaching inside is done by mapping to
+   the nested rack's own macro, exactly as Live does it.
+
+One UX call not in the plan: **the first level of nesting opens by default**,
+deeper levels stay collapsed. Part 2.6's collapse rationale was written for a
+flat parameter tree of thousands of rows, but collapsing everything meant a
+rack whose whole content is one drum rack rendered as an empty-looking page.
+The guard still holds where it matters - a drum rack with a rack on every pad
+stops at the pads instead of opening every engine inside them.
+
+Placeholders that Part 1 replaces, both loudly commented in the source:
+`macroColors.ts` (16 distinguishable colours that are NOT Live's palette) and
+`MacroKnob`'s arc SVG.
+
+---
+
 ## Build order
 
 1. Part 1 (SVG + palette extraction) - **on hold, do not start until told**.
@@ -909,10 +949,9 @@ notes, which is not the same evidence.
    per the existing pattern (`packages/adg-codec/tests/real-fixtures.test.ts`).
 3. ~~Part 4.6 (model additions: nested-rack macros, drum pad notes)~~ -
    **done**, via `Rack.subRack` plus the pad note fields on `Chain`.
-4. Part 3 minus real SVG (use Part 3.2's placeholder shapes) - get the
-   component tree, drag-reorder, arm/bind, and mapped/"more" logic working
-   end to end against the synthetic fixture and `apps/site`'s dev server,
-   without waiting on Part 1.
+4. ~~Part 3 minus real SVG~~ - **done**. The component tree, drag-reorder,
+   arm/bind and the mapped/"more" split all work end to end in `apps/site`,
+   against a placeholder knob and a placeholder palette.
 5. Swap in Part 1's real SVG/palette once ready - should be a localized
    change to `MacroKnob.tsx` and `editor.css`, not a structural one, if
    Part 3 was built against the placeholder cleanly.

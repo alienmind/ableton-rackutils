@@ -63,9 +63,16 @@ is the next real work.
   UI: `adg-tool mappings <file.adg>` (list what's bound), `adg-tool move
   <file.adg> <from> <to> <out.adg>` (run `reorderMacro`), and `move-mapping`
   (same arguments, the narrower `moveMapping`). See "How to test" below.
+- **`packages/editor-ui/` - built** (`doc/UI-PLAN.md` Part 3). Recursive
+  `RackPanel` (a nested rack renders as a rack, a drum rack as its pads, an
+  unknown device as a mapped/"more" parameter list), drag-to-reorder,
+  shift-drop to swap, inline rename, colour swatches, arm-and-bind, undo.
+  11 render tests, 4 against the real `drum-pads.adg`. The knob SVG and the
+  colour palette are placeholders pending UI-PLAN Part 1.
 - `apps/site/` - runs (`pnpm dev`), deployed to GitHub Pages, confirmed
-  working on a real 4000+ element rack. Still the raw XML tree viewer only -
-  not wired to the codec yet, that's next.
+  working on a real 4000+ element rack. **Now renders the editor**, with the
+  raw XML tree behind a checkbox. Saving downloads a copy, never overwriting
+  the original.
 - `apps/m4l-device/` - scaffolded with `m4l-jweb init`, builds a real
   `rack-editor.amxd` (`pnpm build:device` / `install:device`), confirmed
   installed and running in real Live: bridge alive, transport ticking. Audio
@@ -77,17 +84,15 @@ is the next real work.
 
 Do this next, in order:
 
-1. **Wire the codec into `apps/site`, per `doc/UI-PLAN.md`.** That document
-   now supersedes this section's earlier, much lighter sketch: it specs a UI
-   that visually matches Ableton's own macro panel (SVG knobs, editable rack
-   name, drag-to-reorder, a mapped/"more" split per device), not just a
-   functional drag-to-remap. It also resolves the `editor-ui` question -
-   package it for real, `apps/m4l-device` needs to share it. Read
-   `UI-PLAN.md`'s own status line before starting: Part 1 (the reference
-   screenshot / SVG extraction) is explicitly on hold pending the go-ahead.
-2. **Device editor UI** (Phase 5.3-5.4) is lower priority than the above -
-   the site is the product, the device is a convenience layered on the same
-   codec later.
+1. **Use it on real racks and fix what that finds.** The editor is wired up
+   but nobody has yet loaded an edited file back into Live from it. Every bug
+   this project has hit so far came from exactly that step, not from tests.
+2. **UI-PLAN Part 1** (the reference screenshot, the SVG knob, the real colour
+   palette) - still explicitly on hold pending the project owner's go-ahead.
+   Until then the knob and palette are placeholders and look it.
+3. **Device editor UI** (Phase 5.3-5.4) - `apps/m4l-device` should render the
+   same `@rackutils/editor-ui` `RackEditor`. Lower priority: the site is the
+   product, the device is a convenience layered on the same codec later.
 
 Default to a read-only or simulated mode in the UI until real-world use has
 exercised `mutate.ts` on a range of racks beyond the 3 current fixtures,
