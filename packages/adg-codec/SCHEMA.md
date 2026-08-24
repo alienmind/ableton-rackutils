@@ -13,7 +13,17 @@ and is not a file-schema question.
 
 Every element name in the codec must be traceable to a diff recorded here.
 Guessing element names produces files that open in Live without complaint and
-behave incorrectly, which is the worst available failure mode.
+behave incorrectly - the worst failure mode, since nothing short of a human
+checking the result catches it. There is a second, milder failure mode this
+session found the hard way: a file that Live refuses to open at ALL.
+`XMLSerializer.serializeToString()` never emits the `<?xml version="1.0"
+encoding="UTF-8"?>` prolog every `.adg` starts with (true of every browser and
+of jsdom, not a jsdom quirk) - the output was well-formed XML, round-tripped
+fine through this codec's own parser, and Live still silently rejected the
+drag-and-drop. `serializeXmlDoc` (`packages/adg-codec/src/dom.ts`) now
+prepends it unconditionally. Noted here because it's a fact about the format,
+not just a code bug: **every writer for this format needs the prolog, and
+nothing about the DOM APIs used to build one supplies it automatically.**
 
 `alienmind/patchbay` (`doc/ARCHITECTURE.md` §5-11 and `doc/SCHEMA.md` S3-S10)
 documents this in far more depth than repeated below: transfer-function

@@ -100,6 +100,50 @@ still behaves correctly after the move (SCHEMA.md Q6). If it doesn't, that's
 the one remaining from-scratch spike: move a mapping by hand in Live on a
 rack with variations, diff before/after, save as `move-after-live.adg`.
 
+Two real bugs were found and fixed exactly this way, against a real rack, not
+caught by the synthetic test suite until reproduced there afterward:
+
+1. **A macro driving several parameters at once** (normal Live usage - one
+   knob, several things move) only had ONE of its targets moved by
+   `moveMapping`, silently leaving the other still pointing at the vacated
+   slot. `Macro.binding` (singular) is now `Macro.bindings: Binding[]`, and
+   every mutation operates on all of a macro's bindings, not just the first
+   found. Regression-tested in the synthetic fixture (a macro bound to two
+   parameters at once) since none of the three checked-in real fixtures
+   happen to exercise it.
+2. **The output file didn't load in Live at all** - drag-and-drop silently
+   rejected. Cause: `XMLSerializer.serializeToString()` never emits the
+   `<?xml version="1.0" encoding="UTF-8"?>` prolog (true in every browser and
+   in jsdom, not a jsdom-specific bug), and every file Ableton itself writes
+   starts with it. `serializeXmlDoc` in `dom.ts` now prepends it always,
+   confirmed against the same real rack. **This is why "drag the output into
+   Live" is the strongest test in this project, not just a nice-to-have** -
+   it catches exactly this class of bug, which every synthetic and even
+   real-fixture-based automated test missed because nothing in the test
+   suite actually asks Live to load the result.
+
+### Backlog (user-requested, not yet scheduled)
+
+Real feature requests from testing against an actual rack, logged here
+rather than built blind. Revisit once the site's UI (Phase 3-4) exists to
+design them against, since they're mostly UI-shaped, not just codec
+primitives:
+
+- **Macro colour.** `MacroColor.N` is now modeled (`Macro.color`) and
+  `swapMacros` exchanges it along with the name - done. Still open:
+  authoring a macro's colour directly (`setMacroColor`, a straightforward
+  `mutate.ts` addition once wanted), and picking it automatically - from a
+  palette, by name, or "sticky" colours for a given name/function that stay
+  consistent across nested racks (e.g. every "Filter" macro anywhere in a
+  rack tree gets the same colour). The sticky-by-name case needs a design
+  decision (a lookup table shipped with the tool? user-configurable? scoped
+  per rack or global?) before it's a codec function.
+- **Case transforms for names** (rack/macro/device names - CAPITALIZE,
+  lowercase, CamelCase), applied automatically or on demand. Straightforward
+  once there's a UI surface to trigger it from; the codec side is just
+  `renameMacro`/an equivalent for device names with a transform applied
+  first.
+
 ### Prior art, all by the same author
 
 - `alienmind/patchbay` - Python DSL for authoring racks. Has the schema work.
