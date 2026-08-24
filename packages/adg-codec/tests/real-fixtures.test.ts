@@ -9,8 +9,9 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
+import { childValue } from '../src/dom';
 import { Rack } from '../src/model';
-import { moveMapping } from '../src/mutate';
+import { moveMapping, renameRack, reorderMacro, setMacroColor, setMacroCount } from '../src/mutate';
 
 const FIXTURES = join(__dirname, 'fixtures');
 const path = (name: string) => join(FIXTURES, name);
@@ -42,6 +43,47 @@ describe.skipIf(!has('simplerack.adg'))('simplerack.adg', () => {
     expect(roundTripped.macros[0].bindings).toHaveLength(0);
     expect(roundTripped.macros[6].bindings.map((b) => b.targetName).sort()).toEqual(originalTargets);
   });
+
+  test('reorderMacro carries the whole macro - name, colour and all bindings - to the new slot', () => {
+    // What `moveMapping` deliberately does NOT do. Running move on a real rack
+    // left the destination knob wearing its old name over someone else's
+    // mapping, which is what this mutation exists to fix.
+    const rack = Rack.parse(load('simplerack.adg'));
+    const nameBefore = rack.macros[0].name;
+    const colorBefore = rack.macros[0].color;
+    const targetsBefore = rack.macros[0].bindings.map((b) => b.targetName).sort();
+    const displacedBefore = rack.macros[1].name;
+    expect(reorderMacro(rack, 0, 4).ok).toBe(true);
+
+    const roundTripped = Rack.parse(rack.serialize());
+    expect(roundTripped.macros[4].name).toBe(nameBefore);
+    expect(roundTripped.macros[4].color).toBe(colorBefore);
+    expect(roundTripped.macros[4].bindings.map((b) => b.targetName).sort()).toEqual(targetsBefore);
+    // The macros it passed slid up by one rather than being overwritten.
+    expect(roundTripped.macros[0].name).toBe(displacedBefore);
+  });
+
+  test('reorderMacro carries the per-slot fields the model does not expose', () => {
+    const rack = Rack.parse(load('simplerack.adg'));
+    const device = rack.deviceEl;
+    const before = ['MacroAnnotations', 'MacroDefaults', 'ForceDisplayGenericValue', 'ExcludeMacroFromRandomization', 'ExcludeMacroFromSnapshots'].map(
+      (field) => [field, childValue(device, `${field}.0`)] as const,
+    );
+    reorderMacro(rack, 0, 3);
+    const after = Rack.parse(rack.serialize()).deviceEl;
+    for (const [field, value] of before) expect(childValue(after, `${field}.3`)).toBe(value);
+  });
+
+  test('renameRack, setMacroCount and setMacroColor survive a real round trip', () => {
+    const rack = Rack.parse(load('simplerack.adg'));
+    renameRack(rack, 'Renamed Rack');
+    setMacroCount(rack, 12);
+    setMacroColor(rack, 1, 26);
+    const roundTripped = Rack.parse(rack.serialize());
+    expect(roundTripped.name).toBe('Renamed Rack');
+    expect(roundTripped.macroCount).toBe(12);
+    expect(roundTripped.macros[1].color).toBe(26);
+  });
 });
 
 describe.skipIf(!has('withvariations.adg'))('withvariations.adg', () => {
@@ -63,6 +105,23 @@ describe.skipIf(!has('withvariations.adg'))('withvariations.adg', () => {
     rack.variations.forEach((v, i) => {
       expect(v.values[to]).toBe(before[i]);
       expect(v.values[from]).toBe(-1);
+    });
+  });
+
+  test('reorderMacro shifts every variation value across the range it walks', () => {
+    const rack = Rack.parse(load('withvariations.adg'));
+    const from = rack.macros.findIndex((m) => m.bindings.length > 0);
+    expect(from).toBeGreaterThanOrEqual(0);
+    const to = from + 3;
+    const before = rack.variations.map((v) => [...v.values]);
+    expect(reorderMacro(rack, from, to).ok).toBe(true);
+
+    const after = Rack.parse(rack.serialize()).variations;
+    after.forEach((v, i) => {
+      expect(v.values[to]).toBe(before[i][from]);
+      // Everything between slid back by one; nothing outside the range moved.
+      for (let slot = from; slot < to; slot++) expect(v.values[slot]).toBe(before[i][slot + 1]);
+      for (let slot = 0; slot < from; slot++) expect(v.values[slot]).toBe(before[i][slot]);
     });
   });
 });

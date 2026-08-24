@@ -53,7 +53,13 @@ export function moveMapping(rack: Rack, from: number, to: number): MutationResul
   return ok(warnings);
 }
 
-/** Exchange ALL bindings (in both directions), names, colors, stored values, and all variation values between two slots - a full slot swap, not just what each macro drives. */
+/**
+ * Exchange everything the two slots own: all bindings (in both directions),
+ * every per-slot field in `PER_SLOT_FIELDS`, the stored value, and every
+ * variation's value. A swap moves the whole macro, so a user who drags knob 5
+ * onto knob 2 gets knob 5's annotation and randomization flags along with its
+ * name and colour, rather than a macro that half moved.
+ */
 export function swapMacros(rack: Rack, a: number, b: number): MutationResult {
   if (a === b) return ok();
   assertSlot(a);
@@ -66,13 +72,93 @@ export function swapMacros(rack: Rack, a: number, b: number): MutationResult {
   for (const km of bKeyMidis) setChildValue(km, 'NoteOrController', a);
 
   const device = rack.deviceEl;
-  swapChildValue(device, `MacroDisplayNames.${a}`, device, `MacroDisplayNames.${b}`);
-  swapChildValue(device, `MacroColor.${a}`, device, `MacroColor.${b}`);
+  for (const field of PER_SLOT_FIELDS) swapChildValue(device, `${field}.${a}`, device, `${field}.${b}`);
   swapChildValue(child(device, `MacroControls.${a}`), 'Manual', child(device, `MacroControls.${b}`), 'Manual');
 
   permuteVariations(rack, (values) => {
     [values[a], values[b]] = [values[b], values[a]];
   });
+  return ok();
+}
+
+/**
+ * Move the macro at `from` to position `to`, sliding everything in between by
+ * one - a reorder, not a two-way swap: dropping macro 5 on position 2 pushes
+ * 2,3,4 down to 3,4,5. Done as repeated adjacent `swapMacros` calls rather
+ * than a bespoke bulk permutation, so the variation handling stays the one
+ * already-tested path (Constraint 4) instead of a second implementation of it.
+ */
+export function reorderMacro(rack: Rack, from: number, to: number): MutationResult {
+  if (from === to) return ok();
+  assertSlot(from);
+  assertSlot(to);
+  const step = from < to ? 1 : -1;
+  for (let i = from; i !== to; i += step) swapMacros(rack, i, i + step);
+  return ok();
+}
+
+/**
+ * Set how many macro knobs the rack shows. All 16 slots exist in the file
+ * regardless (SCHEMA.md Q7), so shrinking hides macros, it never deletes
+ * their bindings - a slot above the new count keeps driving whatever it drove.
+ */
+export function setMacroCount(rack: Rack, count: number): MutationResult {
+  if (!Number.isInteger(count) || count < 1 || count > MACRO_SLOTS) {
+    throw new RangeError(`macro count ${count} out of range 1..${MACRO_SLOTS}`);
+  }
+  setChildValue(rack.deviceEl, 'NumVisibleMacroControls', count);
+  return ok();
+}
+
+/**
+ * Rename the rack itself - the write side of `Rack.name`. Writes `UserName`
+ * and nothing else; whether Live writes anything alongside it on its own
+ * rename gesture has not been checked against a before/after diff, so this is
+ * the one mutation here not fully traced to SCHEMA.md.
+ */
+export function renameRack(rack: Rack, name: string): MutationResult {
+  setChildValue(rack.deviceEl, 'UserName', name);
+  return ok();
+}
+
+/** Writes `MacroColor.N`, the palette index Live's own colour picker stores. Not range-checked: the palette's size is not confirmed, and guessing a bound would reject colours Live accepts. */
+export function setMacroColor(rack: Rack, macroIndex: number, colorIndex: number): MutationResult {
+  assertSlot(macroIndex);
+  if (!Number.isInteger(colorIndex) || colorIndex < 0) throw new RangeError(`colour index ${colorIndex} is not a non-negative integer`);
+  setChildValue(rack.deviceEl, `MacroColor.${macroIndex}`, colorIndex);
+  return ok();
+}
+
+/**
+ * Remove ONE of a macro's bindings, leaving its others alone - the narrow
+ * sibling of `unbindMacro`, for a macro driving several parameters where only
+ * one row's "x" was clicked. Refuses if the parameter at `targetPath` is not
+ * actually driven by `macroIndex`: a mismatched pair is a caller bug, and
+ * silently unbinding whatever happened to be there instead is the failure
+ * mode this codec exists to avoid.
+ */
+export function unbindOne(rack: Rack, macroIndex: number, targetPath: string): MutationResult {
+  assertSlot(macroIndex);
+  const targetEl = rack.resolveTarget(targetPath);
+  if (!targetEl) return fail(`no parameter at "${targetPath}" - it may belong to a stale snapshot`);
+
+  const container = child(targetEl, 'Timeable') ?? targetEl;
+  const keyMidi = child(container, 'KeyMidi');
+  if (!keyMidi || childValue(keyMidi, 'Channel') !== '16') return fail('that parameter is not driven by a macro');
+  const owner = Number(childValue(keyMidi, 'NoteOrController'));
+  if (owner !== macroIndex) return fail(`that parameter is driven by macro ${owner + 1}, not macro ${macroIndex + 1}`);
+
+  removeKeyMidi(keyMidi);
+
+  // The macro's variation values only become meaningless once it drives
+  // nothing at all. While it still has other targets, its stored per-variation
+  // positions are live and clearing them would break every variation.
+  const remaining = rack.collectMacroBindings().get(macroIndex) ?? [];
+  if (remaining.length === 0) {
+    permuteVariations(rack, (values) => {
+      values[macroIndex] = UNSET_MACRO_VALUE;
+    });
+  }
   return ok();
 }
 
@@ -144,6 +230,22 @@ export function renameMacro(rack: Rack, macroIndex: number, name: string): Mutat
 
 // --- internals ---
 
+/**
+ * Every `<Field>.N` family Live writes once per macro slot (SCHEMA.md Q7),
+ * except `MacroControls.N`, whose payload is a `Manual` child rather than a
+ * Value attribute and so is swapped separately. All 16 of each exist in every
+ * rack regardless of the visible macro count, so a swap can move all of them.
+ */
+const PER_SLOT_FIELDS = [
+  'MacroDisplayNames',
+  'MacroDefaults',
+  'MacroAnnotations',
+  'MacroColor',
+  'ForceDisplayGenericValue',
+  'ExcludeMacroFromRandomization',
+  'ExcludeMacroFromSnapshots',
+] as const;
+
 function assertSlot(index: number): void {
   if (!Number.isInteger(index) || index < 0 || index >= MACRO_SLOTS) {
     throw new RangeError(`macro index ${index} out of range 0..${MACRO_SLOTS - 1}`);
@@ -154,12 +256,21 @@ function removeKeyMidi(keyMidi: Element): void {
   keyMidi.parentElement?.removeChild(keyMidi);
 }
 
+/**
+ * Exchange two `<Tag Value="..." />` children. Skips unless BOTH sides exist:
+ * with one side missing there is no value to give it in return, and writing
+ * the present side's value into both slots (leaving it in place as well) would
+ * duplicate rather than swap. Every per-slot macro field is present in all 16
+ * copies in a real rack (SCHEMA.md Q7), so this only skips on a malformed file
+ * or on the synthetic test fixture, which omits the rarer families.
+ */
 function swapChildValue(a: Element | null, tagA: string, b: Element | null, tagB?: string): void {
   const bTag = tagB ?? tagA;
-  const bothA = a ? childValue(a, tagA) : null;
-  const bothB = b ? childValue(b, bTag) : null;
-  if (a && bothB !== null) setChildValue(a, tagA, bothB);
-  if (b && bothA !== null) setChildValue(b, bTag, bothA);
+  const valueA = a ? childValue(a, tagA) : null;
+  const valueB = b ? childValue(b, bTag) : null;
+  if (valueA === null || valueB === null) return;
+  setChildValue(a!, tagA, valueB);
+  setChildValue(b!, bTag, valueA);
 }
 
 /** Every `MacroSnapshot`, all 16 `MacroValues.N`/`MacroHasValue.N` read, permuted, written back (SCHEMA.md Q5). */

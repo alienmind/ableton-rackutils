@@ -1,7 +1,22 @@
 import { describe, expect, test } from 'vitest';
+import { childValue } from '../src/dom';
 import { Rack } from '../src/model';
-import { bindParameter, moveMapping, renameMacro, swapMacros, unbindMacro } from '../src/mutate';
+import {
+  bindParameter,
+  moveMapping,
+  renameMacro,
+  renameRack,
+  reorderMacro,
+  setMacroColor,
+  setMacroCount,
+  swapMacros,
+  unbindMacro,
+  unbindOne,
+} from '../src/mutate';
 import { buildFixtureBytes } from './fixture';
+
+/** Per-slot fields the typed model deliberately doesn't surface (annotations, defaults, the exclude flags) - read straight off the DOM to check a reorder carried them. */
+const slotField = (rack: Rack, field: string, index: number) => childValue(rack.deviceEl, `${field}.${index}`);
 
 describe('moveMapping', () => {
   test('transfers ALL of a macro\'s bindings to the new slot, not just one', () => {
@@ -81,6 +96,176 @@ describe('swapMacros', () => {
       expect(v.values[0]).toBe(before[i][1]);
       expect(v.values[1]).toBe(before[i][0]);
     });
+  });
+
+  test('carries every per-slot field, not just name and colour', () => {
+    // SCHEMA.md Q7 lists 7 per-slot families. A swap that moved only the two
+    // the typed model happens to expose would leave a macro's annotation and
+    // randomization flag behind on the slot it came from.
+    const rack = Rack.parse(buildFixtureBytes());
+    swapMacros(rack, 0, 1);
+    expect(slotField(rack, 'MacroAnnotations', 0)).toBe('note 1');
+    expect(slotField(rack, 'MacroAnnotations', 1)).toBe('note 0');
+    expect(slotField(rack, 'MacroDefaults', 0)).toBe('1');
+    expect(slotField(rack, 'MacroDefaults', 1)).toBe('0');
+    expect(slotField(rack, 'ExcludeMacroFromRandomization', 0)).toBe('true');
+    expect(slotField(rack, 'ExcludeMacroFromRandomization', 1)).toBe('false');
+  });
+});
+
+describe('reorderMacro', () => {
+  test('shifts the macros in between, it does not swap the two ends', () => {
+    const rack = Rack.parse(buildFixtureBytes());
+    renameMacro(rack, 0, 'Filter');
+    const result = reorderMacro(rack, 0, 3);
+    expect(result.ok).toBe(true);
+    expect(rack.macros[3].name).toBe('Filter');
+    // 1,2,3 slid up into 0,1,2 - a swap would have left 1 and 2 untouched.
+    expect(rack.macros.slice(0, 3).map((m) => m.name)).toEqual(['Macro 2', 'Macro 3', 'Macro 4']);
+  });
+
+  test('carries the whole macro - bindings, colour, stored value, annotations', () => {
+    const rack = Rack.parse(buildFixtureBytes());
+    const colorBefore = rack.macros[0].color;
+    const valueBefore = rack.macros[0].value;
+    setMacroColor(rack, 0, 11);
+    reorderMacro(rack, 0, 4);
+    expect(rack.macros[4].bindings.map((b) => b.targetName).sort()).toEqual(['ParamA', 'ParamC']);
+    expect(rack.macros[0].bindings).toHaveLength(0);
+    expect(rack.macros[4].color).toBe(11);
+    expect(rack.macros[4].value).toBe(valueBefore);
+    expect(slotField(rack, 'MacroAnnotations', 4)).toBe('note 0');
+    expect(colorBefore).not.toBe(11); // the assertion above is not passing by accident
+  });
+
+  test('destroys nothing at the destination - the displaced macro shifts, it is not overwritten', () => {
+    // The difference from moveMapping, which clears whatever the destination
+    // was driving. Reordering is how a user expects dragging a knob to behave.
+    const rack = Rack.parse(buildFixtureBytes());
+    const paramB = rack.chains[0].devices[0].parameters[1];
+    bindParameter(rack, 3, paramB);
+    renameMacro(rack, 3, 'Keep Me');
+    reorderMacro(rack, 0, 3);
+    expect(rack.macros[2].name).toBe('Keep Me');
+    expect(rack.macros[2].bindings.map((b) => b.targetName)).toEqual(['ParamB']);
+  });
+
+  test('works backwards, from a high slot to a low one', () => {
+    const rack = Rack.parse(buildFixtureBytes());
+    renameMacro(rack, 4, 'Late');
+    reorderMacro(rack, 4, 1);
+    expect(rack.macros[1].name).toBe('Late');
+    expect(rack.macros.slice(2, 5).map((m) => m.name)).toEqual(['Macro 2', 'Macro 3', 'Macro 4']);
+  });
+
+  test('shifts variation values in lockstep across the whole range (Constraint 4)', () => {
+    const rack = Rack.parse(buildFixtureBytes({ withVariations: true }));
+    const before = rack.variations.map((v) => [...v.values]);
+    reorderMacro(rack, 0, 2);
+    rack.variations.forEach((v, i) => {
+      expect(v.values[2]).toBe(before[i][0]);
+      expect(v.values[0]).toBe(before[i][1]);
+      expect(v.values[1]).toBe(before[i][2]);
+    });
+  });
+
+  test('is a no-op for from === to', () => {
+    const rack = Rack.parse(buildFixtureBytes());
+    expect(reorderMacro(rack, 2, 2).ok).toBe(true);
+    expect(rack.macros[0].bindings).toHaveLength(2);
+  });
+});
+
+describe('setMacroCount', () => {
+  test('changes the visible count and survives a round trip', () => {
+    const rack = Rack.parse(buildFixtureBytes());
+    expect(setMacroCount(rack, 16).ok).toBe(true);
+    expect(Rack.parse(rack.serialize()).macroCount).toBe(16);
+  });
+
+  test('shrinking hides macros without touching their bindings (SCHEMA.md Q7)', () => {
+    const rack = Rack.parse(buildFixtureBytes());
+    setMacroCount(rack, 1);
+    moveMapping(rack, 0, 9); // macro 10, well above the visible count
+    setMacroCount(rack, 2);
+    expect(Rack.parse(rack.serialize()).macros[9].bindings).toHaveLength(2);
+  });
+
+  test('rejects counts outside 1..16', () => {
+    const rack = Rack.parse(buildFixtureBytes());
+    expect(() => setMacroCount(rack, 0)).toThrow(RangeError);
+    expect(() => setMacroCount(rack, 17)).toThrow(RangeError);
+  });
+});
+
+describe('renameRack', () => {
+  test('renames the rack and survives a round trip', () => {
+    const rack = Rack.parse(buildFixtureBytes());
+    expect(renameRack(rack, 'Bass Machine').ok).toBe(true);
+    expect(Rack.parse(rack.serialize()).name).toBe('Bass Machine');
+  });
+
+  test('leaves a nested rack\'s own name alone', () => {
+    const rack = Rack.parse(buildFixtureBytes());
+    renameRack(rack, 'Outer');
+    expect(rack.chains[0].devices[1].name).toBe('Nested Rack');
+  });
+});
+
+describe('setMacroColor', () => {
+  test('sets the palette index and survives a round trip', () => {
+    const rack = Rack.parse(buildFixtureBytes());
+    expect(setMacroColor(rack, 2, 42).ok).toBe(true);
+    expect(Rack.parse(rack.serialize()).macros[2].color).toBe(42);
+  });
+
+  test('rejects a negative or fractional index', () => {
+    const rack = Rack.parse(buildFixtureBytes());
+    expect(() => setMacroColor(rack, 2, -1)).toThrow(RangeError);
+    expect(() => setMacroColor(rack, 2, 1.5)).toThrow(RangeError);
+  });
+});
+
+describe('unbindOne', () => {
+  test('removes one target from a multi-target macro, leaving the others', () => {
+    const rack = Rack.parse(buildFixtureBytes());
+    const paramA = rack.macros[0].bindings.find((b) => b.targetName === 'ParamA')!;
+    const result = unbindOne(rack, 0, paramA.targetPath);
+    expect(result.ok).toBe(true);
+    expect(rack.macros[0].bindings.map((b) => b.targetName)).toEqual(['ParamC']);
+  });
+
+  test('keeps variation values while the macro still drives something else', () => {
+    // The macro is still live, so its per-variation positions still mean
+    // something. Clearing them here would break every variation in the rack.
+    const rack = Rack.parse(buildFixtureBytes({ withVariations: true }));
+    const before = rack.variations.map((v) => v.values[0]);
+    const paramA = rack.macros[0].bindings.find((b) => b.targetName === 'ParamA')!;
+    unbindOne(rack, 0, paramA.targetPath);
+    rack.variations.forEach((v, i) => expect(v.values[0]).toBe(before[i]));
+  });
+
+  test('clears variation values once the last target is removed', () => {
+    const rack = Rack.parse(buildFixtureBytes({ withVariations: true }));
+    for (const binding of [...rack.macros[0].bindings]) unbindOne(rack, 0, binding.targetPath);
+    expect(rack.macros[0].bindings).toHaveLength(0);
+    for (const v of rack.variations) expect(v.values[0]).toBe(-1);
+  });
+
+  test('refuses when the parameter belongs to a different macro', () => {
+    const rack = Rack.parse(buildFixtureBytes());
+    const paramA = rack.macros[0].bindings.find((b) => b.targetName === 'ParamA')!;
+    const result = unbindOne(rack, 4, paramA.targetPath);
+    expect(result.ok).toBe(false);
+    expect(result.warnings[0]).toMatch(/driven by macro 1/);
+    expect(rack.macros[0].bindings).toHaveLength(2); // nothing removed
+  });
+
+  test('refuses on an unmapped parameter and on an unresolvable path', () => {
+    const rack = Rack.parse(buildFixtureBytes());
+    const paramB = rack.chains[0].devices[0].parameters[1];
+    expect(unbindOne(rack, 0, paramB.path).ok).toBe(false);
+    expect(unbindOne(rack, 0, '99/99/99').ok).toBe(false);
   });
 });
 

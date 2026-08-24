@@ -27,6 +27,15 @@ function macroSlots(mapped: Record<number, number> = {}, colors: Record<number, 
     xml += `<MacroControls.${i}><LomId Value="0" /><Manual Value="${value}" /><MidiControllerRange><Min Value="0" /><Max Value="127" /></MidiControllerRange></MacroControls.${i}>`;
     xml += `<MacroDisplayNames.${i} Value="Macro ${i + 1}" />`;
     xml += `<MacroColor.${i} Value="${colors[i] ?? 0}" />`;
+    // The rest of the per-slot families (SCHEMA.md Q7), all 16 of each, as
+    // every real rack carries them. Annotations and defaults are given
+    // per-index values so a reorder or swap that drops one is visible in a
+    // test rather than silently passing.
+    xml += `<MacroAnnotations.${i} Value="note ${i}" />`;
+    xml += `<MacroDefaults.${i} Value="${i}" />`;
+    xml += `<ForceDisplayGenericValue.${i} Value="false" />`;
+    xml += `<ExcludeMacroFromRandomization.${i} Value="${i === 1}" />`;
+    xml += `<ExcludeMacroFromSnapshots.${i} Value="false" />`;
   }
   return xml;
 }
