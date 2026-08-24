@@ -240,9 +240,13 @@ Tier 1 below therefore means "the editor, running inside Live, with live targeti
 
 These are the load-bearing facts. Do not design around them without re-verifying them first.
 
-### Constraint 1: Mapping targets exist only in the file
+### Constraint 1: Mapping targets are not exposed to code
 
 The Live Object Model exposes a macro's current value as a `DeviceParameter`, and that value is observable. It does not expose which parameter a macro drives. Not through Max's `LiveAPI`, not through a Python Remote Script, not through AbletonOSC (whose own docs list `RackDevice` and `Chain` as incompletely exposed).
+
+State this as "not exposed to code", never as "the mapping exists only in the file". Live plainly knows it at runtime and shows it: right-click a macro knob and the context menu reads "Remove Mapping to \<rack\> | \<chain\> | \<parameter\>", naming the target exactly. The limit is the API surface, not Live's knowledge.
+
+Compounding it: a Max for Live device reaches its own device chain far more readily than an arbitrary rack elsewhere in the set, and the rack the user wants to edit is generally not the one hosting the editor.
 
 Consequence: creating, moving, or deleting a binding is a file operation. There is no live API call for it. Everything in this plan follows from that.
 

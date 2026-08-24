@@ -12,27 +12,24 @@ page, or from the command line.
 > a rack and show you what is inside it, but the editing UI is not wired up.
 > The command line tools below do work today. See [What works today](#what-works-today).
 
-> **Keep backups.** This tool rewrites rack preset files. A bug can produce a
-> file that loads in Live without complaint and behaves incorrectly, including
-> silently breaking every Macro Variation in the rack. Work on copies until you
-> have checked the result in Live yourself.
+> **Keep backups.** This tool rewrites rack files, and a bug here can produce a
+> rack that loads fine and misbehaves quietly - a broken Macro Variation, say.
+> Work on copies until you have checked the result in Live yourself.
 
 ## Your files stay on your machine
 
 The website is a static page with no backend and no account. Your `.adg` is
 opened, edited, and rebuilt inside your browser tab. There is no server for it
-to be uploaded to - the [source](https://github.com/alienmind/ableton-rackutils).
+to be uploaded to.
 
-The command line tools never touch the network at all.
+## Why it works on files
 
-## Why the file, and not a plugin
+Live keeps macro mappings to itself. You can see and change them by hand in
+Live, but they are not open to plugins or scripts, so a tool like this one has
+to go through the saved rack file: save the rack from Live, change it here,
+load it back. ([Details](doc/DEVELOPERS.md#why-this-tool-edits-files).)
 
-Live will tell a plugin what value a macro is currently at, but never which
-parameter that macro drives. That information exists only in the saved file.
-So editing a mapping means editing the file: save the rack from Live, change
-it here, load it back.
-
-Practical consequences:
+What that means in practice:
 
 - Save the rack to disk first (click the disk icon in the rack's title bar, or
   drag the rack into Live's browser). The saved file is what gets edited.
@@ -67,14 +64,13 @@ pnpm adg-tool mappings my-rack.adg
 
 ```
 AlienMind Drum Rack - 8 visible macros
-  Macro 1 (Macro 1) -> MacroControls.0 [0..127], ChainSelector [0..127]
   Macro 2 (DR GAIN) -> Gain [0..56.2341309]
   Macro 3 (EQ LOW) -> GainLo [0.0003162277571..1.99526238]
+  Macro 4 (EQ MID) -> GainMid [0.0003162277571..1.99526238]
 ```
 
-One macro can drive several parameters, so a line can list more than one
-target. The numbers in brackets are the range that macro sweeps the parameter
-across.
+The numbers in brackets are the range that macro sweeps the parameter across.
+A macro can drive several parameters at once, so a line can list more than one.
 
 ### Move a macro to a different knob
 
@@ -89,36 +85,16 @@ nothing is lost.
 
 Then drag `out.adg` from your file manager onto the rack in Live to load it.
 
-There is also `move-mapping`, with the same arguments, which moves only what a
-macro drives and leaves its name and colour behind - and which clears whatever
-the destination knob was driving. It is the narrow primitive underneath `move`;
-you probably want `move` unless you specifically want that.
-
-### Look inside a rack file
-
-```bash
-pnpm adg-tool unpack my-rack.adg > rack.xml
-pnpm adg-tool diff before.adg after.adg
-```
-
-An `.adg` is a gzipped XML document. `unpack` gives you the readable version;
-`diff` shows what changed between two saves, which is a good way to work out
-how Live stores something.
+If you want to move only what a knob drives and leave its name and colour
+behind, `move-mapping` takes the same arguments and does that instead.
 
 ## The website
 
 Open https://alienmind.github.io/ableton-rackutils/ and drag a `.adg` onto the
 page. It works offline once loaded, and on a machine with no Ableton installed.
 
-Right now it decompresses the file and shows its raw structure, collapsed;
-click a node to expand it. The macro editor described above is the next thing
-being built for it.
-
-To run it yourself instead:
-
-```bash
-pnpm dev      # http://localhost:5173
-```
+For now it just shows you what is inside the rack. The macro editing described
+above is the next thing being built for it.
 
 ## The companion device (optional)
 

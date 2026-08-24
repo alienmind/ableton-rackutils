@@ -35,6 +35,29 @@ Rules that keep the pieces honest:
 - The build stays a pure static build. No SSR, no API routes, nothing that
   assumes a Node process at runtime.
 
+## Why this tool edits files
+
+The precise version of the README's short answer, because the imprecise
+version is easy to write and wrong.
+
+Live itself knows perfectly well what a macro drives - right-click a macro
+knob and its context menu offers "Remove Mapping to \<rack\> | \<chain\> |
+\<parameter\>", naming the target exactly. What does not exist is programmatic
+access to it. The Live Object Model exposes a macro as a `DeviceParameter`
+with an observable value, and nothing that says which parameter it drives.
+Not through Max's `LiveAPI`, not through a Python Remote Script, not through
+AbletonOSC (whose own docs list `RackDevice` and `Chain` as incompletely
+exposed). There is no call to create, move, or delete a mapping either.
+
+A second limit compounds it: a Max for Live device can act on the device
+chain it sits in far more readily than on some other rack elsewhere in the
+set, and the rack a user wants to edit is generally not the one hosting the
+editor.
+
+So mapping edits are a file operation. This is `PLAN.md` Constraint 1, and it
+shapes the whole design - see also Constraint 2 (a loaded device carries no
+pointer back to the file it came from, so the user must pick the file).
+
 ## Current state
 
 Pre-alpha. The codec is built and tested; the site still shows a raw XML tree
