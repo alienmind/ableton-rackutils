@@ -6,13 +6,14 @@
  *   adg-tool diff A.adg B.adg
  *   adg-tool mappings rack.adg
  *   adg-tool move rack.adg <from> <to> out.adg
+ *   adg-tool move-mapping rack.adg <from> <to> out.adg
  *
  * `unpack`/`diff` predate the codec and stay independent of it deliberately
  * (Node's own zlib, a regex strip) - they're what SCHEMA.md itself was built
- * with, and should keep working even if the codec has a bug. `mappings`/`move`
- * are the opposite: a way to exercise @rackutils/adg-codec directly against a
- * real file without needing the site UI, useful for testing `mutate.ts`
- * end to end (parse -> mutate -> write -> load the result in Live).
+ * with, and should keep working even if the codec has a bug. The rest are the
+ * opposite: a way to exercise @rackutils/adg-codec directly against a real
+ * file without needing the site UI, useful for testing `mutate.ts` end to end
+ * (parse -> mutate -> write -> load the result in Live).
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
@@ -26,7 +27,7 @@ const { window } = new JSDOM();
 globalThis.DOMParser = window.DOMParser as unknown as typeof DOMParser;
 globalThis.XMLSerializer = window.XMLSerializer as unknown as typeof XMLSerializer;
 
-const { Rack, moveMapping } = await import('@rackutils/adg-codec');
+const { Rack, moveMapping, reorderMacro } = await import('@rackutils/adg-codec');
 
 const VOLATILE = ['Id', 'PointeeId', 'LomId', 'LomIdView'];
 
@@ -89,21 +90,28 @@ if (cmd === 'unpack') {
   if (rack.variations.length) {
     console.log(`${rack.variations.length} variation(s): ${rack.variations.map((v) => v.name).join(', ')}`);
   }
-} else if (cmd === 'move') {
+} else if (cmd === 'move' || cmd === 'move-mapping') {
   const [file, fromStr, toStr, outFile] = args;
   if (!file || !fromStr || !toStr || !outFile) {
-    throw new Error('usage: adg-tool move <file.adg> <from-macro-1-based> <to-macro-1-based> <out.adg>');
+    throw new Error(`usage: adg-tool ${cmd} <file.adg> <from-macro-1-based> <to-macro-1-based> <out.adg>`);
   }
   const rack = Rack.parse(new Uint8Array(readFileSync(file)));
-  const result = moveMapping(rack, Number(fromStr) - 1, Number(toStr) - 1);
+  const from = Number(fromStr) - 1;
+  const to = Number(toStr) - 1;
+  // `move` is the whole macro - name, colour, value, bindings, variations -
+  // sliding the macros it passes along by one, destroying nothing.
+  // `move-mapping` is the narrow primitive: bindings only, leaving the name
+  // and colour behind and clearing whatever the destination drove.
+  const result = cmd === 'move' ? reorderMacro(rack, from, to) : moveMapping(rack, from, to);
   for (const w of result.warnings) console.warn(`warning: ${w}`);
   if (!result.ok) {
-    console.error('move failed');
+    console.error(`${cmd} failed`);
     process.exit(1);
   }
   writeFileSync(outFile, rack.serialize());
-  console.log(`wrote ${outFile} - macro ${fromStr} moved to macro ${toStr}`);
+  const what = cmd === 'move' ? 'macro' : "macro's mapping";
+  console.log(`wrote ${outFile} - ${what} ${fromStr} moved to macro ${toStr}`);
 } else {
-  console.error('usage: adg-tool <unpack|diff|mappings|move> ...');
+  console.error('usage: adg-tool <unpack|diff|mappings|move|move-mapping> ...');
   process.exit(2);
 }
