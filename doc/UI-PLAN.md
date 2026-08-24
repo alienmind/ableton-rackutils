@@ -6,10 +6,11 @@ XML tree viewer with a UI that looks and behaves like Ableton's own rack
 macro panel, built on the same components the embedded M4L device UI reuses
 later (Phase 5.4 in `PLAN.md`).
 
-**Status: planning only. Nothing in this document is implemented yet.** Do
-not start on the reference-image work (Part 1) until explicitly asked -
-that instruction came directly from the project owner and still holds
-until someone says otherwise.
+**Status: Part 4 built, the rest is still planning.** All five new mutations
+exist in `packages/adg-codec/src/mutate.ts` and are tested against the real
+fixtures. Parts 1, 2 and 3 are unimplemented. Do not start on the
+reference-image work (Part 1) until explicitly asked - that instruction came
+directly from the project owner and still holds until someone says otherwise.
 
 ---
 
@@ -743,11 +744,30 @@ rather than guessing.
 
 ## Part 4: New `adg-codec` mutations this UI needs
 
-None of these exist yet. Specs, not implementations - write them in
-`packages/adg-codec/src/mutate.ts` following the exact patterns already
-there (clone-before-mutate is the caller's job per `Rack.clone()`; every
-slot-shifting mutation must permute `MacroSnapshot` values, per Constraint 4
-and the existing `permuteVariations` helper).
+**Built.** All five are in `packages/adg-codec/src/mutate.ts`, exported from
+the package index, and tested both synthetically and against the real
+fixtures. The specs below stand as written except where noted per entry.
+
+Three decisions taken during implementation, none of them in the spec above:
+
+1. **`swapMacros` now exchanges every per-slot field**, not just name,
+   colour and stored value. `SCHEMA.md` Q7 lists seven `<Field>.N` families
+   (adding `MacroDefaults`, `MacroAnnotations`, `ForceDisplayGenericValue`,
+   `ExcludeMacroFromRandomization`, `ExcludeMacroFromSnapshots`), and a swap
+   that moved only the two the typed model exposes left a macro's annotation
+   and randomization flag behind on the slot it came from. Since
+   `reorderMacro` is built out of adjacent swaps, it inherits this. All seven
+   confirmed present x16 per rack in all three real fixtures.
+2. **`unbindOne` clears a macro's variation values only when the removed
+   binding was its last.** While the macro still drives something else its
+   stored per-variation positions are live, and clearing them would break
+   every variation in the rack. `unbindMacro` still clears unconditionally,
+   which is right there - it removes everything.
+3. **`adg-tool move` now runs `reorderMacro`**, not `moveMapping`. Running
+   the old command on a real rack produced exactly the confusing result the
+   distinction in Part 2.1 predicts: the destination knob kept its old name
+   over the incoming mapping, and its own mapping was silently destroyed.
+   `moveMapping` remains available as `adg-tool move-mapping`.
 
 ### 4.1 `reorderMacro(rack, from, to): MutationResult`
 
@@ -803,9 +823,8 @@ wrong thing).
 ## Build order
 
 1. Part 1 (SVG + palette extraction) - **on hold, do not start until told**.
-2. Part 4 (new mutations) - can start independently, does not depend on
-   Part 1 at all. Test against the real fixtures per the existing pattern
-   (`packages/adg-codec/tests/real-fixtures.test.ts`).
+2. ~~Part 4 (new mutations)~~ - **done**, tested against the real fixtures
+   per the existing pattern (`packages/adg-codec/tests/real-fixtures.test.ts`).
 3. Part 3 minus real SVG (use Part 3.2's placeholder shapes) - get the
    component tree, drag-reorder, arm/bind, and mapped/"more" logic working
    end to end against the synthetic fixture and `apps/site`'s dev server,

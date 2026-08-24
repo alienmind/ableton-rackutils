@@ -16,6 +16,9 @@ is meant to lock the toolkit to macro remapping only; `adg-codec` and
 surface, not a rewrite.
 
 Companion docs:
+- `doc/DEVELOPERS.md` - setup, repo layout, how to test, the pipeline. The
+  practical entry point; this document is the reasoning behind it. (`README.md`
+  is for people using the tool, not building it.)
 - `packages/adg-codec/SCHEMA.md` - the schema findings log, confirmed against
   real fixtures, that all codec code must trace to.
 - `doc/UI-PLAN.md` - the web UI overhaul plan (Ableton-matching macro panel,
@@ -44,16 +47,18 @@ is the next real work.
   in Live and checking by eye - is still on you, see "How to test" below.
 - **`packages/adg-codec/src/model.ts` and `mutate.ts` - built.** `Rack.parse`/
   `.clone`/`.serialize`, `macros`/`variations`/`chains` (full device tree,
-  including nested racks), and `moveMapping`/`swapMacros`/`bindParameter`/
-  `unbindMacro`/`renameMacro`. 38 tests (`packages/adg-codec/tests/`): 32
-  synthetic (always run), 6 against the real fixtures (skip cleanly in CI,
-  run locally). All confirmed against `simplerack.adg`, `withvariations.adg`,
-  `drum-nested.adg` - not just the synthetic fixture.
-- `tools/adg-tool/` - `unpack`/`diff` as before, plus two new commands
-  that exercise the codec directly against a real file without needing the
-  site UI: `adg-tool mappings <file.adg>` (list what's bound) and
-  `adg-tool move <file.adg> <from> <to> <out.adg>` (run `moveMapping`,
-  write the result). See "How to test" below.
+  including nested racks), and ten mutations: `moveMapping`/`swapMacros`/
+  `bindParameter`/`unbindMacro`/`renameMacro`, plus `UI-PLAN.md` Part 4's
+  `reorderMacro`/`setMacroCount`/`renameRack`/`setMacroColor`/`unbindOne`.
+  61 tests (`packages/adg-codec/tests/`): 51 synthetic (always run), 10
+  against the real fixtures (skip cleanly in CI, run locally). All confirmed
+  against `simplerack.adg`, `withvariations.adg`, `drum-nested.adg` - not
+  just the synthetic fixture.
+- `tools/adg-tool/` - `unpack`/`diff` as before, plus three commands that
+  exercise the codec directly against a real file without needing the site
+  UI: `adg-tool mappings <file.adg>` (list what's bound), `adg-tool move
+  <file.adg> <from> <to> <out.adg>` (run `reorderMacro`), and `move-mapping`
+  (same arguments, the narrower `moveMapping`). See "How to test" below.
 - `apps/site/` - runs (`pnpm dev`), deployed to GitHub Pages, confirmed
   working on a real 4000+ element rack. Still the raw XML tree viewer only -
   not wired to the codec yet, that's next.
@@ -90,7 +95,7 @@ place.
 No UI needed yet - two ways, both exercise the real code:
 
 ```bash
-pnpm --filter @rackutils/adg-codec test   # 38 tests: parsing, all 5 mutations,
+pnpm --filter @rackutils/adg-codec test   # 61 tests: parsing, all 10 mutations,
                                            # confirmed against real racks too
                                            # if tests/fixtures/*.adg are present
 
@@ -134,10 +139,11 @@ rather than built blind. Revisit once the site's UI (Phase 3-4) exists to
 design them against, since they're mostly UI-shaped, not just codec
 primitives:
 
-- **Macro colour.** `MacroColor.N` is now modeled (`Macro.color`) and
-  `swapMacros` exchanges it along with the name - done. Still open:
-  authoring a macro's colour directly (`setMacroColor`, a straightforward
-  `mutate.ts` addition once wanted), and picking it automatically - from a
+- **Macro colour.** `MacroColor.N` is modeled (`Macro.color`), `swapMacros`
+  exchanges it, and `setMacroColor` authors it directly - all done. Still
+  open: the palette table that turns a stored index into a hex colour for the
+  UI (`UI-PLAN.md` Part 1.3, on hold), and picking a colour automatically -
+  from a
   palette, by name, or "sticky" colours for a given name/function that stay
   consistent across nested racks (e.g. every "Filter" macro anywhere in a
   rack tree gets the same colour). The sticky-by-name case needs a design
