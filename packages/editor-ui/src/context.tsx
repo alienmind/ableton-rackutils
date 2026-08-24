@@ -1,0 +1,54 @@
+import { createContext, useContext } from 'react';
+import type { MutationResult, ParamRef, Rack } from '@rackutils/adg-codec';
+
+/**
+ * Which rack a panel is showing, as the chain of device paths from the root
+ * rack down to it: `[]` is the root, `['0/1']` is the rack at that device
+ * path, `['0/1', '0/0']` a rack inside that one.
+ *
+ * Stored as a path rather than a `Rack` handle on purpose. Every mutation
+ * replaces the root handle (that is how React learns to re-render), which
+ * makes any handle captured earlier stale. A path stays valid, and
+ * `resolveRackPath` turns it back into a live handle against the current root.
+ */
+export type RackPath = readonly string[];
+
+export function resolveRackPath(root: Rack, path: RackPath): Rack | null {
+  let rack: Rack | null = root;
+  for (const devicePath of path) {
+    rack = rack.subRack(devicePath);
+    if (!rack) return null;
+  }
+  return rack;
+}
+
+export const samePath = (a: RackPath, b: RackPath) => a.length === b.length && a.every((p, i) => p === b[i]);
+
+/**
+ * A parameter waiting to be bound to the next macro clicked, together with the
+ * rack it belongs to - a `ParamRef.path` only resolves against its own rack,
+ * so the two must travel together.
+ */
+export interface ArmedParam {
+  rackPath: RackPath;
+  param: ParamRef;
+}
+
+export interface EditorContextValue {
+  armed: ArmedParam | null;
+  arm: (armed: ArmedParam | null) => void;
+  /** Run a mutation against the rack at `rackPath`, recording undo and surfacing warnings. */
+  apply: (rackPath: RackPath, fn: (rack: Rack) => MutationResult) => void;
+  /** Live macro values from the M4L device, keyed by macro index. Root rack only, display only. */
+  liveValues?: Record<number, number>;
+}
+
+const EditorContext = createContext<EditorContextValue | null>(null);
+
+export const EditorProvider = EditorContext.Provider;
+
+export function useEditor(): EditorContextValue {
+  const ctx = useContext(EditorContext);
+  if (!ctx) throw new Error('editor-ui components must be rendered inside a RackEditor');
+  return ctx;
+}

@@ -1,0 +1,426 @@
+/*
+ * Shared editor styles. Themed through custom properties so the same
+ * components can sit on the site's dark page and inside the M4L device's own
+ * chrome without forking (UI-PLAN Part 3.0).
+ *
+ * The knob shape here is a PLACEHOLDER - Part 1's extraction replaces the
+ * dimensions and colours, not the structure.
+ */
+.rack-editor {
+  --edit-bg: #1a1c22;
+  --edit-bg-sunken: #14151a;
+  --edit-line: #2e313a;
+  --edit-text: #e8e8ea;
+  --edit-dim: #9a9aa5;
+  --edit-accent: #6ea8ff;
+  --knob-track: #33363f;
+  --knob-fill-default: #6ea8ff;
+  --knob-live: #ffd166;
+  color: var(--edit-text);
+  text-align: left;
+}
+
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.editor-toolbar button,
+.macro-count button,
+.more-toggle,
+.rack-disclosure,
+.cancel-arm,
+.unbind {
+  background: #23262e;
+  color: var(--edit-text);
+  border: 1px solid var(--edit-line);
+  border-radius: 4px;
+  padding: 0.2rem 0.5rem;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.editor-toolbar button:disabled,
+.macro-count button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.armed-note {
+  font-size: 0.85rem;
+  color: var(--edit-accent);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.warnings {
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.75rem 0.5rem 1.75rem;
+  border-left: 3px solid #ff9f45;
+  background: #241f18;
+  color: #ffd9ad;
+  font-size: 0.85rem;
+}
+
+/* --- rack panel, one per rack at any depth --- */
+
+.rack-panel {
+  border: 1px solid var(--edit-line);
+  border-radius: 6px;
+  background: var(--edit-bg);
+  margin-bottom: 0.75rem;
+}
+
+.rack-panel.depth-1 { background: #1d2027; }
+.rack-panel.depth-2 { background: #202430; }
+.rack-panel.depth-3 { background: #232734; }
+.rack-panel.drum-rack { border-color: #4a4030; }
+
+.rack-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--edit-line);
+}
+
+.rack-name,
+.rack-name-input {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.rack-name-input {
+  background: var(--edit-bg-sunken);
+  border: 1px solid var(--edit-accent);
+  border-radius: 3px;
+  color: inherit;
+  font-family: inherit;
+  padding: 0.1rem 0.3rem;
+}
+
+.rack-kind {
+  font-size: 0.7rem;
+  color: var(--edit-dim);
+  border: 1px solid var(--edit-line);
+  border-radius: 3px;
+  padding: 0 0.3rem;
+}
+
+.macro-count {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  color: var(--edit-dim);
+}
+
+.rack-body {
+  padding: 0.6rem;
+}
+
+/* --- macro bank --- */
+
+.macro-bank {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 0.5rem;
+}
+
+.macro-knob {
+  position: relative;
+  border: 1px solid var(--edit-line);
+  border-radius: 5px;
+  background: var(--edit-bg-sunken);
+  padding: 0.4rem;
+  text-align: center;
+  cursor: grab;
+}
+
+.macro-knob.unmapped { opacity: 0.62; }
+.macro-knob.hidden-slot { border-style: dashed; }
+.macro-knob.bindable { border-color: var(--edit-accent); }
+.macro-knob.drop-reorder { outline: 2px solid var(--edit-accent); }
+.macro-knob.drop-swap { outline: 2px dashed #ffd166; }
+
+.macro-knob-dial {
+  position: relative;
+  display: block;
+  width: 100%;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.macro-knob-dial svg {
+  width: 56px;
+  height: 56px;
+}
+
+.knob-track {
+  fill: none;
+  stroke: var(--knob-track);
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+
+.knob-fill {
+  fill: none;
+  stroke: var(--knob-fill-default);
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+
+/* The live value is the LOM's current position, not what the file stores.
+   Different thing, deliberately different look (doc/PLAN.md Phase 3.3). */
+.knob-live {
+  fill: none;
+  stroke: var(--knob-live);
+  stroke-width: 2;
+  stroke-dasharray: 3 2;
+}
+
+.macro-knob-slot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.75rem;
+  color: var(--edit-dim);
+}
+
+.macro-knob-name,
+.macro-knob-name-input {
+  display: block;
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.macro-knob-name-input {
+  width: 100%;
+  background: #101116;
+  border: 1px solid var(--edit-accent);
+  border-radius: 3px;
+  color: inherit;
+  font-family: inherit;
+}
+
+.macro-knob-swatch {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  padding: 0;
+  cursor: pointer;
+}
+
+.macro-knob-targets {
+  list-style: none;
+  margin: 0.3rem 0 0;
+  padding: 0;
+  font-size: 0.68rem;
+  color: var(--edit-dim);
+}
+
+.macro-knob-targets li {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  justify-content: center;
+}
+
+.macro-knob-targets .target-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.unbind {
+  padding: 0 0.25rem;
+  font-size: 0.65rem;
+  line-height: 1.2;
+}
+
+.color-picker {
+  position: absolute;
+  z-index: 5;
+  top: 1.4rem;
+  right: 0.2rem;
+  display: grid;
+  grid-template-columns: repeat(4, 16px);
+  gap: 3px;
+  padding: 5px;
+  background: #101116;
+  border: 1px solid var(--edit-line);
+  border-radius: 4px;
+}
+
+.color-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  padding: 0;
+  cursor: pointer;
+}
+
+.color-swatch.current { outline: 2px solid #fff; }
+
+.hidden-macros {
+  margin-top: 0.5rem;
+  font-size: 0.78rem;
+  color: #ffd9ad;
+}
+
+.hidden-macros summary { cursor: pointer; }
+.hidden-macros .macro-bank { margin-top: 0.4rem; }
+
+/* --- chains, drum pads, devices --- */
+
+.chain-list { margin-top: 0.7rem; }
+
+.chain-panel {
+  border-top: 1px solid var(--edit-line);
+  padding-top: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.chain-name {
+  margin: 0 0 0.4rem;
+  font-size: 0.8rem;
+  color: var(--edit-dim);
+  font-weight: 500;
+}
+
+.drum-pads {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.7rem;
+}
+
+.drum-pad {
+  border: 1px solid #4a4030;
+  border-radius: 5px;
+  background: #1e1c18;
+}
+
+.drum-pad-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid #4a4030;
+  font-size: 0.8rem;
+}
+
+.pad-note {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  color: #ffd166;
+  border: 1px solid #4a4030;
+  border-radius: 3px;
+  padding: 0 0.25rem;
+}
+
+.pad-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pad-choke {
+  margin-left: auto;
+  font-size: 0.65rem;
+  color: var(--edit-dim);
+}
+
+.drum-pad-body { padding: 0.4rem; }
+
+.device-row {
+  border: 1px solid var(--edit-line);
+  border-radius: 4px;
+  padding: 0.35rem 0.5rem;
+  margin-bottom: 0.4rem;
+  background: var(--edit-bg-sunken);
+}
+
+.device-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.device-name { font-size: 0.85rem; }
+
+.device-type {
+  font-size: 0.68rem;
+  color: var(--edit-dim);
+}
+
+.params {
+  list-style: none;
+  margin: 0.3rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.params li {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.param {
+  background: #23262e;
+  border: 1px solid var(--edit-line);
+  border-radius: 3px;
+  color: var(--edit-text);
+  font: inherit;
+  font-size: 0.72rem;
+  padding: 0.1rem 0.35rem;
+  cursor: pointer;
+}
+
+.param.armed {
+  border-color: var(--edit-accent);
+  background: #1d2a3d;
+}
+
+.mapped-params .param { border-color: #3c5a3c; }
+
+.macro-badge {
+  font-size: 0.65rem;
+  color: #9ad49a;
+}
+
+.more-toggle { margin-top: 0.35rem; }
+
+.no-params {
+  margin: 0.3rem 0 0;
+  font-size: 0.7rem;
+  color: var(--edit-dim);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
