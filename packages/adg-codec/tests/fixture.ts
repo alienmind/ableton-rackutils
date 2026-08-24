@@ -5,20 +5,28 @@
  * observed in the project's own real fixtures (packages/adg-codec/tests/fixtures/,
  * gitignored, not available in CI - hence this).
  *
- * Shape: one outer instrument rack with two parameters (`ParamA` mapped to
- * macro 0, `ParamB` unmapped) and a nested rack whose OWN macro 0 is also
- * mapped - this is what exercises the owning-rack walk (SCHEMA.md Q2):
- * naively matching on NoteOrController alone would wrongly pick up the
- * nested rack's mapping as the outer rack's macro 0.
+ * Shape: one outer instrument rack with three parameters - `ParamA` AND
+ * `ParamC` BOTH mapped to macro 0 (a macro driving two parameters at once is
+ * normal Live usage, not an edge case - a real rack exposed a bug here where
+ * `moveMapping` only moved one of a macro's several targets), `ParamB`
+ * unmapped - and a nested rack whose OWN macro 0 is also mapped, which
+ * exercises the owning-rack walk (SCHEMA.md Q2): naively matching on
+ * NoteOrController alone would wrongly pick up the nested rack's mapping as
+ * the outer rack's macro 0.
  */
 import { compress } from '../src/gzip';
 
-function macroSlots(mapped: Record<number, number> = {}): string {
+function keyMidiXml(macroIndex: number): string {
+  return `<KeyMidi><PersistentKeyString Value="" /><IsNote Value="false" /><Channel Value="16" /><NoteOrController Value="${macroIndex}" /><LowerRangeNote Value="-1" /><UpperRangeNote Value="-1" /><ControllerMapMode Value="0" /></KeyMidi>`;
+}
+
+function macroSlots(mapped: Record<number, number> = {}, colors: Record<number, number> = {}): string {
   let xml = '';
   for (let i = 0; i < 16; i++) {
     const value = mapped[i] ?? 0;
     xml += `<MacroControls.${i}><LomId Value="0" /><Manual Value="${value}" /><MidiControllerRange><Min Value="0" /><Max Value="127" /></MidiControllerRange></MacroControls.${i}>`;
     xml += `<MacroDisplayNames.${i} Value="Macro ${i + 1}" />`;
+    xml += `<MacroColor.${i} Value="${colors[i] ?? 0}" />`;
   }
   return xml;
 }
@@ -48,7 +56,7 @@ export function buildFixtureXml(opts: FixtureOptions = {}): string {
       <InstrumentGroupDevice>
         <UserName Value="Test Rack" />
         <NumVisibleMacroControls Value="8" />
-        ${macroSlots({ 0: 25.4 })}
+        ${macroSlots({ 0: 25.4 }, { 0: 3, 1: 7 })}
         ${variations}
       </InstrumentGroupDevice>
     </Device>
@@ -63,15 +71,7 @@ export function buildFixtureXml(opts: FixtureOptions = {}): string {
                   <Name Value="ParamA" />
                   <Timeable>
                     <LomId Value="0" />
-                    <KeyMidi>
-                      <PersistentKeyString Value="" />
-                      <IsNote Value="false" />
-                      <Channel Value="16" />
-                      <NoteOrController Value="0" />
-                      <LowerRangeNote Value="-1" />
-                      <UpperRangeNote Value="-1" />
-                      <ControllerMapMode Value="0" />
-                    </KeyMidi>
+                    ${keyMidiXml(0)}
                     <Manual Value="25.4" />
                     <MidiControllerRange><Min Value="0" /><Max Value="100" /></MidiControllerRange>
                   </Timeable>
@@ -84,6 +84,15 @@ export function buildFixtureXml(opts: FixtureOptions = {}): string {
                     <MidiControllerRange><Min Value="0" /><Max Value="1" /></MidiControllerRange>
                   </Timeable>
                 </ParamB>
+                <ParamC>
+                  <Name Value="ParamC" />
+                  <Timeable>
+                    <LomId Value="0" />
+                    ${keyMidiXml(0)}
+                    <Manual Value="60" />
+                    <MidiControllerRange><Min Value="0" /><Max Value="127" /></MidiControllerRange>
+                  </Timeable>
+                </ParamC>
               </TestSynth>
             </Device>
           </AbletonDevicePreset>
@@ -106,15 +115,7 @@ export function buildFixtureXml(opts: FixtureOptions = {}): string {
                           <Name Value="InnerParam" />
                           <Timeable>
                             <LomId Value="0" />
-                            <KeyMidi>
-                              <PersistentKeyString Value="" />
-                              <IsNote Value="false" />
-                              <Channel Value="16" />
-                              <NoteOrController Value="0" />
-                              <LowerRangeNote Value="-1" />
-                              <UpperRangeNote Value="-1" />
-                              <ControllerMapMode Value="0" />
-                            </KeyMidi>
+                            ${keyMidiXml(0)}
                             <Manual Value="0" />
                             <MidiControllerRange><Min Value="0" /><Max Value="1" /></MidiControllerRange>
                           </Timeable>

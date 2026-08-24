@@ -4,13 +4,16 @@ import { bindParameter, moveMapping, renameMacro, swapMacros, unbindMacro } from
 import { buildFixtureBytes } from './fixture';
 
 describe('moveMapping', () => {
-  test('transfers the binding to the new slot and clears the old one', () => {
+  test('transfers ALL of a macro\'s bindings to the new slot, not just one', () => {
+    // Regression: a real rack had macro 1 driving two parameters at once;
+    // an earlier version of moveMapping only relocated one of them, leaving
+    // the other still pointing at the source slot after the "move".
     const rack = Rack.parse(buildFixtureBytes());
     const result = moveMapping(rack, 0, 1);
     expect(result.ok).toBe(true);
     expect(result.warnings).toHaveLength(0);
-    expect(rack.macros[0].binding).toBeNull();
-    expect(rack.macros[1].binding?.targetName).toBe('ParamA');
+    expect(rack.macros[0].bindings).toHaveLength(0);
+    expect(rack.macros[1].bindings.map((b) => b.targetName).sort()).toEqual(['ParamA', 'ParamC']);
   });
 
   test('fails cleanly when the source macro has no mapping', () => {
@@ -19,13 +22,14 @@ describe('moveMapping', () => {
     expect(result.ok).toBe(false);
   });
 
-  test('clears and warns about an occupied destination', () => {
+  test('clears and warns about occupied destination bindings, plural', () => {
     const rack = Rack.parse(buildFixtureBytes());
-    bindParameter(rack, 1, { path: rack.chains[0].devices[0].parameters[1].path, name: 'ParamB', boundToMacro: null });
+    const paramB = rack.chains[0].devices[0].parameters[1];
+    bindParameter(rack, 1, paramB); // macro 1 (index 1) now also has a binding
     const result = moveMapping(rack, 0, 1);
     expect(result.ok).toBe(true);
-    expect(result.warnings[0]).toMatch(/cleared existing binding on macro 2/);
-    expect(rack.macros[1].binding?.targetName).toBe('ParamA');
+    expect(result.warnings[0]).toMatch(/cleared 1 existing binding on macro 2/);
+    expect(rack.macros[1].bindings.map((b) => b.targetName).sort()).toEqual(['ParamA', 'ParamC']);
   });
 
   test('permutes every variation in lockstep (Constraint 4, SCHEMA.md Q6)', () => {
@@ -49,20 +53,24 @@ describe('moveMapping', () => {
     const rack = Rack.parse(buildFixtureBytes());
     const result = moveMapping(rack, 0, 0);
     expect(result.ok).toBe(true);
-    expect(rack.macros[0].binding?.targetName).toBe('ParamA');
+    expect(rack.macros[0].bindings).toHaveLength(2);
   });
 });
 
 describe('swapMacros', () => {
-  test('exchanges bindings, names and stored values', () => {
+  test('exchanges ALL bindings both ways, names, colors and stored values', () => {
     const rack = Rack.parse(buildFixtureBytes());
     const nameBefore1 = rack.macros[1].name;
+    const colorBefore0 = rack.macros[0].color;
+    const colorBefore1 = rack.macros[1].color;
     renameMacro(rack, 0, 'Filter');
     swapMacros(rack, 0, 1);
-    expect(rack.macros[1].binding?.targetName).toBe('ParamA');
-    expect(rack.macros[0].binding).toBeNull();
+    expect(rack.macros[1].bindings.map((b) => b.targetName).sort()).toEqual(['ParamA', 'ParamC']);
+    expect(rack.macros[0].bindings).toHaveLength(0);
     expect(rack.macros[1].name).toBe('Filter');
     expect(rack.macros[0].name).toBe(nameBefore1);
+    expect(rack.macros[1].color).toBe(colorBefore0);
+    expect(rack.macros[0].color).toBe(colorBefore1);
   });
 
   test('exchanges variation values both ways', () => {
@@ -83,26 +91,38 @@ describe('bindParameter', () => {
     const result = bindParameter(rack, 3, paramB);
     expect(result.ok).toBe(true);
     expect(result.warnings).toHaveLength(0);
-    expect(rack.macros[3].binding?.targetName).toBe('ParamB');
+    expect(rack.macros[3].bindings.map((b) => b.targetName)).toEqual(['ParamB']);
   });
 
-  test('clears the previous owner of the target (Constraint 5)', () => {
-    const rack = Rack.parse(buildFixtureBytes());
-    const paramA = rack.chains[0].devices[0].parameters[0];
-    const result = bindParameter(rack, 4, paramA);
-    expect(result.ok).toBe(true);
-    expect(result.warnings.some((w) => w.includes("macro 1's binding"))).toBe(true);
-    expect(rack.macros[0].binding).toBeNull();
-    expect(rack.macros[4].binding?.targetName).toBe('ParamA');
-  });
-
-  test('clears the macro slot\'s previous target', () => {
+  test('ADDS a new target to a macro without clearing its existing ones', () => {
+    // A macro driving several parameters is normal - bindParameter must not
+    // treat "this macro already has a binding" as something to clear.
     const rack = Rack.parse(buildFixtureBytes());
     const paramB = rack.chains[0].devices[0].parameters[1];
-    const result = bindParameter(rack, 0, paramB); // macro 0 already drives ParamA
+    const result = bindParameter(rack, 0, paramB); // macro 0 already drives ParamA + ParamC
     expect(result.ok).toBe(true);
-    expect(result.warnings.some((w) => w.includes("previous binding"))).toBe(true);
-    expect(rack.macros[0].binding?.targetName).toBe('ParamB');
+    expect(result.warnings).toHaveLength(0);
+    expect(rack.macros[0].bindings.map((b) => b.targetName).sort()).toEqual(['ParamA', 'ParamB', 'ParamC']);
+  });
+
+  test('clears only the specific previous owner of the target (Constraint 5), leaving that macro\'s other bindings alone', () => {
+    const rack = Rack.parse(buildFixtureBytes());
+    const paramA = rack.chains[0].devices[0].parameters[0];
+    const result = bindParameter(rack, 4, paramA); // ParamA was macro 0's
+    expect(result.ok).toBe(true);
+    expect(result.warnings.some((w) => w.includes("macro 1's binding"))).toBe(true);
+    expect(rack.macros[4].bindings.map((b) => b.targetName)).toEqual(['ParamA']);
+    // Macro 0 still drives ParamC - only ParamA's ownership moved.
+    expect(rack.macros[0].bindings.map((b) => b.targetName)).toEqual(['ParamC']);
+  });
+
+  test('is a no-op when the parameter is already bound to this exact macro', () => {
+    const rack = Rack.parse(buildFixtureBytes());
+    const paramA = rack.macros[0].bindings.find((b) => b.targetName === 'ParamA')!;
+    const result = bindParameter(rack, 0, { path: paramA.targetPath, name: 'ParamA', boundToMacro: 0 });
+    expect(result.ok).toBe(true);
+    expect(result.warnings).toHaveLength(0);
+    expect(rack.macros[0].bindings).toHaveLength(2); // unchanged, not doubled
   });
 
   test('fails cleanly on an unresolvable path', () => {
@@ -113,11 +133,11 @@ describe('bindParameter', () => {
 });
 
 describe('unbindMacro', () => {
-  test('removes the binding and clears variation values', () => {
+  test('removes ALL of a macro\'s bindings and clears variation values', () => {
     const rack = Rack.parse(buildFixtureBytes({ withVariations: true }));
     const result = unbindMacro(rack, 0);
     expect(result.ok).toBe(true);
-    expect(rack.macros[0].binding).toBeNull();
+    expect(rack.macros[0].bindings).toHaveLength(0);
     for (const v of rack.variations) expect(v.values[0]).toBe(-1);
   });
 
@@ -141,7 +161,7 @@ describe('clone isolation', () => {
     const rack = Rack.parse(buildFixtureBytes());
     const clone = rack.clone();
     moveMapping(clone, 0, 1);
-    expect(clone.macros[0].binding).toBeNull();
-    expect(rack.macros[0].binding?.targetName).toBe('ParamA');
+    expect(clone.macros[0].bindings).toHaveLength(0);
+    expect(rack.macros[0].bindings).toHaveLength(2);
   });
 });

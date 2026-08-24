@@ -22,25 +22,25 @@ describe.skipIf(!has('simplerack.adg'))('simplerack.adg', () => {
     const rack = Rack.parse(load('simplerack.adg'));
     expect(rack.macroCount).toBe(8);
     // Confirmed by hand in SCHEMA.md: macros 1-3 map to Drive/Cutoff/Resonance.
-    const mapped = rack.macros.filter((m) => m.binding);
+    const mapped = rack.macros.filter((m) => m.bindings.length > 0);
     expect(mapped).toHaveLength(3);
-    expect(mapped.map((m) => m.binding?.targetName).sort()).toEqual(['Filter Cutoff Frequency', 'Filter Drive Amount', 'Filter Resonance']);
+    expect(mapped.map((m) => m.bindings[0].targetName).sort()).toEqual(['Filter Cutoff Frequency', 'Filter Drive Amount', 'Filter Resonance']);
   });
 
   test('round-trips through serialize without losing the mappings', () => {
     const rack = Rack.parse(load('simplerack.adg'));
     const roundTripped = Rack.parse(rack.serialize());
-    expect(roundTripped.macros.filter((m) => m.binding)).toHaveLength(3);
+    expect(roundTripped.macros.filter((m) => m.bindings.length > 0)).toHaveLength(3);
   });
 
-  test('moveMapping relocates a real mapping and the file still parses back correctly', () => {
+  test('moveMapping relocates a real mapping, ALL of it, and the file still parses back correctly', () => {
     const rack = Rack.parse(load('simplerack.adg'));
-    const originalTarget = rack.macros[0].binding?.targetName;
+    const originalTargets = rack.macros[0].bindings.map((b) => b.targetName).sort();
     const result = moveMapping(rack, 0, 6);
     expect(result.ok).toBe(true);
     const roundTripped = Rack.parse(rack.serialize());
-    expect(roundTripped.macros[0].binding).toBeNull();
-    expect(roundTripped.macros[6].binding?.targetName).toBe(originalTarget);
+    expect(roundTripped.macros[0].bindings).toHaveLength(0);
+    expect(roundTripped.macros[6].bindings.map((b) => b.targetName).sort()).toEqual(originalTargets);
   });
 });
 
@@ -55,9 +55,9 @@ describe.skipIf(!has('withvariations.adg'))('withvariations.adg', () => {
 
   test('moveMapping permutes all 3 variations in lockstep', () => {
     const rack = Rack.parse(load('withvariations.adg'));
-    const from = rack.macros.findIndex((m) => m.binding);
+    const from = rack.macros.findIndex((m) => m.bindings.length > 0);
     expect(from).toBeGreaterThanOrEqual(0);
-    const to = rack.macros.findIndex((m) => !m.binding);
+    const to = rack.macros.findIndex((m) => m.bindings.length === 0);
     const before = rack.variations.map((v) => v.values[from]);
     moveMapping(rack, from, to);
     rack.variations.forEach((v, i) => {
