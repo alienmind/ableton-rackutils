@@ -8,4 +8,5 @@ dist-relative/
 tmp/
 
 # Real racks stay local. They are personal project data and can be large.
-packages/adg-codec/tests/fixtures/*.adg
+# Covers stray output from `pnpm adg-inspect move ...` too, wherever it lands.
+*.adg

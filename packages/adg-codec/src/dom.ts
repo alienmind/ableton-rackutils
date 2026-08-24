@@ -15,8 +15,16 @@ export function parseXmlDoc(xml: string): Document {
   return doc;
 }
 
+/**
+ * `XMLSerializer.serializeToString()` never emits the `<?xml ... ?>`
+ * prolog - that's standard DOM behaviour, true in every browser and in
+ * jsdom, not a bug in either. Every `.adg` Ableton itself writes starts with
+ * `<?xml version="1.0" encoding="UTF-8"?>`, and Live refused to load a file
+ * this codec wrote without it - confirmed by hand, a real rack, drag-and-drop
+ * onto a track silently rejected. Prepend it always.
+ */
 export function serializeXmlDoc(doc: Document): string {
-  return new XMLSerializer().serializeToString(doc);
+  return `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(doc)}`;
 }
 
 /** Direct element children only, skipping text/comment nodes. */
