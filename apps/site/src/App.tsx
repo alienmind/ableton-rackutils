@@ -1,40 +1,30 @@
 import { useCallback, useState } from 'react';
-import { decompress, isGzip } from '@rackutils/adg-codec';
+import { Rack, isGzip } from '@rackutils/adg-codec';
+import { RackEditor } from '@rackutils/editor-ui';
+import '@rackutils/editor-ui/src/editor.css';
 import { RackTree } from './RackTree';
 import { CompanionDownload } from './companion/CompanionDownload';
 import logoUrl from './assets/logo.jpg';
 
-interface LoadedRack {
+interface Loaded {
   fileName: string;
-  doc: XMLDocument;
-  elementCount: number;
+  rack: Rack;
 }
 
 export default function App() {
-  const [rack, setRack] = useState<LoadedRack | null>(null);
+  const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [showRaw, setShowRaw] = useState(false);
 
   const loadFile = useCallback(async (file: File) => {
     setError(null);
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
-      if (!isGzip(bytes)) {
-        throw new Error(`${file.name} is not a gzipped .adg file`);
-      }
-      const xml = decompress(bytes);
-      const doc = new DOMParser().parseFromString(xml, 'text/xml');
-      const parseError = doc.querySelector('parsererror');
-      if (parseError) {
-        throw new Error(`could not parse XML in ${file.name}`);
-      }
-      setRack({
-        fileName: file.name,
-        doc,
-        elementCount: doc.querySelectorAll('*').length,
-      });
+      if (!isGzip(bytes)) throw new Error(`${file.name} is not a gzipped .adg file`);
+      setLoaded({ fileName: file.name, rack: Rack.parse(bytes) });
     } catch (err) {
-      setRack(null);
+      setLoaded(null);
       setError(err instanceof Error ? err.message : String(err));
     }
   }, []);
@@ -57,6 +47,19 @@ export default function App() {
     [loadFile],
   );
 
+  // Downloads a copy under a new name. The original file on disk is never
+  // touched - the read-only-until-proven default from doc/PLAN.md, which
+  // belongs at the call site rather than inside the editor component.
+  const save = useCallback(() => {
+    if (!loaded) return;
+    const url = URL.createObjectURL(new Blob([loaded.rack.serialize() as BlobPart], { type: 'application/gzip' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = loaded.fileName.replace(/\.adg$/i, '') + '-edited.adg';
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [loaded]);
+
   return (
     <div className="app">
       <header>
@@ -65,8 +68,8 @@ export default function App() {
           ableton-rackutils <span className="badge">v0.0.1 pre-alpha</span>
         </h1>
         <p className="tagline">
-          Drag in a rack (.adg) to inspect it. Nothing leaves this tab: the file is
-          parsed entirely in the browser.
+          Drag in a rack (.adg) to edit its macros. Nothing leaves this tab: the file is
+          parsed, edited, and rebuilt entirely in the browser.
         </p>
         <CompanionDownload />
       </header>
@@ -80,10 +83,9 @@ export default function App() {
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
       >
-        {rack ? (
+        {loaded ? (
           <p>
-            <strong>{rack.fileName}</strong> loaded, {rack.elementCount} elements. Drop
-            another file to replace it.
+            <strong>{loaded.fileName}</strong> loaded. Drop another file to replace it.
           </p>
         ) : (
           <p>Drop a .adg file here, or</p>
@@ -96,17 +98,26 @@ export default function App() {
 
       {error && <p className="error">{error}</p>}
 
-      {rack && (
+      {loaded && (
         <section className="rack-view">
-          <h2>Raw structure</h2>
+          <div className="rack-actions">
+            <button type="button" className="save-button" onClick={save}>
+              Save a copy
+            </button>
+            <label className="raw-toggle">
+              <input type="checkbox" checked={showRaw} onChange={(e) => setShowRaw(e.target.checked)} /> raw XML
+            </label>
+          </div>
           <p className="note">
-            This is a schema-agnostic tree view, not the macro editor yet. The .adg
-            schema is still being reverse-engineered (see{' '}
-            <code>packages/adg-codec/SCHEMA.md</code>), so nothing here is
-            interpreted as a macro or a mapping. Collapsed by default, click to
-            expand.
+            Drag a knob onto another to move the whole macro; hold Shift while dropping to
+            swap two. Double-click a name to rename it. Click a parameter to arm it, then
+            click a macro knob in the same rack to bind it. Saving downloads a copy - your
+            original file is never overwritten.
           </p>
-          <RackTree root={rack.doc.documentElement} />
+
+          <RackEditor rack={loaded.rack} onChange={(rack) => setLoaded({ ...loaded, rack })} />
+
+          {showRaw && <RackTree root={loaded.rack.document.documentElement} />}
         </section>
       )}
     </div>

@@ -131,3 +131,26 @@ header h1 {
   color: #6a6a75;
   font-size: 0.8rem;
 }
+
+.rack-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.save-button {
+  background: #2a6df4;
+  color: #fff;
+  border: 0;
+  border-radius: 4px;
+  padding: 0.4rem 0.9rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.raw-toggle {
+  font-size: 0.8rem;
+  color: #9a9aa5;
+}
