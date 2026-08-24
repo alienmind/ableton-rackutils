@@ -73,12 +73,18 @@ What this plan adds, in four parts:
 
 ---
 
-## Part 1: Reference image and SVG extraction (NOT STARTED - do this first when told to)
+## Part 1: Reference images and SVG extraction (NOT STARTED - do this first when told to)
 
-The project owner dropped a screenshot of a real Ableton rack at
-`tmp/rack-example.png` (gitignored, local only - it will not be present in a
-fresh clone, and is not committed). **Nobody has looked at it yet.** This
-section is the brief for whoever does.
+The project owner dropped two reference images, both gitignored and local
+only (neither is present in a fresh clone, neither is committed):
+
+- `tmp/rack-example.png` - a screenshot of a real Ableton rack, covering the
+  macro panel, title bar, and chain UI (Part 1.1).
+- `tmp/ableton-colors.png` - the macro color palette grid, covering the
+  color-index problem (Part 1.3).
+
+**Nobody has looked at either one yet.** This section is the brief for
+whoever does.
 
 ### 1.1 What to extract
 
@@ -176,14 +182,21 @@ offers a fixed palette (a grid of swatches, roughly 60-70 colors in recent
 Live versions). To render a knob in its actual color, this project needs an
 `index -> hex` lookup table that does not exist yet.
 
-Build it by opening Live's own macro color picker (right-click a macro >
-color swatch, or the palette Ableton shows) and recording each swatch's
-position and approximate hex value - the reference screenshot may only show
-a handful of colors in use, not the full palette, so this likely needs a
-short live Ableton session separate from just reading the screenshot. Check
-`alienmind/patchbay`'s docs first (`doc/ARCHITECTURE.md`/`SCHEMA.md` there)
-in case this table is already documented - it covers `MacroColor.N` as a
-known field but the palette values were not confirmed on our side yet.
+**A second reference image now covers most of this:** `tmp/ableton-colors.png`
+(gitignored, local only, same hold as `tmp/rack-example.png` - not processed
+yet). It's the full color palette grid as Ableton's own picker shows it, so
+the hex values can likely be read directly from it (color-pick each swatch)
+rather than needing a live Ableton session just for color - **the position
+in this image still is not guaranteed to be the stored `MacroColor.N` index**
+(grid position and stored index are two different things - the sentence
+below about verifying with a diff is not optional just because a picture of
+the grid exists now). Use the image for the hex values, still confirm the
+index mapping against a real rack with known colors set by hand.
+
+Check `alienmind/patchbay`'s docs first (`doc/ARCHITECTURE.md`/`SCHEMA.md`
+there) in case the index mapping is already documented - it covers
+`MacroColor.N` as a known field but the palette values were not confirmed on
+our side yet.
 
 Store the result as a plain TypeScript const, e.g.
 `packages/editor-ui/src/macroColors.ts`:
