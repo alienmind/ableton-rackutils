@@ -56,6 +56,11 @@ Three structurally different racks, all answers verified against each:
 - [x] `withvariations.adg` - same rack, 3 Macro Variations added
 - [x] `drum-nested.adg` - Drum Rack -> pad rack -> engine rack, 3 levels of
   `GroupDevicePreset`/`InstrumentGroupDevice` nesting, no macros mapped
+- [x] `drum-pads.adg` - an Fx rack containing a Drum Rack with 3 named pads
+  (notes 92/91/90, descending in document order) plus Eq8, Compressor2, Delay,
+  Reverb and StereoGain alongside it, 3 macros mapped to native-device
+  parameters. The only fixture where the drum rack is NOT the root, and the
+  one that found Q11.
 
 Still missing: a **move-mapping-with-variations pair produced BY LIVE ITSELF**
 (Q6) - `mutate.ts`'s own `moveMapping` has been run on `withvariations.adg`
@@ -352,6 +357,53 @@ specifically (patchbay S4) is not independently re-confirmed here - the
 structural nesting is, which is what this question asked. Low priority to
 re-test the macro-to-macro case; patchbay's S4 evidence plus Q1/Q2's
 containment model (which doesn't care about depth at all) covers it.
+
+---
+
+## Q11. What identifies a bindable parameter?
+
+Asked because the codec got this wrong and only a real fixture showed it. The
+UI's arm-a-parameter-then-click-a-macro loop (`doc/UI-PLAN.md` Part 2.5) needs
+to enumerate what a device exposes; the first implementation keyed on Q1's
+`Timeable` wrapper and therefore found **zero parameters on every native
+Ableton device** - `Eq8`, `Reverb`, `Delay`, `Compressor2`, `StereoGain`,
+`OriginalSimpler`, and rack devices themselves all reported an empty list,
+while a Max-hosted device reported 61. Mappings were still discovered, because
+`collectMacroBindings` walks `KeyMidi` elements directly and never consults
+this code - which is exactly why the bug stayed invisible.
+
+**Answer, confirmed against `drum-pads.adg`:** a bindable parameter is an
+element that owns an `AutomationTarget`. There are two shapes, and Q1 only
+documented the second:
+
+```xml
+<!-- Native device (Reverb). No wrapper, no Name child - the TAG is the name. -->
+<DecayTime>
+  <LomId Value="0" />
+  <Manual Value="300" />
+  <MidiControllerRange><Min Value="1" /><Max Value="60000" /></MidiControllerRange>
+  <AutomationTarget Id="0"><LockEnvelope Value="0" /></AutomationTarget>
+  <ModulationTarget Id="0"><LockEnvelope Value="0" /></ModulationTarget>
+</DecayTime>
+```
+
+The Max-hosted shape (`MxDFloatParameter` etc., Q1) is the same set of children
+moved one level down into a `Timeable`, plus an explicit `<Name>`.
+
+So the rule the codec now uses: for each element, the parameter container is
+its `Timeable` child if it has one, otherwise the element itself; the element
+is a parameter if that container owns an `AutomationTarget`. The display name
+is a `<Name>` child when present, otherwise the tag name.
+
+`AutomationTarget` is the right marker rather than `Manual` or
+`MidiControllerRange`: it means precisely "Live can automate this", which is
+the same set of things a macro can drive.
+
+Consequence worth knowing: a rack device's own `MacroControls.N` and its
+`ChainSelector` match this rule, so a NESTED rack enumerates its macros as
+bindable parameters. That is correct and load-bearing - an outer macro driving
+an inner rack's macro is confirmed real (Q2, Q8, patchbay S4), and it is how
+that mapping gets authored.
 
 ---
 

@@ -54,10 +54,10 @@ is the next real work.
   `Rack.subRack(devicePath)` exposes any nested rack as a `Rack` of its own
   over the same document, so every mutation reaches nested macros unmodified,
   and drum pads carry their `ReceivingNote` (SCHEMA.md Q10).
-  73 tests (`packages/adg-codec/tests/`): 60 synthetic (always run), 13
+  78 tests (`packages/adg-codec/tests/`): 60 synthetic (always run), 18
   against the real fixtures (skip cleanly in CI, run locally). All confirmed
-  against `simplerack.adg`, `withvariations.adg`, `drum-nested.adg` - not
-  just the synthetic fixture.
+  against `simplerack.adg`, `withvariations.adg`, `drum-nested.adg` and
+  `drum-pads.adg` - not just the synthetic fixture.
 - `tools/adg-tool/` - `unpack`/`diff` as before, plus three commands that
   exercise the codec directly against a real file without needing the site
   UI: `adg-tool mappings <file.adg>` (list what's bound), `adg-tool move
@@ -99,7 +99,7 @@ place.
 No UI needed yet - two ways, both exercise the real code:
 
 ```bash
-pnpm --filter @rackutils/adg-codec test   # 73 tests: parsing, all 10 mutations,
+pnpm --filter @rackutils/adg-codec test   # 78 tests: parsing, all 10 mutations,
                                            # confirmed against real racks too
                                            # if tests/fixtures/*.adg are present
 

@@ -82,19 +82,24 @@ Run all four of `lint`, `typecheck`, `test`, `build` clean before committing.
 ## Testing the codec
 
 ```bash
-pnpm --filter @rackutils/adg-codec test    # 73 tests
+pnpm --filter @rackutils/adg-codec test    # 78 tests
 ```
 
-60 are synthetic and always run. 13 run against real Ableton-saved racks in
+60 are synthetic and always run. 18 run against real Ableton-saved racks in
 `packages/adg-codec/tests/fixtures/*.adg`, which are gitignored - they skip
-cleanly when absent (so, in CI) and run locally once you drop the three files
+cleanly when absent (so, in CI) and run locally once you drop the four files
 `SCHEMA.md` asks for there.
 
 **Test every mutation against the real fixtures, not only synthetic ones.**
-Two real bugs so far were invisible to the synthetic suite: a macro driving
-several parameters at once had only one target moved, and the output file
-would not load in Live at all because `XMLSerializer` omits the XML prolog.
-Both were found by using the tool on an actual rack.
+Three real bugs so far were invisible to the synthetic suite: a macro driving
+several parameters at once had only one target moved; the output file would
+not load in Live at all because `XMLSerializer` omits the XML prolog; and
+parameter enumeration found NOTHING on any native Ableton device, because the
+synthetic fixture only ever modelled the Max-device parameter shape
+(`SCHEMA.md` Q11). All three were found by using the tool on an actual rack.
+
+The third one is the cautionary tale: the synthetic fixture had been written
+from the codec's own assumptions, so it agreed with the bug.
 
 The strongest test available is not automated: run a mutation, then drag the
 result into Live and look. It is the only thing that catches a file Live
