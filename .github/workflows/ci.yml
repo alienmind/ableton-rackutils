@@ -20,3 +20,30 @@ jobs:
       - run: pnpm typecheck
       # The codec gate. Nothing merges if a rack cannot survive a round trip.
       - run: pnpm --filter @rackutils/adg-codec test
+      - run: pnpm --filter @rackutils/editor-ui test
+
+  # A real browser, because jsdom is not one. Two bugs shipped past a fully
+  # green unit suite: the XML declaration was emitted twice so every edit threw
+  # (SCHEMA.md Q12), and HTML5 drag-and-drop did nothing. Neither is reachable
+  # from jsdom - a test suite cannot falsify an assumption about the
+  # environment it runs in.
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      # Chromium only: the point is "a real browser", not cross-browser
+      # coverage, and each browser is a download on every run.
+      - run: pnpm --filter @rackutils/site exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: apps/site/playwright-report/
+          retention-days: 7

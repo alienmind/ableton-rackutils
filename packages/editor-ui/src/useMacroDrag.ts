@@ -3,21 +3,18 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 /**
  * Pointer-based drag for the macro grid, NOT the HTML5 drag-and-drop API.
  *
- * HTML5 DnD was the first implementation and it did not work: a knob picked up
- * and dragged fine, and dropping did nothing. It also swallowed clicks on the
- * buttons inside a `draggable` element, which took the unbind "x" and the
- * colour swatch down with it. On top of that the same components have to run
+ * HTML5 DnD was the first implementation and it did not work in a browser: a
+ * knob picked up and dragged fine, and dropping did nothing. It also swallowed
+ * clicks on the buttons inside a `draggable` element, which took the unbind
+ * "x" and the colour swatch down with it. The same components have to run
  * inside the Max `jweb` webview later, where HTML5 DnD is not something to
- * rely on.
+ * rely on either.
  *
- * Pointer events have none of that: no drag images, no data-transfer MIME
- * negotiation, no interaction with click handling. `setPointerCapture` keeps
- * the gesture even when the pointer leaves the element, and the drop target is
- * resolved from the element under the pointer.
- *
- * The window listeners are attached once per gesture and read their callbacks
- * through a ref, so a re-render mid-drag does not detach and reattach them
- * (the pattern trackster's `useKnobInteraction` documents).
+ * The window listeners are attached IN the pointerdown handler, not from an
+ * effect that runs after the resulting render. An effect loses fast gestures:
+ * pointerup can arrive before React has committed, and the drop is silently
+ * dropped. That showed up as two flaky-looking browser tests and would hit any
+ * user who flicks a knob quickly.
  */
 export interface MacroDragState {
   /** Index being dragged, or null. */
@@ -35,69 +32,72 @@ export interface UseMacroDragOptions {
   onSwap: (a: number, b: number) => void;
 }
 
+function indexUnder(x: number, y: number): number | null {
+  const el = document.elementFromPoint(x, y)?.closest('[data-macro-index]');
+  const raw = el?.getAttribute('data-macro-index');
+  return raw === null || raw === undefined ? null : Number(raw);
+}
+
 export function useMacroDrag({ onReorder, onSwap }: UseMacroDragOptions) {
   const [state, setState] = useState<MacroDragState>(IDLE);
 
+  // Callbacks read through a ref so the listeners never need reattaching when
+  // a re-render hands us new ones mid-drag.
   const handlers = useRef({ onReorder, onSwap });
   useLayoutEffect(() => {
     handlers.current = { onReorder, onSwap };
   });
 
-  const live = useRef(IDLE);
-  live.current = state;
+  const from = useRef<number | null>(null);
+  const detach = useRef<(() => void) | null>(null);
 
-  const dragging = state.from !== null;
-
-  useEffect(() => {
-    if (!dragging) return;
-
-    const indexUnder = (x: number, y: number): number | null => {
-      const el = document.elementFromPoint(x, y)?.closest('[data-macro-index]');
-      const raw = el?.getAttribute('data-macro-index');
-      return raw === null || raw === undefined ? null : Number(raw);
-    };
-
-    const move = (e: PointerEvent) => {
-      const over = indexUnder(e.clientX, e.clientY);
-      setState((s) => (s.over === over && s.swap === e.shiftKey ? s : { ...s, over, swap: e.shiftKey }));
-    };
-
-    const finish = (e: PointerEvent) => {
-      const { from } = live.current;
-      const to = indexUnder(e.clientX, e.clientY);
-      setState(IDLE);
-      if (from === null || to === null || from === to) return;
-      if (e.shiftKey) handlers.current.onSwap(from, to);
-      else handlers.current.onReorder(from, to);
-    };
-
-    const cancel = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setState(IDLE);
-    };
-
-    const abandon = () => setState(IDLE);
-
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', finish);
-    window.addEventListener('pointercancel', abandon);
-    window.addEventListener('keydown', cancel);
-    return () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', finish);
-      window.removeEventListener('pointercancel', abandon);
-      window.removeEventListener('keydown', cancel);
-    };
-  }, [dragging]);
-
-  /**
-   * Attach to a knob's drag handle. Only a primary-button press starts a drag,
-   * and the press is not swallowed: a press with no movement still ends as a
-   * plain click on whatever was under it.
-   */
-  const startDrag = useCallback((index: number, e: React.PointerEvent) => {
-    if (e.button !== 0) return;
-    setState({ from: index, over: index, swap: e.shiftKey });
+  const stop = useCallback(() => {
+    detach.current?.();
+    detach.current = null;
+    from.current = null;
+    setState(IDLE);
   }, []);
+
+  // Only for a component unmounted mid-gesture; the normal path detaches in `stop`.
+  useEffect(() => stop, [stop]);
+
+  const startDrag = useCallback(
+    (index: number, e: React.PointerEvent) => {
+      if (e.button !== 0) return;
+      from.current = index;
+      setState({ from: index, over: index, swap: e.shiftKey });
+
+      const move = (ev: PointerEvent) => {
+        const over = indexUnder(ev.clientX, ev.clientY);
+        setState((s) => (s.over === over && s.swap === ev.shiftKey ? s : { ...s, over, swap: ev.shiftKey }));
+      };
+
+      const finish = (ev: PointerEvent) => {
+        const source = from.current;
+        const target = indexUnder(ev.clientX, ev.clientY);
+        stop();
+        if (source === null || target === null || source === target) return;
+        if (ev.shiftKey) handlers.current.onSwap(source, target);
+        else handlers.current.onReorder(source, target);
+      };
+
+      const cancel = (ev: KeyboardEvent) => {
+        if (ev.key === 'Escape') stop();
+      };
+
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', finish);
+      window.addEventListener('pointercancel', stop);
+      window.addEventListener('keydown', cancel);
+      detach.current = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', finish);
+        window.removeEventListener('pointercancel', stop);
+        window.removeEventListener('keydown', cancel);
+      };
+    },
+    [stop],
+  );
 
   return { drag: state, startDrag };
 }

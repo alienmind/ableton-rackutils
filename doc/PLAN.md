@@ -889,7 +889,9 @@ export default defineConfig({
 
 The workflows are committed at `.github/workflows/`. Three of them:
 
-- `ci.yml` - lint, typecheck, codec tests, on every PR.
+- `ci.yml` - lint, typecheck, codec and UI tests on every PR, plus a separate
+  `browser` job running the Playwright specs in Chromium. That job exists
+  because jsdom is not a browser: see SCHEMA.md Q12 and doc/DEVELOPERS.md.
 - `deploy.yml` - Pages, with `VITE_BASE: /${{ github.event.repository.name }}/`
   so it is repo-name agnostic. Codec tests gate the deploy: a broken codec
   corrupts racks silently, which is worse than the site being down.

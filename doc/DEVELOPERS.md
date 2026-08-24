@@ -83,10 +83,14 @@ Run all four of `lint`, `typecheck`, `test`, `build` clean before committing.
 ## Testing the codec
 
 ```bash
-pnpm test                                  # everything, 95 tests
-pnpm --filter @rackutils/adg-codec test    # 78 codec tests
-pnpm --filter @rackutils/editor-ui test    # 17 UI tests
+pnpm test                                  # everything headless, 100 tests
+pnpm --filter @rackutils/adg-codec test    # 81 codec tests
+pnpm --filter @rackutils/editor-ui test    # 19 UI tests
+pnpm test:e2e                              # 9 browser specs, needs Chromium
 ```
+
+The first time, install the browser: `pnpm --filter @rackutils/site exec
+playwright install chromium`.
 
 `editor-ui` has two kinds of test and both are needed. `render.test.tsx`
 checks what comes out of a render; `interact.test.tsx` mounts the tree and
@@ -94,7 +98,7 @@ fires real DOM events at it. The first cut of the UI shipped with every
 interaction broken and every render test green - markup was never the
 question.
 
-### Neither of them runs in a browser, and that has cost real bugs
+### Neither of them runs in a browser, so there is a third suite
 
 Both run under jsdom, which is not Chrome. Two bugs got through with a fully
 green suite:
@@ -105,14 +109,26 @@ green suite:
   edit failed silently. 89 tests passed throughout.
 - **HTML5 drag-and-drop.** Worked in jsdom, did nothing in Chrome.
 
-So when a change touches DOM serialization or pointer/drag behaviour, **drive
-a real browser before believing the suite**. There is no browser test in the
-repo yet - it was done ad hoc with Playwright against `pnpm dev`, loading a
-real `.adg` through the file input and asserting on the DOM afterwards. Adding
-that as a checked-in smoke test is worth doing; it is not done.
+A test suite cannot falsify an assumption about the environment it is itself
+running in. So:
 
-The general shape of the lesson: a test suite cannot falsify an assumption
-about the environment it is itself running in.
+```bash
+pnpm test:e2e            # Playwright, real Chromium, against the dev server
+```
+
+Nine specs in `apps/site/e2e/`, run in CI as a separate `browser` job. They
+drive the real gestures - a pointer drag between two knobs, a click on the
+unbind "x", a colour pick - and one of them saves a file and checks the bytes,
+which is the direct guard on Q12. They use the codec's synthetic racks written
+to a temp file, because the real fixtures are gitignored and absent in CI.
+
+Adding one caught a third bug immediately: `useMacroDrag` attached its window
+listeners from an effect, so a gesture that finished before React committed
+was silently dropped. Slow enough to pass by hand, fast enough to fail under
+Playwright - and it would have failed for anyone who flicks a knob quickly.
+
+Add a spec here whenever a change touches DOM serialization, pointer handling,
+or layout that must not overflow.
 
 Of the codec's 78, 60 are synthetic and always run; 18 run against real
 Ableton-saved racks in
@@ -167,7 +183,7 @@ the bridge is alive and nothing else. See `apps/m4l-device/README.md`.
 
 | Workflow | Trigger | Does |
 |---|---|---|
-| `ci.yml` | PR, push to main | lint, typecheck, codec tests |
+| `ci.yml` | PR, push to main | lint, typecheck, codec and UI tests, plus a `browser` job running the Playwright specs in Chromium |
 | `deploy.yml` | push to main | codec tests, then build and deploy to Pages |
 | `release-device.yml` | push to main | build `rack-editor.amxd`, publish to the `latest-device` release (overwritten each push, no versioning yet) |
 
