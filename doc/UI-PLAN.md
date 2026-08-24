@@ -112,15 +112,49 @@ Concretely, from the screenshot, identify and vectorize:
 
 ### 1.2 How to extract it
 
-The source is a PNG screenshot, not a vector original, so "extraction" means
-**redrawing** each element as clean SVG that matches the screenshot closely
-(shapes, proportions, relative colors) - not literally tracing pixels. Two
-viable approaches, pick per element based on complexity:
+**Check for a reusable asset first, before drawing anything new.**
+`alienmind/trackster` (a sibling project, freely reusable - explicit
+permission from the project owner) already has hardware-style knob
+components worth starting from:
 
-- **Hand-authored SVG** for simple geometric shapes (the knob is a circle +
-  an arc `<path>` + a few text elements) - most of what's here is this
-  simple. This is almost certainly the right choice for the knob itself:
-  see the worked example in Part 3.2.
+- `trackster/src/components/Core/HardwareUI/Knob.tsx` - a full SVG rotary
+  knob (radial-gradient cap, rim, an LED indicator, 4 color variants) as a
+  React component, not a static asset - copy the component, not just the
+  markup.
+- `trackster/src/hooks/useKnobInteraction.ts` - vertical-drag-to-rotate
+  pointer handling, `-135..+135` degree range (the exact same convention
+  this plan's own `MacroKnob` sketch in Part 3.2 already uses), with a
+  documented anti-render-storm pattern (refs refreshed via
+  `useLayoutEffect` so window-level `pointermove`/`pointerup` listeners are
+  attached once per drag, not re-registered every render). Directly
+  reusable if this UI ever wants click-drag-to-set-value on a knob (not in
+  the current interaction spec, Part 2, but a natural extension).
+- `trackster/src/components/devices/` (MiniFreak, Circuit Tracks, Grind, S1)
+  - several complete hardware-panel UIs built from the same primitives, worth
+    a look for chain-strip / button chrome ideas beyond just the knob.
+
+**The honest gap:** trackster's `Knob` renders a physical potentiometer
+look - a rotating indicator LINE on a knob cap, meant to mimic a real
+hardware dial. Ableton's own macro knob (confirmed from the reference
+screenshot once Part 1.1 happens, but true of Ableton's UI in general) uses
+an ARC-fill sweep instead - a value shown as how much of a ring is filled
+in, not a rotated line. So trackster's component is a strong **base for the
+physical shell** (the gradient cap, the rim, the sizing, the color-variant
+system) but the value-indicator itself still needs the arc approach already
+in Part 3.2's `arcPath` sketch, layered on top or swapped in. Don't force a
+line-indicator knob into this UI just because it's already built - match
+Ableton's actual visual language (that's the whole point of Part 1), reuse
+trackster for everything that doesn't conflict with that goal.
+
+Once existing-asset reuse is exhausted, for whatever's left the source is a
+PNG screenshot, not a vector original, so "extraction" means **redrawing**
+each element as clean SVG that matches the screenshot closely (shapes,
+proportions, relative colors) - not literally tracing pixels. Two viable
+approaches, pick per element based on complexity:
+
+- **Hand-authored SVG** for simple geometric shapes (an arc `<path>` + a few
+  text elements) - most of what's left after reusing trackster's knob shell
+  is this simple. See the worked example in Part 3.2.
 - **Traced/simplified SVG** (via an image trace, then manually cleaned up)
   only if something is genuinely irregular (an icon glyph, a logo). Prefer
   redrawing over tracing wherever the shape is describable geometrically -
@@ -431,7 +465,11 @@ This is the one component Part 1's extraction most directly feeds. A
 reasonable starting shape, to be corrected against the actual screenshot
 once Part 1 happens - **do not treat these exact numbers as final**, they
 are a plausible placeholder so the rest of the plan has something concrete
-to reference:
+to reference. Per Part 1.2, build the knob's physical shell from
+`trackster/src/components/Core/HardwareUI/Knob.tsx` rather than from
+scratch (its gradient cap/rim/sizing), replacing only its rotating-line
+value indicator with the arc-fill sweep below to match Ableton's actual
+look:
 
 ```tsx
 interface MacroKnobProps {
