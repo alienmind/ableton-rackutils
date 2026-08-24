@@ -16,7 +16,11 @@ is meant to lock the toolkit to macro remapping only; `adg-codec` and
 surface, not a rewrite.
 
 Companion docs:
-- `packages/adg-codec/SCHEMA.md` - the empty schema log that gates all codec work.
+- `packages/adg-codec/SCHEMA.md` - the schema findings log, confirmed against
+  real fixtures, that all codec code must trace to.
+- `doc/UI-PLAN.md` - the web UI overhaul plan (Ableton-matching macro panel,
+  SVG extraction, drag-and-drop, the mapped/"more" parameter split). Planning
+  only, not started - see its own status line.
 - `.github/workflows/` - the pipeline described in Phase 4.2.
 
 Handoff document. Written so another agent can pick this up cold. Read the Constraints section before writing any code, several intuitive designs are ruled out by facts about Ableton's API that are not obvious.
@@ -64,13 +68,14 @@ is the next real work.
 
 Do this next, in order:
 
-1. **Wire the codec into `apps/site`.** Phase 3-4. Turns the current raw-tree
-   viewer into the actual macro editor: `Rack.parse` instead of raw
-   `DOMParser`, a macro bank UI, drag one macro onto another calls
-   `moveMapping` for real. `editor-ui` as its own package is optional -
-   folding it directly into `apps/site` is a reasonable simplification for
-   now, split it out only if the device UI (Phase 5) genuinely needs to share
-   components later.
+1. **Wire the codec into `apps/site`, per `doc/UI-PLAN.md`.** That document
+   now supersedes this section's earlier, much lighter sketch: it specs a UI
+   that visually matches Ableton's own macro panel (SVG knobs, editable rack
+   name, drag-to-reorder, a mapped/"more" split per device), not just a
+   functional drag-to-remap. It also resolves the `editor-ui` question -
+   package it for real, `apps/m4l-device` needs to share it. Read
+   `UI-PLAN.md`'s own status line before starting: Part 1 (the reference
+   screenshot / SVG extraction) is explicitly on hold pending the go-ahead.
 2. **Device editor UI** (Phase 5.3-5.4) is lower priority than the above -
    the site is the product, the device is a convenience layered on the same
    codec later.
