@@ -96,7 +96,9 @@ export function RackEditor({ rack, onChange, liveValues }: RackEditorProps) {
           </ul>
         )}
 
-        <RackPanel rack={rack} rackPath={[]} depth={0} />
+        <div className="rack-editor-scroll">
+          <RackPanel rack={rack} rackPath={[]} depth={0} />
+        </div>
       </div>
     </EditorProvider>
   );

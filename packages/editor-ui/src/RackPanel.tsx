@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { bindParameter, renameMacro, renameRack, reorderMacro, setMacroColor, setMacroCount, swapMacros, unbindOne } from '@rackutils/adg-codec';
-import type { Chain, DeviceNode, Rack } from '@rackutils/adg-codec';
+import type { DeviceNode, Rack } from '@rackutils/adg-codec';
+import { ChainList } from './ChainList';
 import { DeviceRow } from './DeviceRow';
-import { DrumPadGrid } from './DrumPadGrid';
 import { MacroBank } from './MacroBank';
 import { RackHeader } from './RackHeader';
 import { samePath, useEditor, type RackPath } from './context';
@@ -11,30 +11,30 @@ export interface RackPanelProps {
   rack: Rack;
   rackPath: RackPath;
   depth: number;
-  /** Nested racks collapse; the root does not. */
+  /** Nested racks collapse to a vertical title strip; the root does not. */
   collapsible?: boolean;
 }
 
 /**
- * One rack, drawn as a rack: its macro panel on the left, its chains and their
- * devices running left to right beside it - the layout Live itself uses, so a
- * rack looks like the thing the user already knows (UI-PLAN Part 2.6 rule 1,
- * Part 5).
+ * One rack, laid out as Live lays a rack out and on ONE row: a thin title bar,
+ * then macros on the left, the chain list beside them, and the SELECTED
+ * chain's devices running off to the right.
  *
- * The root rack is not a special case, it is the outermost call.
+ * Selecting one chain at a time is what keeps the row a row. Drawing every
+ * chain's devices stacked - the first cut - turned a four-pad drum rack into
+ * a page-height wall and buried the devices below the fold.
  *
- * `rack` is a live handle derived during the parent's render, so it is never
- * stale. Anything that has to survive a mutation travels as a `RackPath`
- * instead (see `context.tsx`).
+ * The root rack is not a special case, it is the outermost call: a nested rack
+ * is this same component, rendered inline in its parent's device strip.
  */
 export function RackPanel({ rack, rackPath, depth, collapsible }: RackPanelProps) {
-  // The first level of nesting opens by default; deeper levels start
-  // collapsed, as a vertical title strip, the way Live collapses a device.
   const [open, setOpen] = useState(!collapsible || depth <= 1);
+  const [selectedChain, setSelectedChain] = useState(0);
   const { armed, arm, apply, liveValues } = useEditor();
 
   const isDrumRack = rack.deviceEl.tagName === 'DrumGroupDevice';
-  const pads = isDrumRack ? rack.chains.filter((c) => c.receivingNote !== null) : [];
+  const chains = rack.chains;
+  const chain = chains[Math.min(selectedChain, chains.length - 1)];
 
   // Only the root rack gets the live overlay: liveValues are keyed by macro
   // index with no rack identity, and every rack reuses indices 0..15
@@ -59,8 +59,6 @@ export function RackPanel({ rack, rackPath, depth, collapsible }: RackPanelProps
     ) : (
       <DeviceRow key={device.path} device={device} rackPath={rackPath} />
     );
-
-  const chainBody = (chain: Chain) => chain.devices.map(renderDevice);
 
   if (collapsible && !open) {
     return (
@@ -87,39 +85,31 @@ export function RackPanel({ rack, rackPath, depth, collapsible }: RackPanelProps
       />
 
       <div className="rack-body">
-        <div className="macro-panel">
-          <MacroBank
-            macros={rack.macros}
-            macroCount={rack.macroCount}
-            armed={armed !== null && samePath(armed.rackPath, rackPath)}
-            liveValues={showLive}
-            onReorder={(from, to) => apply(rackPath, (r) => reorderMacro(r, from, to))}
-            onSwap={(a, b) => apply(rackPath, (r) => swapMacros(r, a, b))}
-            onBindArmed={bindHere}
-            onRename={(i, name) => apply(rackPath, (r) => renameMacro(r, i, name))}
-            onRecolor={(i, colorIndex) => apply(rackPath, (r) => setMacroColor(r, i, colorIndex))}
-            onUnbindOne={(i, targetPath) => apply(rackPath, (r) => unbindOne(r, i, targetPath))}
-          />
-        </div>
+        <MacroBank
+          macros={rack.macros}
+          macroCount={rack.macroCount}
+          armed={armed !== null && samePath(armed.rackPath, rackPath)}
+          liveValues={showLive}
+          onReorder={(from, to) => apply(rackPath, (r) => reorderMacro(r, from, to))}
+          onSwap={(a, b) => apply(rackPath, (r) => swapMacros(r, a, b))}
+          onBindArmed={bindHere}
+          onRename={(i, name) => apply(rackPath, (r) => renameMacro(r, i, name))}
+          onRecolor={(i, colorIndex) => apply(rackPath, (r) => setMacroColor(r, i, colorIndex))}
+          onUnbindOne={(i, targetPath) => apply(rackPath, (r) => unbindOne(r, i, targetPath))}
+        />
 
-        {isDrumRack && pads.length > 0 ? (
-          <DrumPadGrid pads={pads} rackPath={rackPath} renderChainBody={chainBody} />
-        ) : (
-          <div className="chain-lanes">
-            {rack.chains.map((chain) => (
-              <div className="chain-lane" key={chain.path}>
-                <span className="chain-name">{chain.name || 'Chain'}</span>
-                <div className="device-strip">{chainBody(chain)}</div>
-              </div>
-            ))}
-          </div>
+        {chains.length > 0 && (
+          <>
+            <ChainList chains={chains} selected={selectedChain} onSelect={setSelectedChain} drum={isDrumRack} />
+            <div className="device-strip">{chain ? chain.devices.map(renderDevice) : null}</div>
+          </>
         )}
       </div>
     </section>
   );
 }
 
-/** A rack inside a rack: resolve it as a sub-rack view and render the same panel one level down. */
+/** A rack inside a rack: resolve it as a sub-rack view and render the same panel inline, one level down. */
 function NestedRack({ parent, device, rackPath, depth }: { parent: Rack; device: DeviceNode; rackPath: RackPath; depth: number }) {
   const nested = parent.subRack(device.path);
   if (!nested) return <DeviceRow device={device} rackPath={rackPath} />;

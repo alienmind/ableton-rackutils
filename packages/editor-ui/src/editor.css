@@ -1,30 +1,33 @@
 /*
- * Shared editor styles, following Live's own layout rather than inventing one:
- * a device is a fixed-height panel in a horizontal chain that scrolls
- * sideways, a collapsed device becomes a vertical title strip, and a rack's
- * macro panel sits to the left of its chains.
+ * Live's layout, not an invented one (UI-PLAN Part 5).
  *
- * --device-height is Live's device row height, which is also the height a Max
- * for Live device view gets (169px) - fixing it here means the same components
- * fit that view later without a second layout.
+ * The whole rack is ONE ROW. A rack panel is a thin title bar over a body of
+ * fixed height; the body holds the macro panel, the chain list, and the
+ * selected chain's devices running off to the right. Nested racks continue
+ * rightward in that same row rather than stacking downward.
+ *
+ * --device-height is Live's device row height and also the height a Max for
+ * Live device view gets (169px). Everything is sized against it so a rack
+ * cannot grow vertically: the page scrolls sideways, as Live's chain does.
  *
  * The knob shape is still a PLACEHOLDER (UI-PLAN Part 1).
  */
 .rack-editor {
   --device-height: 169px;
-  --edit-bg: #1a1c22;
-  --edit-bg-sunken: #14151a;
+  --header-height: 17px;
   --edit-panel: #2b2e36;
-  --edit-line: #101116;
+  --edit-panel-dark: #23262e;
+  --edit-line: #16181d;
   --edit-text: #e8e8ea;
   --edit-dim: #9a9aa5;
   --edit-accent: #6ea8ff;
-  --knob-track: #45484f;
-  --knob-body: #23262e;
+  --knob-track: #4a4d55;
+  --knob-body: #1e2027;
   --macro-color: #6ea8ff;
   color: var(--edit-text);
   text-align: left;
   font-size: 11px;
+  font-family: -apple-system, Segoe UI, Roboto, sans-serif;
 }
 
 .rack-editor button {
@@ -32,25 +35,32 @@
   font-size: 11px;
 }
 
+/* The one place horizontal scrolling happens: the outermost chain. */
+.rack-editor-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
+}
+
 .editor-toolbar {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.4rem;
 }
 
 .editor-toolbar button,
 .macro-count button,
 .more-toggle,
-.rack-disclosure,
 .cancel-arm,
 .unbind,
-.device-collapse {
+.device-collapse,
+.rack-disclosure {
   background: #3a3d45;
   color: var(--edit-text);
   border: 1px solid var(--edit-line);
-  border-radius: 3px;
-  padding: 0.15rem 0.4rem;
+  border-radius: 2px;
+  padding: 0 4px;
   cursor: pointer;
 }
 
@@ -68,38 +78,43 @@
 }
 
 .warnings {
-  margin: 0 0 0.5rem;
-  padding: 0.4rem 0.6rem 0.4rem 1.5rem;
+  margin: 0 0 0.4rem;
+  padding: 0.3rem 0.5rem 0.3rem 1.4rem;
   border-left: 3px solid #ff9f45;
   background: #241f18;
   color: #ffd9ad;
 }
 
-/* --- rack panel: header strip, then macro panel + chains side by side --- */
+/* --- rack panel: title bar over a fixed-height body --- */
 
 .rack-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  height: calc(var(--device-height) + var(--header-height));
+  background: var(--edit-panel);
   border: 1px solid var(--edit-line);
   border-radius: 3px;
-  background: var(--edit-panel);
-  margin-bottom: 0.4rem;
-  display: inline-flex;
-  flex-direction: column;
-  min-width: 0;
-  max-width: 100%;
+  overflow: hidden;
 }
 
 .rack-panel.depth-1 { background: #30333c; }
 .rack-panel.depth-2 { background: #353943; }
 .rack-panel.depth-3 { background: #3a3e49; }
 
-/* A collapsed rack or device: a vertical title strip, as Live draws one. */
+/* A nested rack sits inside its parent's device strip and fills that row. */
+.device-strip > .rack-panel {
+  height: 100%;
+  margin: 0;
+}
+
+/* Collapsed rack or device: a vertical title strip, as Live draws one. */
 .rack-panel.collapsed,
 .device-panel.collapsed {
-  height: var(--device-height);
-  min-width: 22px;
-  width: 22px;
-  flex: 0 0 22px;
-  padding: 0;
+  width: 20px;
+  min-width: 20px;
+  flex: 0 0 20px;
+  height: 100%;
 }
 
 .device-title-strip {
@@ -110,7 +125,7 @@
   color: var(--edit-text);
   writing-mode: vertical-rl;
   text-orientation: mixed;
-  padding: 0.4rem 0;
+  padding: 4px 0;
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
@@ -122,11 +137,12 @@
 .rack-header {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.15rem 0.3rem;
-  background: #23262e;
+  gap: 5px;
+  height: var(--header-height);
+  padding: 0 4px;
+  background: var(--edit-panel-dark);
   border-bottom: 1px solid var(--edit-line);
-  border-radius: 3px 3px 0 0;
+  flex: 0 0 auto;
 }
 
 .rack-name,
@@ -134,70 +150,73 @@
   margin: 0;
   font-size: 11px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .rack-name-input {
-  background: var(--edit-bg-sunken);
+  background: #101116;
   border: 1px solid var(--edit-accent);
   border-radius: 2px;
   color: inherit;
   font-family: inherit;
-  padding: 0 0.2rem;
+  padding: 0 2px;
+  width: 120px;
 }
 
 .rack-kind {
   color: var(--edit-dim);
   font-size: 10px;
+  white-space: nowrap;
 }
 
 .macro-count {
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 0.2rem;
+  gap: 3px;
   color: var(--edit-dim);
 }
 
-/* The rack's contents: macros on the left, chains running right, as in Live. */
+/* Macros, chain list, devices - side by side, never stacked. */
 .rack-body {
   display: flex;
   align-items: stretch;
-  gap: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-}
-
-.macro-panel {
-  flex: 0 0 auto;
-  padding: 0.3rem;
-  border-right: 1px solid var(--edit-line);
   height: var(--device-height);
-  overflow-y: auto;
+  min-height: var(--device-height);
+  overflow: hidden;
 }
 
 /* --- macro bank: two rows, left to right, as Live lays macros out --- */
+
+.macro-bank-wrap {
+  flex: 0 0 auto;
+  padding: 3px;
+  border-right: 1px solid var(--edit-line);
+  overflow: hidden;
+}
 
 .macro-bank {
   display: grid;
   grid-template-rows: repeat(2, auto);
   grid-auto-flow: column;
-  gap: 0.25rem;
+  gap: 2px;
 }
 
 .macro-knob {
   position: relative;
-  width: 66px;
+  width: 58px;
+  height: 78px;
   border: 1px solid transparent;
-  border-radius: 3px;
-  padding: 0.1rem;
+  border-radius: 2px;
+  padding: 1px;
   text-align: center;
   touch-action: none;
 }
 
-.macro-knob.unmapped { opacity: 0.75; }
+.macro-knob.unmapped { opacity: 0.8; }
 .macro-knob.hidden-slot { border-style: dashed; border-color: var(--edit-line); }
 .macro-knob.bindable { border-color: var(--edit-accent); }
-.macro-knob.dragging { opacity: 0.4; }
+.macro-knob.dragging { opacity: 0.35; }
 .macro-knob.drop-reorder { border-color: var(--edit-accent); background: #1d2a3d; }
 .macro-knob.drop-swap { border-color: #ffd166; background: #2e2a1c; }
 
@@ -210,15 +229,15 @@
 .macro-bank-wrap.dragging .macro-knob-dial { cursor: grabbing; }
 
 .macro-knob-dial svg {
-  width: 44px;
-  height: 44px;
+  width: 38px;
+  height: 38px;
   display: block;
   margin: 0 auto;
 }
 
 .knob-body {
   fill: var(--knob-body);
-  stroke: #14151a;
+  stroke: #101116;
   stroke-width: 1;
 }
 
@@ -255,8 +274,8 @@
 
 .macro-knob-slot {
   position: absolute;
-  top: 4px;
-  left: 4px;
+  top: 1px;
+  left: 2px;
   font-size: 9px;
   color: var(--edit-dim);
 }
@@ -265,12 +284,13 @@
 .macro-knob-name-input {
   display: block;
   font-size: 10px;
+  line-height: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  background: #23262e;
+  background: #3a3d45;
   border-radius: 2px;
-  padding: 1px 2px;
+  padding: 0 2px;
 }
 
 .macro-knob.mapped .macro-knob-name {
@@ -288,10 +308,10 @@
 
 .macro-knob-swatch {
   position: absolute;
-  top: 3px;
-  right: 3px;
-  width: 9px;
-  height: 9px;
+  top: 1px;
+  right: 1px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   border: 1px solid rgba(0, 0, 0, 0.6);
   background: var(--macro-color);
@@ -304,6 +324,7 @@
   margin: 1px 0 0;
   padding: 0;
   font-size: 9px;
+  line-height: 11px;
   color: var(--edit-dim);
 }
 
@@ -323,26 +344,26 @@
 .unbind {
   padding: 0 3px;
   font-size: 9px;
-  line-height: 1.2;
+  line-height: 11px;
 }
 
 .color-picker {
   position: absolute;
-  z-index: 5;
-  top: 12px;
+  z-index: 10;
+  top: 10px;
   right: 0;
   display: grid;
-  grid-template-columns: repeat(4, 14px);
+  grid-template-columns: repeat(4, 13px);
   gap: 2px;
-  padding: 4px;
+  padding: 3px;
   background: #101116;
-  border: 1px solid #45484f;
+  border: 1px solid #4a4d55;
   border-radius: 3px;
 }
 
 .color-swatch {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
   border-radius: 2px;
   border: 1px solid rgba(0, 0, 0, 0.5);
   padding: 0;
@@ -352,67 +373,125 @@
 .color-swatch.current { outline: 2px solid #fff; }
 
 .hidden-macros {
-  margin-top: 0.3rem;
+  position: absolute;
+  bottom: 2px;
+  left: 4px;
   color: #ffd9ad;
-  font-size: 10px;
+  font-size: 9px;
 }
 
-.hidden-macros summary { cursor: pointer; }
+/* --- chain list: a narrow column, one row per chain, one selected --- */
 
-/* --- chains and devices: horizontal lanes --- */
-
-.chain-lanes {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.chain-lane {
+.chain-list {
+  flex: 0 0 auto;
   display: flex;
   align-items: stretch;
-  gap: 0.25rem;
-  min-width: 0;
+  border-right: 1px solid var(--edit-line);
+  background: var(--edit-panel-dark);
+  max-width: 220px;
 }
 
-.chain-name {
+.pad-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 26px);
+  grid-auto-rows: 20px;
+  gap: 1px;
+  padding: 2px;
+  align-content: start;
+  border-right: 1px solid var(--edit-line);
+}
+
+.pad {
+  background: #3a3d45;
+  border: 1px solid var(--edit-line);
+  border-radius: 2px;
+  color: var(--edit-text);
+  font-size: 9px;
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.pad.selected {
+  background: #ffd166;
+  color: #14151a;
+  font-weight: 600;
+}
+
+.chain-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px;
+  overflow-y: auto;
+  min-width: 90px;
+}
+
+.chain-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: #3a3d45;
+  border: 1px solid var(--edit-line);
+  border-radius: 2px;
+  color: var(--edit-text);
+  padding: 1px 3px;
+  cursor: pointer;
+  text-align: left;
   flex: 0 0 auto;
-  align-self: center;
-  color: var(--edit-dim);
-  padding: 0 0.3rem;
-  max-width: 90px;
+}
+
+.chain-row.selected {
+  background: var(--edit-accent);
+  color: #14151a;
+  font-weight: 600;
+}
+
+.chain-note {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9px;
+  opacity: 0.8;
+}
+
+.chain-row-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 110px;
 }
+
+/* --- devices: left to right, fixed height, the row never grows --- */
 
 .device-strip {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 2px;
   padding: 2px;
-  min-width: 0;
   overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .device-panel {
   flex: 0 0 auto;
-  width: 170px;
-  height: var(--device-height);
+  width: 160px;
+  height: 100%;
   display: flex;
   flex-direction: column;
   background: var(--edit-panel);
   border: 1px solid var(--edit-line);
-  border-radius: 3px;
+  border-radius: 2px;
   overflow: hidden;
 }
 
 .device-title {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.1rem 0.25rem;
-  background: #23262e;
+  gap: 3px;
+  height: var(--header-height);
+  padding: 0 3px;
+  background: var(--edit-panel-dark);
   border-bottom: 1px solid var(--edit-line);
+  flex: 0 0 auto;
 }
 
 .device-name {
@@ -421,52 +500,17 @@
   white-space: nowrap;
 }
 
-.device-collapse {
-  padding: 0 4px;
-  line-height: 1;
-}
+.device-collapse { line-height: 1; }
 
 .device-body {
-  padding: 0.25rem;
+  padding: 3px;
   overflow-y: auto;
   flex: 1 1 auto;
 }
 
-/* Drum pads: a column of named rows, Live's chain list, one row per pad. */
-.drum-pads {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.drum-pad {
-  align-items: center;
-  border-bottom: 1px solid var(--edit-line);
-}
-
-.pad-note {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
-  color: #14151a;
-  background: #ffd166;
-  border-radius: 2px;
-  padding: 0 3px;
-  margin-left: 3px;
-}
-
-.pad-name {
-  flex: 0 0 auto;
-  width: 84px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.pad-choke { color: var(--edit-dim); font-size: 9px; }
-
 .params {
   list-style: none;
-  margin: 0.2rem 0 0;
+  margin: 0;
   padding: 0;
   display: flex;
   flex-wrap: wrap;
@@ -487,7 +531,7 @@
   font-size: 10px;
   padding: 0 3px;
   cursor: pointer;
-  max-width: 150px;
+  max-width: 148px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -498,14 +542,15 @@
   background: #1d2a3d;
 }
 
+.mapped-params { margin-bottom: 2px; }
 .mapped-params .param { background: #2f4a2f; }
 
 .macro-badge { font-size: 9px; color: #9ad49a; }
 
-.more-toggle { margin-top: 0.2rem; }
+.more-toggle { margin-top: 2px; }
 
 .no-params {
-  margin: 0.2rem 0 0;
+  margin: 0;
   font-size: 10px;
   color: var(--edit-dim);
 }

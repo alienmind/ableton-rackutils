@@ -53,9 +53,9 @@ describe('RackEditor', () => {
 });
 
 describe('drum racks', () => {
-  test('renders pads rather than a plain chain list', () => {
+  test('renders a pad grid alongside the chain rows', () => {
     const html = render(Rack.parse(buildDrumFixtureBytes()));
-    expect(html).toContain('drum-pads');
+    expect(html).toContain('pad-grid');
     expect(html).toContain('Kick');
     expect(html).toContain('Snare');
   });
@@ -63,7 +63,7 @@ describe('drum racks', () => {
   test('orders pads by note, not by document order', () => {
     // The fixture stores them 40, 36, 38 on purpose.
     const html = render(Rack.parse(buildDrumFixtureBytes()));
-    const order = [...html.matchAll(/class="pad-name"[^>]*>([^<]+)</g)].map((m) => m[1]);
+    const order = [...html.matchAll(/class="chain-note">[^<]*<\/span><span class="chain-row-name">([^<]+)</g)].map((m) => m[1]);
     expect(order).toEqual(['Kick', 'Snare', 'Hat']);
   });
 });
@@ -79,7 +79,7 @@ describe.skipIf(!hasReal('drum-pads.adg'))('against the real drum-pads.adg', () 
 
   test('pads come out in ascending note order, reversing the file order', () => {
     const html = render(Rack.parse(loadReal('drum-pads.adg')));
-    const order = [...html.matchAll(/class="pad-name"[^>]*>([^<]+)</g)].map((m) => m[1]);
+    const order = [...html.matchAll(/class="chain-note">[^<]*<\/span><span class="chain-row-name">([^<]+)</g)].map((m) => m[1]);
     expect(order).toEqual(['Riser + Decay', 'Riser Moog', 'Riser Faze']);
   });
 
@@ -104,6 +104,6 @@ describe.skipIf(!hasReal('simplerack.adg'))('against the real simplerack.adg', (
     expect(html).toContain('Filter Drive Amount');
     expect(html).toContain('Filter Cutoff Frequency');
     expect(html).toContain('Filter Resonance');
-    expect(html).not.toContain('drum-pads');
+    expect(html).not.toContain('pad-grid');
   });
 });
