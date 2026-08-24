@@ -104,10 +104,10 @@ describe('Rack.parse', () => {
 
   test('serialize always emits the XML declaration Live requires', () => {
     // Regression: a real rack, moved with `moveMapping`, silently refused
-    // to load in Live at all - drag-and-drop rejected outright. Root cause:
-    // XMLSerializer.serializeToString() never emits `<?xml ... ?>` (true in
-    // every browser and jsdom, not a jsdom quirk), and every file Ableton
-    // itself writes starts with it.
+    // to load in Live at all - drag-and-drop rejected outright, because the
+    // output had no `<?xml ... ?>` declaration and every file Ableton writes
+    // does. Whether the host serializer supplies one varies (SCHEMA.md Q12),
+    // which is why this asserts the result rather than the mechanism.
     const rack = Rack.parse(buildFixtureBytes());
     const xml = decompress(rack.serialize());
     expect(xml.startsWith('<?xml version="1.0" encoding="UTF-8"?>\n')).toBe(true);
@@ -200,6 +200,41 @@ describe('drum racks (SCHEMA.md Q10)', () => {
     for (const chain of rack.chains) {
       const nested = rack.subRack(chain.devices[0].path)!;
       expect(nested.macros[0].bindings).toHaveLength(1);
+    }
+  });
+});
+
+describe('serialize emits exactly one XML declaration', () => {
+  // Regression, found by driving a real browser: XMLSerializer omits the
+  // declaration in jsdom and INCLUDES it in Chrome (SCHEMA.md Q12). Prepending
+  // one unconditionally produced two in the browser, which fails to reparse -
+  // so every mutation threw inside Rack.clone() in the real app while this
+  // suite stayed green, and a saved file would not have loaded in Live.
+  test('parse -> serialize -> parse survives repeatedly', () => {
+    let rack = Rack.parse(buildFixtureBytes());
+    for (let i = 0; i < 3; i++) rack = Rack.parse(rack.serialize());
+    expect(rack.name).toBe('Test Rack');
+  });
+
+  test('the declaration appears once, at the very start', () => {
+    const xml = decompress(Rack.parse(buildFixtureBytes()).serialize());
+    expect(xml.startsWith('<?xml version="1.0" encoding="UTF-8"?>\n')).toBe(true);
+    expect(xml.split('<?xml')).toHaveLength(2);
+  });
+
+  test('clone survives a host serializer that emits its own declaration', () => {
+    // Simulates Chrome's behaviour under jsdom: if the serializer already
+    // supplies a declaration, serializeXmlDoc must not add a second.
+    const rack = Rack.parse(buildFixtureBytes());
+    const original = XMLSerializer.prototype.serializeToString;
+    XMLSerializer.prototype.serializeToString = function (node: Node) {
+      return `<?xml version="1.0" encoding="UTF-8"?>${original.call(this, node)}`;
+    };
+    try {
+      expect(() => rack.clone()).not.toThrow();
+      expect(rack.clone().name).toBe('Test Rack');
+    } finally {
+      XMLSerializer.prototype.serializeToString = original;
     }
   });
 });

@@ -15,16 +15,28 @@ export function parseXmlDoc(xml: string): Document {
   return doc;
 }
 
+const XML_DECLARATION = '<?xml version="1.0" encoding="UTF-8"?>';
+
 /**
- * `XMLSerializer.serializeToString()` never emits the `<?xml ... ?>`
- * prolog - that's standard DOM behaviour, true in every browser and in
- * jsdom, not a bug in either. Every `.adg` Ableton itself writes starts with
- * `<?xml version="1.0" encoding="UTF-8"?>`, and Live refused to load a file
- * this codec wrote without it - confirmed by hand, a real rack, drag-and-drop
- * onto a track silently rejected. Prepend it always.
+ * Every `.adg` Ableton writes starts with an XML declaration, and Live
+ * silently refuses to load a file without one - confirmed by hand on a real
+ * rack, drag-and-drop onto a track rejected with no message.
+ *
+ * `XMLSerializer.serializeToString()` is NOT consistent about emitting it:
+ * jsdom omits it, Chrome includes it (SCHEMA.md Q12). An earlier version of
+ * this function prepended one unconditionally, which was right under the test
+ * suite and produced TWO in a browser. Not a cosmetic difference: the result
+ * fails to reparse ("XML declaration allowed only at the start of the
+ * document"), so `Rack.clone()` threw on every mutation in the real app while
+ * every test passed, and a saved file would have been rejected by Live.
+ *
+ * So: emit exactly one, wherever this runs.
  */
 export function serializeXmlDoc(doc: Document): string {
-  return `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(doc)}`;
+  const xml = new XMLSerializer().serializeToString(doc);
+  if (!xml.startsWith('<?xml')) return `${XML_DECLARATION}\n${xml}`;
+  const declEnd = xml.indexOf('?>') + 2;
+  return `${xml.slice(0, declEnd)}\n${xml.slice(declEnd).replace(/^\n/, '')}`;
 }
 
 /** Direct element children only, skipping text/comment nodes. */

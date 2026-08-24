@@ -297,7 +297,10 @@ export class Rack {
       };
       return {
         path: this.pathOf(branchPreset),
-        name: childValue(branchPreset, 'Name') || branchPreset.tagName,
+        // An unnamed chain reports '' - Live shows no name for one either.
+        // Do NOT substitute the XML tag: "InstrumentBranchPreset" is not a
+        // name a user ever chose, and it reads as one in a UI.
+        name: childValue(branchPreset, 'Name') ?? '',
         devices: (child(branchPreset, 'DevicePresets') ? elementChildren(child(branchPreset, 'DevicePresets')!) : []).map((dp) =>
           this.walkDevicePreset(dp),
         ),

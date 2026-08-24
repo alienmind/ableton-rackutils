@@ -15,15 +15,13 @@ Every element name in the codec must be traceable to a diff recorded here.
 Guessing element names produces files that open in Live without complaint and
 behave incorrectly - the worst failure mode, since nothing short of a human
 checking the result catches it. There is a second, milder failure mode this
-session found the hard way: a file that Live refuses to open at ALL.
-`XMLSerializer.serializeToString()` never emits the `<?xml version="1.0"
-encoding="UTF-8"?>` prolog every `.adg` starts with (true of every browser and
-of jsdom, not a jsdom quirk) - the output was well-formed XML, round-tripped
-fine through this codec's own parser, and Live still silently rejected the
-drag-and-drop. `serializeXmlDoc` (`packages/adg-codec/src/dom.ts`) now
-prepends it unconditionally. Noted here because it's a fact about the format,
-not just a code bug: **every writer for this format needs the prolog, and
-nothing about the DOM APIs used to build one supplies it automatically.**
+session found the hard way: a file that Live refuses to open at ALL, because
+it lacked the `<?xml version="1.0" encoding="UTF-8"?>` declaration every
+`.adg` starts with. The output was well-formed XML, round-tripped fine through
+this codec's own parser, and Live still silently rejected the drag-and-drop.
+**Every writer for this format needs that declaration, and the DOM APIs are
+inconsistent about supplying one** - see Q12, which is the same line of code
+breaking a second time, in the opposite direction.
 
 `alienmind/patchbay` (`doc/ARCHITECTURE.md` §5-11 and `doc/SCHEMA.md` S3-S10)
 documents this in far more depth than repeated below: transfer-function
@@ -357,6 +355,46 @@ specifically (patchbay S4) is not independently re-confirmed here - the
 structural nesting is, which is what this question asked. Low priority to
 re-test the macro-to-macro case; patchbay's S4 evidence plus Q1/Q2's
 containment model (which doesn't care about depth at all) covers it.
+
+---
+
+## Q12. Does `XMLSerializer` emit the XML declaration?
+
+Not a question about Ableton's format - a question about the DOM APIs used to
+write it, and the second time this one line has broken the tool.
+
+Q1's note and an earlier version of `serializeXmlDoc` both said
+`XMLSerializer.serializeToString()` "never emits the `<?xml ... ?>` prolog,
+true in every browser and in jsdom". **That is wrong.** Measured directly in
+Chromium via a scripted browser:
+
+| Host | `serializeToString` output starts with |
+|---|---|
+| jsdom (the test environment) | `<Ableton ...` - no declaration |
+| Chrome / Chromium (the real app) | `<?xml version="1.0" encoding="UTF-8"?>` |
+
+The codec prepended a declaration unconditionally. Under the tests that gave
+exactly one; in a browser it gave two, and a document with a second
+declaration does not reparse:
+
+```
+malformed XML: error on line 2 at column 6:
+XML declaration allowed only at the start of the document
+```
+
+`Rack.clone()` reparses, and every mutation clones for undo, so **every edit in
+the deployed web app failed** while all 89 tests passed. A saved file would
+have carried two declarations and been rejected by Live, exactly the failure
+the original prolog fix existed to prevent.
+
+`serializeXmlDoc` now emits exactly one declaration whichever host it runs on:
+it prepends only when the serializer did not supply one.
+
+**The general lesson, worth more than the fix:** this codec's rule is that
+every element name must trace to a real diff, and that rule was followed here.
+The bug was in an assumption about the *environment*, which nothing in the
+test suite could contradict because the test suite IS that environment. Where
+behaviour differs between jsdom and a browser, only a browser settles it.
 
 ---
 
