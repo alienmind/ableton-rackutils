@@ -72,6 +72,16 @@ export interface Chain {
   path: string;
   name: string;
   devices: DeviceNode[];
+  /**
+   * Drum rack pads only (`DrumBranchPreset`, SCHEMA.md Q10) - null on an
+   * ordinary chain. `receivingNote` is the MIDI note the pad answers to and
+   * the only thing identifying a pad's position; the grid geometry Live
+   * displays it in is NOT confirmed, so order by note rather than trying to
+   * reproduce `PadScrollPosition`.
+   */
+  receivingNote: number | null;
+  sendingNote: number | null;
+  chokeGroup: number | null;
 }
 
 export interface Variation {
@@ -101,14 +111,43 @@ export class Rack {
   }
 
   /**
+   * A view of a NESTED rack, given the path of one of this rack's `isRack`
+   * DeviceNodes. Shares the same document: mutating the returned Rack edits
+   * the same file, and serializing either handle writes the whole file, not
+   * the fragment.
+   *
+   * This exists because nested racks are structurally identical to the root
+   * one - a `GroupDevicePreset` with a `Device` and a `BranchPresets` sibling
+   * (SCHEMA.md Q8) - so every getter and every mutation already works on one
+   * unmodified, as long as it is pointed at the right root.
+   *
+   * Paths are relative to the rack they came from. A `ParamRef` read from a
+   * sub-rack only resolves against that sub-rack, so keep the two together;
+   * mixing a nested path with the root handle silently resolves to the wrong
+   * element or to nothing.
+   */
+  subRack(devicePath: string): Rack | null {
+    const el = this.resolveTarget(devicePath);
+    if (!el || el.tagName !== 'GroupDevicePreset') return null;
+    return new Rack(this.doc, el);
+  }
+
+  /**
    * A deep, independent copy for undo stacks (doc/PLAN.md Phase 2.1). Goes
    * through serialize+reparse rather than `cloneNode` + cross-document
    * adoption - a full reparse of a several-thousand-element rack is a few
    * milliseconds, cheap enough to trade for not having to reason about
    * adoption edge cases across DOM implementations (browser vs jsdom).
+   *
+   * Cloning a sub-rack view clones the whole document and returns a view at
+   * the same position in the copy, not a rack rooted back at the top.
    */
   clone(): Rack {
-    return Rack.fromXml(serializeXmlDoc(this.doc));
+    const doc = parseXmlDoc(serializeXmlDoc(this.doc));
+    const rootPath = pathOf(this.doc.documentElement, this.root);
+    const root = resolvePath(doc.documentElement, rootPath);
+    if (!root) throw new Error('clone lost its rack root - the document shape changed under it');
+    return new Rack(doc, root);
   }
 
   serialize(): Uint8Array {
@@ -248,13 +287,25 @@ export class Rack {
   }
 
   private walkChains(branchPresets: Element): Chain[] {
-    return elementChildren(branchPresets).map((branchPreset) => ({
-      path: this.pathOf(branchPreset),
-      name: childValue(branchPreset, 'Name') || branchPreset.tagName,
-      devices: (child(branchPreset, 'DevicePresets') ? elementChildren(child(branchPreset, 'DevicePresets')!) : []).map((dp) =>
-        this.walkDevicePreset(dp),
-      ),
-    }));
+    return elementChildren(branchPresets).map((branchPreset) => {
+      // A drum pad's note assignment (SCHEMA.md Q10). Absent on every other
+      // branch type, so these read null rather than a default note.
+      const zone = child(branchPreset, 'ZoneSettings');
+      const note = (tag: string) => {
+        const raw = childValue(zone, tag);
+        return raw === null ? null : Number(raw);
+      };
+      return {
+        path: this.pathOf(branchPreset),
+        name: childValue(branchPreset, 'Name') || branchPreset.tagName,
+        devices: (child(branchPreset, 'DevicePresets') ? elementChildren(child(branchPreset, 'DevicePresets')!) : []).map((dp) =>
+          this.walkDevicePreset(dp),
+        ),
+        receivingNote: note('ReceivingNote'),
+        sendingNote: note('SendingNote'),
+        chokeGroup: note('ChokeGroup'),
+      };
+    });
   }
 
   private walkDevicePreset(preset: Element): DeviceNode {

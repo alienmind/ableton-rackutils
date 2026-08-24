@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { childValue } from '../src/dom';
 import { Rack } from '../src/model';
-import { moveMapping, renameRack, reorderMacro, setMacroColor, setMacroCount } from '../src/mutate';
+import { moveMapping, renameMacro, renameRack, reorderMacro, setMacroColor, setMacroCount } from '../src/mutate';
 
 const FIXTURES = join(__dirname, 'fixtures');
 const path = (name: string) => join(FIXTURES, name);
@@ -143,5 +143,44 @@ describe.skipIf(!has('drum-nested.adg'))('drum-nested.adg', () => {
     let deepest = 0;
     for (const chain of rack.chains) deepest = Math.max(deepest, maxRackDepth(chain.devices, 1));
     expect(deepest).toBeGreaterThanOrEqual(2); // outer rack (0) -> pad rack (1) -> engine rack (2)
+  });
+
+  test('reads the pad note assignment off a real DrumBranchPreset (SCHEMA.md Q10)', () => {
+    const rack = Rack.parse(load('drum-nested.adg'));
+    expect(rack.deviceEl.tagName).toBe('DrumGroupDevice');
+    const pads = rack.chains.filter((c) => c.receivingNote !== null);
+    expect(pads.length).toBeGreaterThanOrEqual(1);
+    // Confirmed by hand in SCHEMA.md Q10: this fixture's single pad is note 92.
+    expect(pads[0].receivingNote).toBe(92);
+    expect(pads[0].sendingNote).toBe(60);
+  });
+
+  test('a real pad rack is reachable as a sub-rack, with its own macros, editable in place', () => {
+    const rack = Rack.parse(load('drum-nested.adg'));
+    const padRack = rack.chains.flatMap((c) => c.devices).find((d) => d.isRack);
+    expect(padRack).toBeDefined();
+
+    const nested = rack.subRack(padRack!.path)!;
+    expect(nested).not.toBeNull();
+    expect(nested.macros).toHaveLength(16);
+    expect(nested.name).toBe(padRack!.name);
+
+    renameMacro(nested, 0, 'Pad Macro');
+    const roundTripped = Rack.parse(rack.serialize());
+    expect(roundTripped.subRack(padRack!.path)!.macros[0].name).toBe('Pad Macro');
+    // The drum rack's own macro 0 is a different slot entirely.
+    expect(roundTripped.macros[0].name).not.toBe('Pad Macro');
+  });
+
+  test('sub-rack views reach all three nesting levels independently', () => {
+    const rack = Rack.parse(load('drum-nested.adg'));
+    const padRack = rack.chains.flatMap((c) => c.devices).find((d) => d.isRack)!;
+    const pad = rack.subRack(padRack.path)!;
+    const engineNode = pad.chains.flatMap((c) => c.devices).find((d) => d.isRack);
+    expect(engineNode).toBeDefined();
+    // Paths are relative to the rack they came from - resolve the engine rack
+    // against the PAD's handle, never the root's.
+    expect(pad.subRack(engineNode!.path)).not.toBeNull();
+    expect(pad.subRack(engineNode!.path)!.macros).toHaveLength(16);
   });
 });

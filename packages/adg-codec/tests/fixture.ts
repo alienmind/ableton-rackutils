@@ -146,3 +146,84 @@ export function buildFixtureXml(opts: FixtureOptions = {}): string {
 export function buildFixtureBytes(opts?: FixtureOptions): Uint8Array {
   return compress(buildFixtureXml(opts));
 }
+
+/**
+ * A drum rack: `DrumGroupDevice`, pads as `DrumBranchPreset` with a
+ * `ZoneSettings/ReceivingNote` each (SCHEMA.md Q10). Every pad holds its own
+ * nested rack, which is the organising pattern this exists to exercise -
+ * one drum rack bundling several functions, each routed through a pad.
+ *
+ * Notes are deliberately out of document order (40, 36, 38) so anything that
+ * lays pads out by note has to sort rather than take document order and
+ * happen to be right. Pad 36's nested rack maps its OWN macro 0 to
+ * `InnerParam`, so a sub-rack view has something to find.
+ */
+export function buildDrumFixtureXml(): string {
+  const pad = (note: number, sending: number, choke: number, label: string) => `
+    <DrumBranchPreset>
+      <Name Value="${label}" />
+      <DevicePresets>
+        <GroupDevicePreset>
+          <Device>
+            <InstrumentGroupDevice>
+              <UserName Value="${label} Rack" />
+              <NumVisibleMacroControls Value="4" />
+              ${macroSlots()}
+            </InstrumentGroupDevice>
+          </Device>
+          <BranchPresets>
+            <InstrumentBranchPreset>
+              <Name Value="" />
+              <DevicePresets>
+                <AbletonDevicePreset>
+                  <Device>
+                    <InnerSynth>
+                      <InnerParam>
+                        <Name Value="InnerParam" />
+                        <Timeable>
+                          <LomId Value="0" />
+                          ${keyMidiXml(0)}
+                          <Manual Value="0" />
+                          <MidiControllerRange><Min Value="0" /><Max Value="1" /></MidiControllerRange>
+                        </Timeable>
+                      </InnerParam>
+                    </InnerSynth>
+                  </Device>
+                </AbletonDevicePreset>
+              </DevicePresets>
+            </InstrumentBranchPreset>
+          </BranchPresets>
+        </GroupDevicePreset>
+      </DevicePresets>
+      <ZoneSettings>
+        <ReceivingNote Value="${note}" />
+        <SendingNote Value="${sending}" />
+        <ChokeGroup Value="${choke}" />
+      </ZoneSettings>
+    </DrumBranchPreset>`;
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<Ableton MajorVersion="5" MinorVersion="12.0_12402" SchemaChangeCount="5" Creator="test fixture">
+  <GroupDevicePreset>
+    <Device>
+      <DrumGroupDevice>
+        <UserName Value="Test Drum Rack" />
+        <NumVisibleMacroControls Value="8" />
+        ${macroSlots()}
+        <ArePadsVisible Value="true" />
+        <PadScrollPosition Value="19" />
+      </DrumGroupDevice>
+    </Device>
+    <BranchPresets>
+      ${pad(40, 60, 0, 'Hat')}
+      ${pad(36, 60, 1, 'Kick')}
+      ${pad(38, 62, 1, 'Snare')}
+    </BranchPresets>
+    <ReturnBranchPresets />
+  </GroupDevicePreset>
+</Ableton>`;
+}
+
+export function buildDrumFixtureBytes(): Uint8Array {
+  return compress(buildDrumFixtureXml());
+}
