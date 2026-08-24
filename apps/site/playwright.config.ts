@@ -15,7 +15,10 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: 0,
-  reporter: process.env.CI ? 'github' : 'list',
+  // 'github' annotates the failing lines in the Actions log; 'html' also
+  // writes playwright-report/, which the workflow uploads on failure. With
+  // 'github' alone a CI failure leaves nothing to inspect afterwards.
+  reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: 'http://localhost:5173',
     trace: 'on-first-retry',

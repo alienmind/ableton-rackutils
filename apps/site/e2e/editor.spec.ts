@@ -1,6 +1,6 @@
 import { gunzipSync } from 'node:zlib';
 import { readFileSync } from 'node:fs';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { writeRackFile } from './rack-file';
 
 async function loadRack(page: Page, kind: 'instrument' | 'drum' = 'instrument') {
@@ -23,22 +23,29 @@ const rootDials = (page: Page) => rootBody(page).locator('> .macro-bank-wrap .ma
 const rootChainRows = (page: Page) => rootBody(page).locator('> .chain-list .chain-row');
 const macroNames = (page: Page) => rootKnobs(page).locator('.macro-knob-name').allTextContents();
 
-/** Pointer drag, the gesture the UI actually uses. HTML5 drag-and-drop was the first implementation and did nothing here. */
-async function dragKnob(page: Page, from: number, to: number, shift = false) {
-  // Scroll the knobs into view FIRST. The page header is tall enough to push
-  // the editor below the fold at the default viewport, and `mouse.move` to a
-  // coordinate outside the viewport quietly does nothing - which looks exactly
-  // like a broken drag.
-  await rootDials(page).nth(from).scrollIntoViewIfNeeded();
-  const a = (await rootDials(page).nth(from).boundingBox())!;
-  const b = (await rootDials(page).nth(to).boundingBox())!;
+/**
+ * Pointer drag, the gesture the UI actually uses - HTML5 drag-and-drop was the
+ * first implementation and did nothing in a browser.
+ *
+ * Driven through `hover()` rather than `boundingBox()` arithmetic on purpose.
+ * The page header is tall enough to push the editor below the fold, and
+ * `mouse.move` to a coordinate outside the viewport quietly does nothing,
+ * which is indistinguishable from a broken drag. `hover()` scrolls the element
+ * into view first, so the test cannot fail for a reason the user never sees -
+ * this exact trap passed locally and failed in CI at a different window size.
+ */
+async function dragBetween(page: Page, source: Locator, target: Locator, shift = false) {
   if (shift) await page.keyboard.down('Shift');
-  await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+  await source.hover();
   await page.mouse.down();
-  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 8 });
+  await target.hover();
+  await target.hover(); // a second move, so the drag registers a hover on the target before release
   await page.mouse.up();
   if (shift) await page.keyboard.up('Shift');
 }
+
+const dragKnob = (page: Page, from: number, to: number, shift = false) =>
+  dragBetween(page, rootDials(page).nth(from), rootDials(page).nth(to), shift);
 
 test('loads a rack and renders its macros', async ({ page }) => {
   const errors = await loadRack(page);
@@ -152,18 +159,11 @@ test('dragging a parameter onto a knob binds it', async ({ page }) => {
   // The gesture people reach for first. Binding used to be click-to-arm then
   // click-a-knob, which is discoverable only if you read the instructions.
   await loadRack(page);
-  await page.locator('.more-toggle').first().scrollIntoViewIfNeeded();
   await page.locator('.more-toggle').first().click();
 
   const param = page.locator('.param', { hasText: 'ParamB' }).first();
   const knob = rootKnobs(page).nth(5);
-  const from = (await param.boundingBox())!;
-  const to = (await knob.boundingBox())!;
-
-  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 10 });
-  await page.mouse.up();
+  await dragBetween(page, param, knob);
 
   await expect(knob.locator('.target-name')).toContainText('ParamB');
   // The drag must not also leave the parameter armed.

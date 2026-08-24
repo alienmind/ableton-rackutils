@@ -45,5 +45,7 @@ jobs:
         if: failure()
         with:
           name: playwright-report
-          path: apps/site/playwright-report/
+          path: |
+            apps/site/playwright-report/
+            apps/site/test-results/
           retention-days: 7
