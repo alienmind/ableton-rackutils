@@ -4,8 +4,6 @@ import { arcPath, KNOB_MAX_DEG, KNOB_MIN_DEG, valueToDegrees } from './arc';
 import { ColorPicker } from './ColorPicker';
 import { macroColor } from './macroColors';
 
-export const MACRO_DRAG_TYPE = 'text/macro-index';
-
 export interface MacroKnobProps {
   macro: Macro;
   /** M4L device only. Drawn distinctly from the stored value: they are different things (doc/PLAN.md Constraint 1) and must never look alike. */
@@ -13,8 +11,10 @@ export interface MacroKnobProps {
   /** Something is armed, so clicking this knob binds it here. */
   armed: boolean;
   hidden?: boolean;
-  onReorder: (from: number) => void;
-  onSwap: (from: number) => void;
+  dragging: boolean;
+  dropTarget: boolean;
+  dropSwaps: boolean;
+  onDragStart: (e: React.PointerEvent) => void;
   onClick: () => void;
   onRename: (name: string) => void;
   onRecolor: (colorIndex: number) => void;
@@ -24,13 +24,17 @@ export interface MacroKnobProps {
 /**
  * PLACEHOLDER SHAPE. The real geometry comes from `doc/UI-PLAN.md` Part 1,
  * which is on hold - this is an arc-sweep knob built to that plan's sketch so
- * the interactions can be finished without it. Swapping in the extracted SVG
- * should touch this file's `<svg>` block and `editor.css`, nothing structural.
+ * the interactions can be finished without it.
+ *
+ * The macro's colour tints the ring at every value, not only the filled part.
+ * The first cut coloured the fill alone and only when the macro was mapped,
+ * which meant a macro sitting at value 0 - most of them, in a real rack -
+ * showed no colour at all and picking a colour looked like it did nothing.
  */
-export function MacroKnob({ macro, liveValue, armed, hidden, onReorder, onSwap, onClick, onRename, onRecolor, onUnbindOne }: MacroKnobProps) {
+export function MacroKnob(props: MacroKnobProps) {
+  const { macro, liveValue, armed, hidden, dragging, dropTarget, dropSwaps, onDragStart, onClick, onRename, onRecolor, onUnbindOne } = props;
   const [editing, setEditing] = useState(false);
   const [picking, setPicking] = useState(false);
-  const [dropHint, setDropHint] = useState<'reorder' | 'swap' | null>(null);
 
   const mapped = macro.bindings.length > 0;
   const color = macroColor(macro.color);
@@ -39,39 +43,28 @@ export function MacroKnob({ macro, liveValue, armed, hidden, onReorder, onSwap, 
   const classes = ['macro-knob', mapped ? 'mapped' : 'unmapped'];
   if (armed) classes.push('bindable');
   if (hidden) classes.push('hidden-slot');
-  if (dropHint) classes.push(`drop-${dropHint}`);
+  if (dragging) classes.push('dragging');
+  if (dropTarget) classes.push(dropSwaps ? 'drop-swap' : 'drop-reorder');
 
   return (
-    <div
-      className={classes.join(' ')}
-      draggable={!editing}
-      onDragStart={(e) => e.dataTransfer.setData(MACRO_DRAG_TYPE, String(macro.index))}
-      onDragOver={(e) => {
-        e.preventDefault();
-        setDropHint(e.shiftKey ? 'swap' : 'reorder');
-      }}
-      onDragLeave={() => setDropHint(null)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setDropHint(null);
-        const from = Number(e.dataTransfer.getData(MACRO_DRAG_TYPE));
-        if (!Number.isInteger(from) || from === macro.index) return;
-        (e.shiftKey ? onSwap : onReorder)(from);
-      }}
-    >
-      <button
-        type="button"
-        className="macro-knob-dial"
-        onClick={onClick}
-        title={armed ? `Bind the armed parameter to macro ${macro.index + 1}` : `Macro ${macro.index + 1}`}
-      >
+    <div className={classes.join(' ')} data-macro-index={macro.index} style={{ '--macro-color': color } as React.CSSProperties}>
+      <div className="macro-knob-dial" onPointerDown={onDragStart} onClick={onClick} title={armed ? `Bind the armed parameter here` : 'Drag to move, Shift-drag to swap'}>
         <svg viewBox="0 0 64 64" aria-hidden="true">
+          <circle className="knob-body" cx="32" cy="32" r="19" />
           <path className="knob-track" d={arcPath(32, 32, 25, KNOB_MIN_DEG, KNOB_MAX_DEG)} />
-          <path className="knob-fill" style={{ stroke: mapped ? color : undefined }} d={arcPath(32, 32, 25, KNOB_MIN_DEG, angle)} />
-          {liveValue !== undefined && <path className="knob-live" d={arcPath(32, 32, 18, KNOB_MIN_DEG, valueToDegrees(liveValue))} />}
+          <path className="knob-fill" d={arcPath(32, 32, 25, KNOB_MIN_DEG, angle)} />
+          {/* A pointer as well as the arc, so a macro at 0 still reads as "at zero" rather than as blank. */}
+          <line
+            className="knob-pointer"
+            x1="32"
+            y1="32"
+            x2={32 + 15 * Math.cos(((angle - 90) * Math.PI) / 180)}
+            y2={32 + 15 * Math.sin(((angle - 90) * Math.PI) / 180)}
+          />
+          {liveValue !== undefined && <path className="knob-live" d={arcPath(32, 32, 10, KNOB_MIN_DEG, valueToDegrees(liveValue))} />}
         </svg>
         <span className="macro-knob-slot">{macro.index + 1}</span>
-      </button>
+      </div>
 
       {editing ? (
         <input
@@ -84,18 +77,16 @@ export function MacroKnob({ macro, liveValue, armed, hidden, onReorder, onSwap, 
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') e.currentTarget.blur();
-            // Escape cancels without mutating - blur would commit, so drop the
-            // edit state first and let the blur handler find nothing to do.
             if (e.key === 'Escape') setEditing(false);
           }}
         />
       ) : (
-        <span className="macro-knob-name" onDoubleClick={() => setEditing(true)} title="Double-click to rename">
+        <span className="macro-knob-name" onDoubleClick={() => setEditing(true)} title={`${macro.name} - double-click to rename`}>
           {macro.name}
         </span>
       )}
 
-      <button type="button" className="macro-knob-swatch" style={{ background: color }} onClick={() => setPicking((p) => !p)} title="Colour">
+      <button type="button" className="macro-knob-swatch" onClick={() => setPicking((p) => !p)} title="Colour">
         <span className="sr-only">Change colour</span>
       </button>
       {picking && (

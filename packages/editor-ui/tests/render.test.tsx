@@ -63,7 +63,7 @@ describe('drum racks', () => {
   test('orders pads by note, not by document order', () => {
     // The fixture stores them 40, 36, 38 on purpose.
     const html = render(Rack.parse(buildDrumFixtureBytes()));
-    const order = [...html.matchAll(/class="pad-name">([^<]+)</g)].map((m) => m[1]);
+    const order = [...html.matchAll(/class="pad-name"[^>]*>([^<]+)</g)].map((m) => m[1]);
     expect(order).toEqual(['Kick', 'Snare', 'Hat']);
   });
 });
@@ -79,7 +79,7 @@ describe.skipIf(!hasReal('drum-pads.adg'))('against the real drum-pads.adg', () 
 
   test('pads come out in ascending note order, reversing the file order', () => {
     const html = render(Rack.parse(loadReal('drum-pads.adg')));
-    const order = [...html.matchAll(/class="pad-name">([^<]+)</g)].map((m) => m[1]);
+    const order = [...html.matchAll(/class="pad-name"[^>]*>([^<]+)</g)].map((m) => m[1]);
     expect(order).toEqual(['Riser + Decay', 'Riser Moog', 'Riser Faze']);
   });
 

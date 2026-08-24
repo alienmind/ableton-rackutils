@@ -16,9 +16,12 @@ export interface RackPanelProps {
 }
 
 /**
- * One rack, drawn as a rack: its name, its macro bank, and its chains - and
- * every rack inside it drawn the same way, recursively (UI-PLAN Part 2.6 rule
- * 1). The root rack is not a special case, it is the outermost call.
+ * One rack, drawn as a rack: its macro panel on the left, its chains and their
+ * devices running left to right beside it - the layout Live itself uses, so a
+ * rack looks like the thing the user already knows (UI-PLAN Part 2.6 rule 1,
+ * Part 5).
+ *
+ * The root rack is not a special case, it is the outermost call.
  *
  * `rack` is a live handle derived during the parent's render, so it is never
  * stale. Anything that has to survive a mutation travels as a `RackPath`
@@ -26,11 +29,7 @@ export interface RackPanelProps {
  */
 export function RackPanel({ rack, rackPath, depth, collapsible }: RackPanelProps) {
   // The first level of nesting opens by default; deeper levels start
-  // collapsed. A rack's contents are the point of this UI - hiding a drum
-  // rack's pads behind a click when the whole rack IS that drum rack makes the
-  // page look empty. The guard still holds where it matters: a drum rack with
-  // a rack on every pad stops expanding at the pads rather than opening every
-  // engine inside them (UI-PLAN Part 2.6).
+  // collapsed, as a vertical title strip, the way Live collapses a device.
   const [open, setOpen] = useState(!collapsible || depth <= 1);
   const { armed, arm, apply, liveValues } = useEditor();
 
@@ -63,6 +62,16 @@ export function RackPanel({ rack, rackPath, depth, collapsible }: RackPanelProps
 
   const chainBody = (chain: Chain) => chain.devices.map(renderDevice);
 
+  if (collapsible && !open) {
+    return (
+      <div className="rack-panel collapsed" title={rack.name}>
+        <button type="button" className="device-title-strip rack-strip" onClick={() => setOpen(true)}>
+          {rack.name}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <section className={`rack-panel depth-${Math.min(depth, 3)}${isDrumRack ? ' drum-rack' : ''}`}>
       <RackHeader
@@ -77,8 +86,8 @@ export function RackPanel({ rack, rackPath, depth, collapsible }: RackPanelProps
         onSetMacroCount={(count) => apply(rackPath, (r) => setMacroCount(r, count))}
       />
 
-      {open && (
-        <div className="rack-body">
+      <div className="rack-body">
+        <div className="macro-panel">
           <MacroBank
             macros={rack.macros}
             macroCount={rack.macroCount}
@@ -91,21 +100,21 @@ export function RackPanel({ rack, rackPath, depth, collapsible }: RackPanelProps
             onRecolor={(i, colorIndex) => apply(rackPath, (r) => setMacroColor(r, i, colorIndex))}
             onUnbindOne={(i, targetPath) => apply(rackPath, (r) => unbindOne(r, i, targetPath))}
           />
-
-          {isDrumRack && pads.length > 0 ? (
-            <DrumPadGrid pads={pads} rackPath={rackPath} renderChainBody={chainBody} />
-          ) : (
-            <div className="chain-list">
-              {rack.chains.map((chain) => (
-                <section className="chain-panel" key={chain.path}>
-                  <h4 className="chain-name">{chain.name || 'Chain'}</h4>
-                  {chainBody(chain)}
-                </section>
-              ))}
-            </div>
-          )}
         </div>
-      )}
+
+        {isDrumRack && pads.length > 0 ? (
+          <DrumPadGrid pads={pads} rackPath={rackPath} renderChainBody={chainBody} />
+        ) : (
+          <div className="chain-lanes">
+            {rack.chains.map((chain) => (
+              <div className="chain-lane" key={chain.path}>
+                <span className="chain-name">{chain.name || 'Chain'}</span>
+                <div className="device-strip">{chainBody(chain)}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </section>
   );
 }
