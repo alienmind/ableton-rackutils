@@ -11,7 +11,7 @@ Everything needed to continue is in the repo.
 |---|---|
 | [`doc/PLAN.md`](PLAN.md) | Full implementation plan, phase by phase, with code. Opens with current state, next steps, and the constraints that rule out obvious designs. |
 | [`packages/adg-codec/SCHEMA.md`](../packages/adg-codec/SCHEMA.md) | Schema findings, confirmed against real racks. The codec's spec. |
-| [`doc/UI-PLAN.md`](UI-PLAN.md) | Web UI overhaul plan (Ableton-matching macro panel). Part 4 built, the rest planning. |
+| [`doc/UI-PLAN.md`](UI-PLAN.md) | Web UI plan. Part 5 (match Live's visual language) is the governing principle; Parts 2-4 built, Part 1 on hold. |
 | [`CLAUDE.md`](../CLAUDE.md) | House rules: commit style, comment style, where scratch work goes. |
 
 ## Repo layout
@@ -83,15 +83,23 @@ Run all four of `lint`, `typecheck`, `test`, `build` clean before committing.
 ## Testing the codec
 
 ```bash
-pnpm test                                  # everything, 89 tests
+pnpm test                                  # everything, 95 tests
 pnpm --filter @rackutils/adg-codec test    # 78 codec tests
-pnpm --filter @rackutils/editor-ui test    # 11 render tests
+pnpm --filter @rackutils/editor-ui test    # 17 UI tests
 ```
 
-60 are synthetic and always run. 18 run against real Ableton-saved racks in
+`editor-ui` has two kinds of test and both are needed. `render.test.tsx`
+checks what comes out of a render; `interact.test.tsx` mounts the tree and
+fires real DOM events at it. The first cut of the UI shipped with every
+interaction broken and every render test green - markup was never the
+question.
+
+Of the codec's 78, 60 are synthetic and always run; 18 run against real
+Ableton-saved racks in
 `packages/adg-codec/tests/fixtures/*.adg`, which are gitignored - they skip
 cleanly when absent (so, in CI) and run locally once you drop the four files
-`SCHEMA.md` asks for there.
+`SCHEMA.md` asks for there. Four of `editor-ui`'s tests use those same
+fixtures.
 
 **Test every mutation against the real fixtures, not only synthetic ones.**
 Three real bugs so far were invisible to the synthetic suite: a macro driving

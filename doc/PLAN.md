@@ -22,9 +22,9 @@ Companion docs:
 - `packages/adg-codec/SCHEMA.md` - the schema findings log, confirmed against
   real fixtures, that all codec code must trace to.
 - `doc/UI-PLAN.md` - the web UI overhaul plan (Ableton-matching macro panel,
-  SVG extraction, drag-and-drop, the mapped/"more" parameter split). Its Part 4
-  (codec mutations and model additions) is built; the components and the SVG
-  work are not - see its own status line.
+  SVG extraction, drag-and-drop, the mapped/"more" parameter split). Part 5 (match
+  Live's visual language) is the governing principle; Parts 2, 3 and 4 are
+  built and Part 1 is on hold - see its own status line.
 - `.github/workflows/` - the pipeline described in Phase 4.2.
 
 Handoff document. Written so another agent can pick this up cold. Read the Constraints section before writing any code, several intuitive designs are ruled out by facts about Ableton's API that are not obvious.
@@ -63,12 +63,15 @@ is the next real work.
   UI: `adg-tool mappings <file.adg>` (list what's bound), `adg-tool move
   <file.adg> <from> <to> <out.adg>` (run `reorderMacro`), and `move-mapping`
   (same arguments, the narrower `moveMapping`). See "How to test" below.
-- **`packages/editor-ui/` - built** (`doc/UI-PLAN.md` Part 3). Recursive
-  `RackPanel` (a nested rack renders as a rack, a drum rack as its pads, an
-  unknown device as a mapped/"more" parameter list), drag-to-reorder,
-  shift-drop to swap, inline rename, colour swatches, arm-and-bind, undo.
-  11 render tests, 4 against the real `drum-pads.adg`. The knob SVG and the
-  colour palette are placeholders pending UI-PLAN Part 1.
+- **`packages/editor-ui/` - built** (`doc/UI-PLAN.md` Parts 3 and 5).
+  Recursive `RackPanel` (a nested rack renders as a rack, a drum rack as its
+  pads, an unknown device as a mapped/"more" parameter list), laid out the way
+  Live lays a rack out: horizontal device chain at a fixed 169px height,
+  collapse-to-vertical-strip, macros in two rows. Pointer-based drag to
+  reorder or swap, inline rename, colour swatches, arm-and-bind, undo. 17
+  tests, split between render and real-DOM interaction, 4 against the real
+  `drum-pads.adg`. The knob SVG and the colour palette are placeholders
+  pending UI-PLAN Part 1.
 - `apps/site/` - runs (`pnpm dev`), deployed to GitHub Pages, confirmed
   working on a real 4000+ element rack. **Now renders the editor**, with the
   raw XML tree behind a checkbox. Saving downloads a copy, never overwriting
@@ -84,13 +87,16 @@ is the next real work.
 
 Do this next, in order:
 
-1. **Use it on real racks and fix what that finds.** The editor is wired up
-   but nobody has yet loaded an edited file back into Live from it. Every bug
-   this project has hit so far came from exactly that step, not from tests.
-2. **UI-PLAN Part 1** (the reference screenshot, the SVG knob, the real colour
+1. **UI-PLAN Part 5**, matching Ableton's visual language, is the priority
+   item for the UI. The horizontal skeleton is in; the Macro Variations panel,
+   chain colours and the real knob are not.
+2. **Use it on real racks and fix what that finds.** Every bug this project
+   has hit came from that step, not from tests - including a first UI cut
+   whose every interaction was broken while its whole test suite passed.
+3. **UI-PLAN Part 1** (the reference screenshot, the SVG knob, the real colour
    palette) - still explicitly on hold pending the project owner's go-ahead.
    Until then the knob and palette are placeholders and look it.
-3. **Device editor UI** (Phase 5.3-5.4) - `apps/m4l-device` should render the
+4. **Device editor UI** (Phase 5.3-5.4) - `apps/m4l-device` should render the
    same `@rackutils/editor-ui` `RackEditor`. Lower priority: the site is the
    product, the device is a convenience layered on the same codec later.
 

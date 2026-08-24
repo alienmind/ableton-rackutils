@@ -6,7 +6,7 @@ XML tree viewer with a UI that looks and behaves like Ableton's own rack
 macro panel, built on the same components the embedded M4L device UI reuses
 later (Phase 5.4 in `PLAN.md`).
 
-**Status: Parts 2, 3 and 4 built. Part 1 not started.** `packages/editor-ui`
+**Status: Parts 2, 3, 4 built and Part 5 started. Part 1 not started.** `packages/editor-ui`
 exists and `apps/site` renders through it: recursive rack panels, drag to
 reorder or shift-drop to swap, double-click rename, colour swatches,
 arm-and-bind with the mapped/"more" split, and drum pads. 11 render tests,
@@ -73,16 +73,77 @@ generic collapsible XML dump (`apps/site/src/RackTree.tsx`). That component
 is superseded by this plan, not extended - the new UI is schema-aware
 (reads `Rack.macros`/`.chains`), the old one deliberately wasn't.
 
-What this plan adds, in four parts:
+What this plan adds, in five parts:
 
-1. **Part 1** - extract Ableton's own macro-panel visual language from a
-   reference screenshot into reusable SVG assets. Not started yet.
-2. **Part 2** - the interaction and data-flow spec: what drag-reorder,
+1. **Part 5** - match Ableton's visual language rather than inventing a
+   layout. Read this first: it is the governing principle for everything
+   else, and it is why the first cut was rejected. Partly built.
+2. **Part 1** - extract Ableton's own macro-panel visual language from a
+   reference screenshot into reusable SVG assets. On hold.
+3. **Part 2** - the interaction and data-flow spec: what drag-reorder,
    double-click-rename, arm-and-bind, and the mapped/"more" split actually
    do, in terms of the mutations above (plus a couple of new ones).
-3. **Part 3** - the React component tree, file by file, with skeletons.
-4. **Part 4** - new `adg-codec` mutations this UI needs that don't exist yet
-   (macro count, reorder, chain rename, macro color).
+4. **Part 3** - the React component tree, file by file, with skeletons.
+   Built; where the implementation departed from the sketches below, the
+   sketches are marked rather than rewritten.
+5. **Part 4** - new `adg-codec` mutations this UI needs. Built.
+
+---
+
+## Part 5: Match Ableton's visual language (PRIORITY, partly built)
+
+**The governing principle for this UI, set by the project owner after seeing
+the first cut: do not invent a layout. Reproduce Live's.** Users already know
+where things are in a rack; a tool that rearranges that knowledge costs them
+more than it gains. The first implementation laid racks out vertically, as a
+stack of cards, and was rejected on exactly this basis.
+
+### 5.1 What Live's layout actually is
+
+From the owner's own reference screenshot (a real device chain, pasted in
+conversation - separate from Part 1's `tmp/rack-example.png`, which is still
+untouched):
+
+- **The device chain runs horizontally** and scrolls sideways. Every device is
+  a fixed-height panel; the chain never grows downward.
+- **That fixed height is 169px**, which is not a coincidence: it is the height
+  a Max for Live device view gets. Building to it means the same components fit
+  inside the companion device without a second layout. `apps/m4l-device`'s view
+  cannot scroll, so anything taller is simply unreachable there.
+- **A collapsed device becomes a vertical title strip** - a narrow column with
+  its name rotated. It is not hidden and it does not shrink to a header row.
+  This is how a real chain stays readable with a dozen devices in it.
+- **Macros sit in two rows**, filling left to right: 8 macros read as 2x4, 16
+  as 2x8. Each knob carries its name in a coloured label beneath it, where the
+  colour is the macro's own.
+- **A rack's chain list is a narrow column of named rows** beside the device
+  area, one row per chain, coloured per chain. A drum rack's pads are the same
+  component, one row per pad.
+- **Macro Variations get their own panel** inside the rack, to the left of the
+  macros.
+
+### 5.2 Built so far
+
+The horizontal skeleton, in the same pass that fixed the interaction bugs:
+device panels at `--device-height: 169px` in a horizontally scrolling
+`.device-strip`, collapse-to-vertical-strip for both devices and nested racks,
+macros in two rows, chain and pad lanes as named rows, and Live's darker
+panel/line palette in place of the first cut's card look.
+
+### 5.3 Still to do
+
+- **The knob itself** - still the placeholder arc. This is Part 1's job and
+  Part 1 is still on hold.
+- **Macro Variations panel.** The codec reads variations already
+  (`rack.variations`); nothing renders them.
+- **Chain colours.** Live colours each chain row; `DocumentColorIndex` exists
+  on branch presets in the real fixtures but is not modelled yet, and it needs
+  the same palette confirmation as `MacroColor.N` (Part 1.3).
+- **The chain selector strip**, the Key/Vel/Chain zone editors, and the
+  Rand/Map buttons in a rack's title bar. None are wired to anything this tool
+  edits, but their absence is visible.
+- **Drum pads as a 4x4 grid** rather than a list of rows, once Q10's geometry
+  is confirmed.
 
 ---
 
@@ -928,6 +989,19 @@ written.
    macro while a nested parameter is armed does nothing rather than producing
    a mapping the file cannot express; reaching inside is done by mapping to
    the nested rack's own macro, exactly as Live does it.
+
+**Interactions are pointer-based, not HTML5 drag-and-drop.** The first cut
+used the HTML5 DnD API and every interaction on a knob was broken in a real
+browser while every jsdom render test passed: a knob picked up and dragged but
+dropping did nothing, and the buttons inside a `draggable` element - the
+unbind "x", the colour swatch - had their clicks swallowed. `useMacroDrag`
+replaces it with pointerdown/move/up plus `elementFromPoint` to resolve the
+target. That also removes a dependency on HTML5 DnD working inside the Max
+`jweb` webview, which is not something to count on.
+
+The lesson worth keeping: **render tests prove markup, not behaviour.**
+`tests/interact.test.tsx` drives real DOM events against a mounted tree, and
+is the only reason the rebuilt interactions are known to work.
 
 One UX call not in the plan: **the first level of nesting opens by default**,
 deeper levels stay collapsed. Part 2.6's collapse rationale was written for a
