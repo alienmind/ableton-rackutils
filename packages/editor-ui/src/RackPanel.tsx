@@ -117,6 +117,7 @@ export function RackPanel({ rack, rackPath, depth, collapsible, forceCollapsed }
           macros={rack.macros}
           macroCount={rack.macroCount}
           armed={armed !== null && samePath(armed.rackPath, rackPath)}
+          rackPath={rackPath}
           liveValues={showLive}
           onReorder={(from, to) => apply(rackPath, (r) => reorderMacro(r, from, to))}
           onSwap={(a, b) => apply(rackPath, (r) => swapMacros(r, a, b))}

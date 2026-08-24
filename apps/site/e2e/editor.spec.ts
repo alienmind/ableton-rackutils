@@ -147,3 +147,33 @@ test('a drum rack renders pads and keeps the whole rack on one row', async ({ pa
   );
   expect(clipped).toEqual([]);
 });
+
+test('dragging a parameter onto a knob binds it', async ({ page }) => {
+  // The gesture people reach for first. Binding used to be click-to-arm then
+  // click-a-knob, which is discoverable only if you read the instructions.
+  await loadRack(page);
+  await page.locator('.more-toggle').first().scrollIntoViewIfNeeded();
+  await page.locator('.more-toggle').first().click();
+
+  const param = page.locator('.param', { hasText: 'ParamB' }).first();
+  const knob = rootKnobs(page).nth(5);
+  const from = (await param.boundingBox())!;
+  const to = (await knob.boundingBox())!;
+
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 10 });
+  await page.mouse.up();
+
+  await expect(knob.locator('.target-name')).toContainText('ParamB');
+  // The drag must not also leave the parameter armed.
+  await expect(page.locator('.armed-note')).toHaveCount(0);
+});
+
+test('chain rows carry a colour stripe', async ({ page }) => {
+  await loadRack(page, 'drum');
+  const stripe = await rootChainRows(page)
+    .first()
+    .evaluate((el) => getComputedStyle(el).borderLeftColor);
+  expect(stripe).not.toBe('rgba(0, 0, 0, 0)');
+});

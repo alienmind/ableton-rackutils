@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { DeviceNode, ParamRef } from '@rackutils/adg-codec';
 import { samePath, useEditor, type RackPath } from './context';
 
@@ -24,7 +24,16 @@ export function DeviceRow({ device, rackPath, collapsed: collapsedFromRack }: De
   const [collapsed, setCollapsed] = useState(Boolean(collapsedFromRack));
   useEffect(() => setCollapsed(Boolean(collapsedFromRack)), [collapsedFromRack]);
   const [showMore, setShowMore] = useState(false);
-  const { armed, arm } = useEditor();
+  const { armed, arm, startParamDrag } = useEditor();
+  // Where the pointer went down on a parameter. A press that does not move is
+  // a click (arm it); a press that moves is a drag onto a knob (bind it). The
+  // two gestures share a starting point, so the click handler has to know
+  // which one just happened or every drag would also arm the parameter.
+  const pressedAt = useRef<{ x: number; y: number } | null>(null);
+  const wasClick = (e: React.MouseEvent) => {
+    const from = pressedAt.current;
+    return !from || Math.hypot(e.clientX - from.x, e.clientY - from.y) < 4;
+  };
 
   const mapped = device.parameters.filter((p) => p.boundToMacro !== null);
   const unmapped = device.parameters.filter((p) => p.boundToMacro === null);
@@ -56,7 +65,16 @@ export function DeviceRow({ device, rackPath, collapsed: collapsedFromRack }: De
           <ul className="params mapped-params">
             {mapped.map((p) => (
               <li key={p.path}>
-                <button type="button" className={isArmed(p) ? 'param armed' : 'param'} onClick={() => toggleArm(p)}>
+                <button
+                  type="button"
+                  className={isArmed(p) ? 'param armed' : 'param'}
+                  onPointerDown={(e) => {
+                    pressedAt.current = { x: e.clientX, y: e.clientY };
+                    startParamDrag(p, rackPath, e);
+                  }}
+                  onClick={(e) => wasClick(e) && toggleArm(p)}
+                  title={`${p.name} - drag onto a macro knob to bind, or click to arm`}
+                >
                   {p.name}
                 </button>
                 <span className="macro-badge">M{p.boundToMacro! + 1}</span>
@@ -74,7 +92,16 @@ export function DeviceRow({ device, rackPath, collapsed: collapsedFromRack }: De
               <ul className="params unmapped-params">
                 {unmapped.map((p) => (
                   <li key={p.path}>
-                    <button type="button" className={isArmed(p) ? 'param armed' : 'param'} onClick={() => toggleArm(p)}>
+                    <button
+                      type="button"
+                      className={isArmed(p) ? 'param armed' : 'param'}
+                      onPointerDown={(e) => {
+                        pressedAt.current = { x: e.clientX, y: e.clientY };
+                        startParamDrag(p, rackPath, e);
+                      }}
+                      onClick={(e) => wasClick(e) && toggleArm(p)}
+                      title={`${p.name} - drag onto a macro knob to bind, or click to arm`}
+                    >
                       {p.name}
                     </button>
                   </li>

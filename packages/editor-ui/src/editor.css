@@ -334,6 +334,8 @@
 .macro-knob.dragging { opacity: 0.35; }
 .macro-knob.drop-reorder { border-color: var(--edit-accent); background: #1d2a3d; }
 .macro-knob.drop-swap { border-color: #ffd166; background: #2e2a1c; }
+/* A parameter is being dragged and would bind here. */
+.macro-knob.bind-target { border-color: #9ad49a; background: #1e2f1e; }
 
 .macro-knob-dial {
   position: relative;
@@ -547,6 +549,9 @@
   align-items: center;
   gap: 3px;
   background: #3a3d45;
+  /* Live colours chain rows; the stripe is that colour where a chain has one.
+     Placeholder palette (SCHEMA.md Q13) - not necessarily Live's colour. */
+  border-left: 3px solid var(--chain-color, transparent);
   border: 1px solid var(--edit-line);
   border-radius: 2px;
   color: var(--edit-text);

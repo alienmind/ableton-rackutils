@@ -358,6 +358,44 @@ containment model (which doesn't care about depth at all) covers it.
 
 ---
 
+## Q13. Where is a chain's colour stored?
+
+Live colours each chain row in a rack's chain list, and the UI reproduces that
+(`doc/UI-PLAN.md` Part 5).
+
+**Answer, confirmed present in all four fixtures:** `DocumentColorIndex` on the
+branch preset, alongside `AutoColored`.
+
+```xml
+<DrumBranchPreset>
+  <Name Value="Riser Faze" />
+  <DocumentColorIndex Value="3" />
+  <AutoColored Value="true" />
+  ...
+</DrumBranchPreset>
+```
+
+Like `MacroColor.N` (Q7), it is a **palette index, not a colour**, and this
+project still has no confirmed index -> hex table - that is `UI-PLAN.md` Part
+1.3, on hold. The UI renders it through the same placeholder palette and is
+labelled as such.
+
+**Weaker evidence than the other answers here, and worth saying so.** Every
+chain in every fixture is `AutoColored="true"` and every chain within a file
+carries the SAME index (9, 9, 9 in `drum-nested.adg`; 3, 3, 3, 3 in
+`drum-pads.adg`). So:
+
+- That the field holds a colour is inference from its name plus Live's UI, not
+  from a diff where a colour was changed and the value moved.
+- Whether it varies per chain in a rack where the user coloured chains by hand
+  has never been observed here.
+
+To settle it: take a rack, colour two chains differently by hand in Live, save,
+and diff. Until then the codec reads the field and the UI shows it, and neither
+should be trusted to be showing Live's actual colour.
+
+---
+
 ## Q12. Does `XMLSerializer` emit the XML declaration?
 
 Not a question about Ableton's format - a question about the DOM APIs used to

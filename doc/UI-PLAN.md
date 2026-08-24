@@ -150,6 +150,16 @@ panel is two rows.
 `rack.variations` and every slot-changing mutation permutes them, but there is
 no mutation to create or recall one).
 
+**Binding is a drag**: pull a parameter onto a macro knob. Click-to-arm still
+works and is still the only keyboard-reachable path, but the drag is the
+gesture people try first - the arm step was tried and not found. A drop onto a
+knob belonging to a DIFFERENT rack is refused rather than silently doing
+nothing sensible: a `KeyMidi` belongs to the nearest enclosing rack
+(`SCHEMA.md` Q2), so that mapping cannot exist in the file.
+
+**Chain rows carry their colour** from `DocumentColorIndex` (`SCHEMA.md` Q13),
+through the placeholder palette and with the same caveat as macro colours.
+
 Also: collapse-to-vertical-title-strip for devices and nested racks, a pad grid
 beside the chain rows for drum racks, Live's darker panel/line palette, text
 selection off throughout (dragging a knob was selecting its label, which reads
@@ -166,12 +176,10 @@ genuine scrollbar in the layout.
 
 - **The knob itself** - still the placeholder arc. This is Part 1's job and
   Part 1 is still on hold.
-- **Chain rows are not coloured**, and Live colours them. `DocumentColorIndex`
-  is present on branch presets in the real fixtures but is not modelled, and
-  needs the same palette confirmation as `MacroColor.N` (Part 1.3).
-- **Drag a parameter onto a knob to bind it.** Today binding is click-to-arm
-  then click-a-knob, which the project owner found unobvious. The pointer-drag
-  machinery from `useMacroDrag` is in place to support the direct gesture.
+- **Macro Variations are read-only.** Creating, recalling and deleting one
+  need codec mutations that do not exist.
+- **The chain selector strip**, the Key/Vel/Chain zone editors, and the
+  Rand/Map buttons in a rack's title bar.
 - **Macro Variations panel.** The codec reads variations already
   (`rack.variations`); nothing renders them.
 - **Chain colours.** Live colours each chain row; `DocumentColorIndex` exists
@@ -180,8 +188,10 @@ genuine scrollbar in the layout.
 - **The chain selector strip**, the Key/Vel/Chain zone editors, and the
   Rand/Map buttons in a rack's title bar. None are wired to anything this tool
   edits, but their absence is visible.
-- **Drum pads as a 4x4 grid** rather than a list of rows, once Q10's geometry
-  is confirmed.
+- **Drum pads matching Live's scroll window.** They are laid out 4 wide and
+  bottom-up now, which is Live's orientation, but which SIXTEEN pads are shown
+  depends on `PadScrollPosition`, whose geometry is unconfirmed (`SCHEMA.md`
+  Q10). Every pad that exists is drawn, rather than a window over them.
 
 ---
 

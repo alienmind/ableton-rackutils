@@ -1,4 +1,5 @@
 import type { Chain } from '@rackutils/adg-codec';
+import { macroColor } from './macroColors';
 import { noteName } from './noteName';
 
 export interface ChainListProps {
@@ -24,11 +25,20 @@ export function ChainList({ chains, selected, onSelect, drum }: ChainListProps) 
   const ordered = chains.map((chain, index) => ({ chain, index }));
   if (drum) ordered.sort((a, b) => (a.chain.receivingNote ?? 0) - (b.chain.receivingNote ?? 0));
 
+  // Live's pad grid is 4 wide and reads from the BOTTOM left: the lowest note
+  // sits bottom-left and rows climb. Rendering ascending order straight into a
+  // grid puts the lowest note top-left, mirroring it vertically. Reversing by
+  // row of four fixes the orientation without claiming to reproduce Live's
+  // scroll window, whose geometry is unconfirmed (SCHEMA.md Q10).
+  const padRows: (typeof ordered)[] = [];
+  for (let i = 0; i < ordered.length; i += 4) padRows.push(ordered.slice(i, i + 4));
+  const padGrid = padRows.reverse().flat();
+
   return (
     <div className="chain-list">
       {drum && (
         <div className="pad-grid">
-          {ordered.map(({ chain, index }) => (
+          {padGrid.map(({ chain, index }) => (
             <button
               key={chain.path}
               type="button"
@@ -49,6 +59,10 @@ export function ChainList({ chains, selected, onSelect, drum }: ChainListProps) 
             className={`chain-row${index === selected ? ' selected' : ''}`}
             onClick={() => onSelect(index)}
             title={chain.name || 'Chain'}
+            // Live colours each chain row. The index -> colour table is not
+            // confirmed (SCHEMA.md Q13), so this is the placeholder palette
+            // and is not necessarily the colour Live would draw.
+            style={chain.colorIndex === null ? undefined : ({ '--chain-color': macroColor(chain.colorIndex) } as React.CSSProperties)}
           >
             {drum && chain.receivingNote !== null && <span className="chain-note">{noteName(chain.receivingNote)}</span>}
             <span className="chain-row-name">{chain.name || 'Chain'}</span>

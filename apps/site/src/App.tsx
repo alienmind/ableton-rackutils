@@ -109,10 +109,9 @@ export default function App() {
             </label>
           </div>
           <p className="note">
-            Drag a knob onto another to move the whole macro; hold Shift while dropping to
-            swap two. Double-click a name to rename it. Click a parameter to arm it, then
-            click a macro knob in the same rack to bind it. Saving downloads a copy - your
-            original file is never overwritten.
+            Drag a parameter onto a macro knob to bind it. Drag a knob onto another to move
+            the whole macro, or hold Shift while dropping to swap two. Double-click a name
+            to rename it. Saving downloads a copy - your original file is never overwritten.
           </p>
 
           <RackEditor rack={loaded.rack} onChange={(rack) => setLoaded({ ...loaded, rack })} />

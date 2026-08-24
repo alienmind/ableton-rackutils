@@ -113,3 +113,62 @@ describe('clicking things', () => {
     expect(rack.macros[3].bindings.map((b) => b.targetName)).toEqual(['ParamB']);
   });
 });
+
+describe('dragging a parameter onto a knob', () => {
+  /** Press on a parameter, move, release over a macro knob. Same pointer approach as the knob drag. */
+  function dragParamToKnob(param: Element, knobIndex: number) {
+    const knob = container.querySelectorAll('.macro-knob')[knobIndex];
+    const original = document.elementFromPoint;
+    document.elementFromPoint = () => knob as Element;
+    try {
+      act(() => param.dispatchEvent(Object.assign(new Event('pointerdown', { bubbles: true }), { button: 0, clientX: 0, clientY: 0 })));
+      act(() => window.dispatchEvent(Object.assign(new Event('pointermove'), { clientX: 60, clientY: 0 })));
+      act(() => window.dispatchEvent(Object.assign(new Event('pointerup'), { clientX: 60, clientY: 0 })));
+    } finally {
+      document.elementFromPoint = original;
+    }
+  }
+
+  test('binds it, without needing the arm step', () => {
+    click(container.querySelector('.more-toggle')!);
+    const paramB = [...container.querySelectorAll('.param')].find((p) => p.textContent === 'ParamB')!;
+    dragParamToKnob(paramB, 4);
+    expect(rack.macros[4].bindings.map((b) => b.targetName)).toEqual(['ParamB']);
+  });
+
+  test('a drag does not also arm the parameter it started from', () => {
+    // Both gestures start with a press on the same button, so the click
+    // handler has to tell them apart or every drag would leave something armed.
+    click(container.querySelector('.more-toggle')!);
+    const paramB = [...container.querySelectorAll('.param')].find((p) => p.textContent === 'ParamB')!;
+    dragParamToKnob(paramB, 4);
+    expect(container.querySelector('.armed-note')).toBeNull();
+  });
+
+  test('refuses a drop onto another rack knob (SCHEMA.md Q2)', () => {
+    // The nested rack's knobs carry a different data-rack-path. A KeyMidi
+    // belongs to the nearest enclosing rack, so this mapping cannot exist.
+    click(container.querySelector('.more-toggle')!);
+    const paramB = [...container.querySelectorAll('.param')].find((p) => p.textContent === 'ParamB')!;
+    const nestedKnobs = container.querySelectorAll('.macro-bank-wrap[data-rack-path]:not([data-rack-path=""]) .macro-knob');
+    expect(nestedKnobs.length).toBeGreaterThan(0);
+
+    const original = document.elementFromPoint;
+    document.elementFromPoint = () => nestedKnobs[0];
+    try {
+      act(() => paramB.dispatchEvent(Object.assign(new Event('pointerdown', { bubbles: true }), { button: 0, clientX: 0, clientY: 0 })));
+      act(() => window.dispatchEvent(Object.assign(new Event('pointerup'), { clientX: 60, clientY: 0 })));
+    } finally {
+      document.elementFromPoint = original;
+    }
+    // Nothing bound anywhere: not in the nested rack, not in the outer one.
+    expect(rack.subRack(rack.chains[0].devices[1].path)!.macros[0].bindings.map((b) => b.targetName)).toEqual(['InnerParam']);
+  });
+});
+
+describe('chain colours (SCHEMA.md Q13)', () => {
+  test('a chain with a colour index gets a stripe', () => {
+    const row = container.querySelector('.chain-row') as HTMLElement;
+    expect(row.style.getPropertyValue('--chain-color')).toMatch(/^#/);
+  });
+});

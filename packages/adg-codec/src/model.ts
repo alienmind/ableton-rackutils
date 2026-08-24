@@ -82,6 +82,15 @@ export interface Chain {
   receivingNote: number | null;
   sendingNote: number | null;
   chokeGroup: number | null;
+  /**
+   * `DocumentColorIndex`, a palette index like `Macro.color` and with the same
+   * caveat: the index -> colour table is not confirmed (SCHEMA.md Q13). Every
+   * chain in every fixture here is `AutoColored`, so they all carry the same
+   * value and this project has never seen it vary.
+   */
+  colorIndex: number | null;
+  /** `AutoColored` - Live picked the colour rather than the user. */
+  autoColored: boolean;
 }
 
 export interface Variation {
@@ -295,6 +304,7 @@ export class Rack {
         const raw = childValue(zone, tag);
         return raw === null ? null : Number(raw);
       };
+      const colorIndex = childValue(branchPreset, 'DocumentColorIndex');
       return {
         path: this.pathOf(branchPreset),
         // An unnamed chain reports '' - Live shows no name for one either.
@@ -307,6 +317,8 @@ export class Rack {
         receivingNote: note('ReceivingNote'),
         sendingNote: note('SendingNote'),
         chokeGroup: note('ChokeGroup'),
+        colorIndex: colorIndex === null ? null : Number(colorIndex),
+        autoColored: childValue(branchPreset, 'AutoColored') === 'true',
       };
     });
   }

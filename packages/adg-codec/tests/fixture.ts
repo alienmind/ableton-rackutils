@@ -72,6 +72,8 @@ export function buildFixtureXml(opts: FixtureOptions = {}): string {
     <BranchPresets>
       <InstrumentBranchPreset>
         <Name Value="" />
+        <DocumentColorIndex Value="9" />
+        <AutoColored Value="true" />
         <DevicePresets>
           <AbletonDevicePreset>
             <Device>
@@ -170,6 +172,8 @@ export function buildDrumFixtureXml(): string {
   const pad = (note: number, sending: number, choke: number, label: string) => `
     <DrumBranchPreset>
       <Name Value="${label}" />
+      <DocumentColorIndex Value="${note % 16}" />
+      <AutoColored Value="false" />
       <DevicePresets>
         <GroupDevicePreset>
           <Device>

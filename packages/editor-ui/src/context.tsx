@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
 import type { MutationResult, ParamRef, Rack } from '@rackutils/adg-codec';
+import type { ParamDragState } from './useParamDrag';
 
 /**
  * Which rack a panel is showing, as the chain of device paths from the root
@@ -36,6 +37,9 @@ export interface ArmedParam {
 
 export interface EditorContextValue {
   armed: ArmedParam | null;
+  /** Live state of a parameter being dragged onto a knob, and the way to start one. */
+  paramDrag: ParamDragState;
+  startParamDrag: (param: ParamRef, rackPath: RackPath, e: React.PointerEvent) => void;
   arm: (armed: ArmedParam | null) => void;
   /** Run a mutation against the rack at `rackPath`, recording undo and surfacing warnings. */
   apply: (rackPath: RackPath, fn: (rack: Rack) => MutationResult) => void;

@@ -14,6 +14,8 @@ export interface MacroKnobProps {
   dragging: boolean;
   dropTarget: boolean;
   dropSwaps: boolean;
+  /** A parameter is being dragged and would bind here if dropped. */
+  bindTarget: boolean;
   onDragStart: (e: React.PointerEvent) => void;
   onClick: () => void;
   onRename: (name: string) => void;
@@ -32,7 +34,8 @@ export interface MacroKnobProps {
  * showed no colour at all and picking a colour looked like it did nothing.
  */
 export function MacroKnob(props: MacroKnobProps) {
-  const { macro, liveValue, armed, hidden, dragging, dropTarget, dropSwaps, onDragStart, onClick, onRename, onRecolor, onUnbindOne } = props;
+  const { macro, liveValue, armed, hidden, dragging, dropTarget, dropSwaps, bindTarget } = props;
+  const { onDragStart, onClick, onRename, onRecolor, onUnbindOne } = props;
   const [editing, setEditing] = useState(false);
   const [picking, setPicking] = useState(false);
 
@@ -45,6 +48,7 @@ export function MacroKnob(props: MacroKnobProps) {
   if (hidden) classes.push('hidden-slot');
   if (dragging) classes.push('dragging');
   if (dropTarget) classes.push(dropSwaps ? 'drop-swap' : 'drop-reorder');
+  if (bindTarget) classes.push('bind-target');
 
   return (
     <div className={classes.join(' ')} data-macro-index={macro.index} style={{ '--macro-color': color } as React.CSSProperties}>

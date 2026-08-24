@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Rack, type MutationResult } from '@rackutils/adg-codec';
+import { Rack, bindParameter, type MutationResult } from '@rackutils/adg-codec';
 import { RackPanel } from './RackPanel';
 import { EditorProvider, resolveRackPath, type ArmedParam, type RackPath } from './context';
+import { useParamDrag } from './useParamDrag';
 
 export interface RackEditorProps {
   /** The loaded rack, owned by the host so it can decide how a file is opened (picker, drop, M4L path). */
@@ -54,9 +55,13 @@ export function RackEditor({ rack, onChange, liveValues }: RackEditorProps) {
     [rack, onChange],
   );
 
+  const { paramDrag, startParamDrag } = useParamDrag({
+    onBind: (rackPath, macroIndex, param) => apply(rackPath, (r) => bindParameter(r, macroIndex, param)),
+  });
+
   const context = useMemo(
-    () => ({ armed, arm: setArmed, apply, liveValues }),
-    [armed, apply, liveValues],
+    () => ({ armed, arm: setArmed, apply, liveValues, paramDrag, startParamDrag }),
+    [armed, apply, liveValues, paramDrag, startParamDrag],
   );
 
   if (!rack) return null;
