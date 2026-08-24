@@ -136,12 +136,31 @@ stacked turned a four-pad drum rack into a page-height wall of panels with
 scrollbars in it. Live shows one chain at a time, and doing the same collapses
 the whole problem.
 
-Also: collapse-to-vertical-title-strip for devices and nested racks, macros in
-two rows (2x4 at 8, 2x8 at 16), a pad grid beside the chain rows for drum
-racks, and Live's darker panel/line palette.
+**Macros are numbered across, then down** - `1 2 3 4 / 5 6 7 8`, the grid
+being `ceil(count / 2)` columns wide. The first cut used a column-flow grid and
+produced `1 3 5 7 / 2 4 6 8`, which reads wrong against Live the moment anyone
+counts knobs.
 
-Measured after the rework, on `drum-pads.adg` in a real browser: the editor is
-213px tall (one rack panel at 186px), against 651px before.
+**The vertical button column** down a rack's left edge, as Live has it: show/
+hide macros, add two, remove two, show/hide Macro Variations, collapse/expand
+the devices in the rack, show/hide chains. Macros step in PAIRS because the
+panel is two rows.
+
+**The Macro Variations panel** renders (read-only - the codec reads
+`rack.variations` and every slot-changing mutation permutes them, but there is
+no mutation to create or recall one).
+
+Also: collapse-to-vertical-title-strip for devices and nested racks, a pad grid
+beside the chain rows for drum racks, Live's darker panel/line palette, text
+selection off throughout (dragging a knob was selecting its label, which reads
+as a web page rather than an app), and thin dark scrollbars in the two places
+anything really scrolls.
+
+Measured on `drum-pads.adg` in a real browser: 238px tall with a nested drum
+rack expanded, against 651px for the first cut. A rack panel is sized to its
+content with `--device-height` as the floor rather than clipped to a fixed
+height - clipping cost each nested rack its title bar and produced the last
+genuine scrollbar in the layout.
 
 ### 5.3 Still to do
 
