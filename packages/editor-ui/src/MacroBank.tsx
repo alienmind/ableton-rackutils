@@ -17,8 +17,16 @@ export interface MacroBankProps {
 }
 
 /**
- * The macro panel, laid out the way Live lays it out: two rows, filling left
- * to right, so 8 macros read as 2x4 and 16 as 2x8.
+ * The macro panel, laid out the way Live lays it out: two rows, numbered
+ * ACROSS then down.
+ *
+ *   8 macros:  1 2 3 4     NOT  1 3 5 7
+ *              5 6 7 8          2 4 6 8
+ *
+ * The first cut used a column-flow grid and got the second layout, which reads
+ * wrong the moment you count knobs against Live. Row-major also makes the +/-
+ * buttons behave: adding a pair extends both rows by one column, so the grid
+ * is `ceil(count / 2)` columns wide and never ragged.
  */
 export function MacroBank(props: MacroBankProps) {
   const { macros, macroCount, armed, liveValues, onReorder, onSwap, onBindArmed, onRename, onRecolor, onUnbindOne } = props;
@@ -48,9 +56,13 @@ export function MacroBank(props: MacroBankProps) {
     />
   );
 
+  const columns = Math.max(1, Math.ceil(macroCount / 2));
+
   return (
     <div className={`macro-bank-wrap${drag.from !== null ? ' dragging' : ''}`}>
-      <div className="macro-bank">{visible.map((m) => knob(m, false))}</div>
+      <div className="macro-bank" style={{ gridTemplateColumns: `repeat(${columns}, auto)` }}>
+        {visible.map((m) => knob(m, false))}
+      </div>
       {hiddenButMapped.length > 0 && (
         <details className="hidden-macros">
           <summary>

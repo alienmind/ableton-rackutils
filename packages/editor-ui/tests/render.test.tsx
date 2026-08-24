@@ -107,3 +107,27 @@ describe.skipIf(!hasReal('simplerack.adg'))('against the real simplerack.adg', (
     expect(html).not.toContain('pad-grid');
   });
 });
+
+describe('macro numbering and the rack side buttons', () => {
+  test('macros are numbered across then down, in a ceil(count / 2) grid', () => {
+    // Live numbers 1 2 3 4 / 5 6 7 8. A column-flow grid gives 1 3 5 7 /
+    // 2 4 6 8, which is what the first cut shipped.
+    const html = render(Rack.parse(buildFixtureBytes()));
+    expect(html).toContain('grid-template-columns:repeat(4, auto)');
+    const slots = [...html.matchAll(/class="macro-knob-slot">(\d+)</g)].map((m) => Number(m[1]));
+    expect(slots.slice(0, 8)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+  });
+
+  test('the side button column offers Live\'s six controls', () => {
+    const html = render(Rack.parse(buildFixtureBytes()));
+    for (const title of [
+      'Show/hide macro controls',
+      'Add two macros',
+      'Remove two macros',
+      'Show/hide Macro Variations',
+      'Show/hide chains',
+    ]) {
+      expect(html).toContain(title);
+    }
+  });
+});

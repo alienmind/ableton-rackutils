@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { DeviceNode, ParamRef } from '@rackutils/adg-codec';
 import { samePath, useEditor, type RackPath } from './context';
 
 export interface DeviceRowProps {
   device: DeviceNode;
   rackPath: RackPath;
+  /** The rack's collapse-devices toggle. Sets this device's state without owning it, so it can still be opened on its own afterwards. */
+  collapsed?: boolean;
 }
 
 /**
@@ -18,8 +20,9 @@ export interface DeviceRowProps {
  * what makes a parameter jump from "more" up into the mapped list the instant
  * it is bound, with no list surgery anywhere (Part 2.5).
  */
-export function DeviceRow({ device, rackPath }: DeviceRowProps) {
-  const [collapsed, setCollapsed] = useState(false);
+export function DeviceRow({ device, rackPath, collapsed: collapsedFromRack }: DeviceRowProps) {
+  const [collapsed, setCollapsed] = useState(Boolean(collapsedFromRack));
+  useEffect(() => setCollapsed(Boolean(collapsedFromRack)), [collapsedFromRack]);
   const [showMore, setShowMore] = useState(false);
   const { armed, arm } = useEditor();
 

@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { bindParameter, renameMacro, renameRack, reorderMacro, setMacroColor, setMacroCount, swapMacros, unbindOne } from '@rackutils/adg-codec';
 import type { DeviceNode, Rack } from '@rackutils/adg-codec';
 import { ChainList } from './ChainList';
 import { DeviceRow } from './DeviceRow';
+import { RackSideButtons } from './RackSideButtons';
+import { VariationsPanel } from './VariationsPanel';
 import { MacroBank } from './MacroBank';
 import { RackHeader } from './RackHeader';
 import { samePath, useEditor, type RackPath } from './context';
@@ -13,6 +15,8 @@ export interface RackPanelProps {
   depth: number;
   /** Nested racks collapse to a vertical title strip; the root does not. */
   collapsible?: boolean;
+  /** The parent rack's collapse-devices toggle. Drives this panel's state without taking it over. */
+  forceCollapsed?: boolean;
 }
 
 /**
@@ -27,9 +31,17 @@ export interface RackPanelProps {
  * The root rack is not a special case, it is the outermost call: a nested rack
  * is this same component, rendered inline in its parent's device strip.
  */
-export function RackPanel({ rack, rackPath, depth, collapsible }: RackPanelProps) {
+export function RackPanel({ rack, rackPath, depth, collapsible, forceCollapsed }: RackPanelProps) {
   const [open, setOpen] = useState(!collapsible || depth <= 1);
+  useEffect(() => {
+    if (collapsible) setOpen(!forceCollapsed);
+  }, [forceCollapsed, collapsible]);
   const [selectedChain, setSelectedChain] = useState(0);
+  // The six toggles Live puts down the rack's left edge.
+  const [showMacros, setShowMacros] = useState(true);
+  const [showVariations, setShowVariations] = useState(false);
+  const [showChains, setShowChains] = useState(true);
+  const [devicesCollapsed, setDevicesCollapsed] = useState(false);
   const { armed, arm, apply, liveValues } = useEditor();
 
   const isDrumRack = rack.deviceEl.tagName === 'DrumGroupDevice';
@@ -55,9 +67,9 @@ export function RackPanel({ rack, rackPath, depth, collapsible }: RackPanelProps
 
   const renderDevice = (device: DeviceNode) =>
     device.isRack ? (
-      <NestedRack key={device.path} parent={rack} device={device} rackPath={rackPath} depth={depth} />
+      <NestedRack key={device.path} parent={rack} device={device} rackPath={rackPath} depth={depth} collapsed={devicesCollapsed} />
     ) : (
-      <DeviceRow key={device.path} device={device} rackPath={rackPath} />
+      <DeviceRow key={device.path} device={device} rackPath={rackPath} collapsed={devicesCollapsed} />
     );
 
   if (collapsible && !open) {
@@ -85,6 +97,22 @@ export function RackPanel({ rack, rackPath, depth, collapsible }: RackPanelProps
       />
 
       <div className="rack-body">
+        <RackSideButtons
+          showMacros={showMacros}
+          showVariations={showVariations}
+          showChains={showChains}
+          devicesCollapsed={devicesCollapsed}
+          macroCount={rack.macroCount}
+          onToggleMacros={() => setShowMacros((v) => !v)}
+          onToggleVariations={() => setShowVariations((v) => !v)}
+          onToggleChains={() => setShowChains((v) => !v)}
+          onToggleDevices={() => setDevicesCollapsed((v) => !v)}
+          onSetMacroCount={(count) => apply(rackPath, (r) => setMacroCount(r, Math.min(16, Math.max(1, count))))}
+        />
+
+        {showVariations && <VariationsPanel variations={rack.variations} />}
+
+        {showMacros && (
         <MacroBank
           macros={rack.macros}
           macroCount={rack.macroCount}
@@ -97,10 +125,11 @@ export function RackPanel({ rack, rackPath, depth, collapsible }: RackPanelProps
           onRecolor={(i, colorIndex) => apply(rackPath, (r) => setMacroColor(r, i, colorIndex))}
           onUnbindOne={(i, targetPath) => apply(rackPath, (r) => unbindOne(r, i, targetPath))}
         />
+        )}
 
         {chains.length > 0 && (
           <>
-            <ChainList chains={chains} selected={selectedChain} onSelect={setSelectedChain} drum={isDrumRack} />
+            {showChains && <ChainList chains={chains} selected={selectedChain} onSelect={setSelectedChain} drum={isDrumRack} />}
             <div className="device-strip">{chain ? chain.devices.map(renderDevice) : null}</div>
           </>
         )}
@@ -110,8 +139,20 @@ export function RackPanel({ rack, rackPath, depth, collapsible }: RackPanelProps
 }
 
 /** A rack inside a rack: resolve it as a sub-rack view and render the same panel inline, one level down. */
-function NestedRack({ parent, device, rackPath, depth }: { parent: Rack; device: DeviceNode; rackPath: RackPath; depth: number }) {
+function NestedRack({
+  parent,
+  device,
+  rackPath,
+  depth,
+  collapsed,
+}: {
+  parent: Rack;
+  device: DeviceNode;
+  rackPath: RackPath;
+  depth: number;
+  collapsed: boolean;
+}) {
   const nested = parent.subRack(device.path);
-  if (!nested) return <DeviceRow device={device} rackPath={rackPath} />;
-  return <RackPanel rack={nested} rackPath={[...rackPath, device.path]} depth={depth + 1} collapsible />;
+  if (!nested) return <DeviceRow device={device} rackPath={rackPath} collapsed={collapsed} />;
+  return <RackPanel rack={nested} rackPath={[...rackPath, device.path]} depth={depth + 1} collapsible forceCollapsed={collapsed} />;
 }
