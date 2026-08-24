@@ -184,3 +184,65 @@ describe.skipIf(!has('drum-nested.adg'))('drum-nested.adg', () => {
     expect(pad.subRack(engineNode!.path)!.macros).toHaveLength(16);
   });
 });
+
+describe.skipIf(!has('drum-pads.adg'))('drum-pads.adg', () => {
+  // AlienMind Fx Rack -> AlienMind Fx Drum Rack -> 3 named pads -> a Simpler
+  // each, with Eq8/Compressor2/Delay/Reverb/StereoGain alongside the drum
+  // rack. The drum rack is NOT the root here, which is the point: pads are
+  // only reachable through a sub-rack view.
+  const drumRackNode = (rack: Rack) => rack.chains.flatMap((c) => c.devices).find((d) => d.type === 'DrumGroupDevice')!;
+
+  test('the drum rack is nested, and its pads are reachable through a sub-rack', () => {
+    const rack = Rack.parse(load('drum-pads.adg'));
+    expect(rack.deviceEl.tagName).toBe('InstrumentGroupDevice');
+    // No pads at the top level - the root's own chain is an ordinary one.
+    expect(rack.chains.every((c) => c.receivingNote === null)).toBe(true);
+
+    const drums = rack.subRack(drumRackNode(rack).path)!;
+    expect(drums.deviceEl.tagName).toBe('DrumGroupDevice');
+    expect(drums.chains).toHaveLength(3);
+    expect(drums.chains.every((c) => c.receivingNote !== null)).toBe(true);
+  });
+
+  test('pads keep their names and come in descending note order in the file', () => {
+    // Document order is 92, 91, 90 - so anything laying out a pad grid has to
+    // sort by note rather than trust the order it reads them in.
+    const rack = Rack.parse(load('drum-pads.adg'));
+    const pads = rack.subRack(drumRackNode(rack).path)!.chains;
+    expect(pads.map((p) => p.receivingNote)).toEqual([92, 91, 90]);
+    expect(pads.map((p) => p.name)).toEqual(['Riser Faze', 'Riser Moog', 'Riser + Decay']);
+    expect(pads.every((p) => p.sendingNote === 60)).toBe(true);
+  });
+
+  test('native Ableton devices expose their parameters (SCHEMA.md Q11 regression)', () => {
+    // This is the bug this fixture found: keying parameter detection on Q1's
+    // `Timeable` wrapper reported ZERO parameters for every native device,
+    // while mappings still resolved - so nothing else in the suite noticed.
+    const rack = Rack.parse(load('drum-pads.adg'));
+    const byType = new Map(rack.chains.flatMap((c) => c.devices).map((d) => [d.type, d]));
+    for (const type of ['Eq8', 'Compressor2', 'Delay', 'Reverb', 'StereoGain']) {
+      expect(byType.get(type)!.parameters.length).toBeGreaterThan(10);
+    }
+    // Simpler, two levels down inside a pad.
+    const pad = rack.subRack(drumRackNode(rack).path)!.chains[0];
+    expect(pad.devices[0].type).toBe('OriginalSimpler');
+    expect(pad.devices[0].parameters.length).toBeGreaterThan(10);
+  });
+
+  test('the three real mappings show up as bound parameters on the right devices', () => {
+    const rack = Rack.parse(load('drum-pads.adg'));
+    const bound = rack.chains
+      .flatMap((c) => c.devices)
+      .flatMap((d) => d.parameters.filter((p) => p.boundToMacro !== null).map((p) => `${d.type}.${p.name}=M${p.boundToMacro! + 1}`))
+      .sort();
+    expect(bound).toEqual(['Delay.DryWet=M3', 'Reverb.DecayTime=M1', 'StereoGain.Gain=M2']);
+  });
+
+  test('a nested rack exposes its own macros as bindable parameters (Q11)', () => {
+    // How an outer macro gets mapped to an inner rack's macro - confirmed real
+    // in SCHEMA.md Q2/Q8. The drum rack's macros must be visible as targets
+    // from the ROOT rack's device tree.
+    const drums = drumRackNode(Rack.parse(load('drum-pads.adg')));
+    expect(drums.parameters.map((p) => p.name)).toContain('MacroControls.0');
+  });
+});

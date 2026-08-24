@@ -338,19 +338,31 @@ export class Rack {
   }
 
   /**
-   * Any element that directly owns a `Timeable` child is a bindable
-   * parameter (SCHEMA.md Q1) - stop descending there, its own descendants
-   * (KeyMidi, Manual, ...) aren't further parameters. Otherwise recurse,
-   * except into BranchPresets/DevicePresets, which `walkChains` already
-   * covers from the rack-nesting side.
+   * A bindable parameter is an element owning an `AutomationTarget`, either
+   * directly (every native Ableton device: `<DecayTime><LomId/><Manual/>...`)
+   * or inside a `Timeable` child (Max-hosted devices, SCHEMA.md Q1/Q11).
+   * Keying on `Timeable` alone found ZERO parameters on Eq8, Reverb, Delay,
+   * Simpler and rack devices, while reporting 61 on a Max device - the bug
+   * stayed invisible because mappings come from `collectMacroBindings`, which
+   * walks KeyMidi directly and never consults this.
+   *
+   * `AutomationTarget` is the marker rather than `Manual` or
+   * `MidiControllerRange` because it means exactly "Live can automate this",
+   * which is the same set of things a macro can drive.
+   *
+   * Stop descending at a match - a parameter's own children (KeyMidi, Manual,
+   * ...) are not further parameters. Otherwise recurse, except into
+   * BranchPresets/DevicePresets, which `walkChains` covers from the
+   * rack-nesting side.
    */
   private collectParameters(el: Element): ParamRef[] {
     const result: ParamRef[] = [];
     const walk = (node: Element) => {
       for (const c of elementChildren(node)) {
-        const timeable = child(c, 'Timeable');
-        if (timeable) {
-          const keyMidi = child(timeable, 'KeyMidi');
+        if (c.tagName === 'BranchPresets' || c.tagName === 'DevicePresets') continue;
+        const container = child(c, 'Timeable') ?? c;
+        if (child(container, 'AutomationTarget')) {
+          const keyMidi = child(container, 'KeyMidi');
           // Channel 16 is specifically the macro bus (SCHEMA.md Q1) - a real
           // MIDI CC mapping (any other channel) isn't a macro binding.
           const isMacro = keyMidi && childValue(keyMidi, 'Channel') === '16';
@@ -361,7 +373,7 @@ export class Rack {
           });
           continue;
         }
-        if (c.tagName !== 'BranchPresets' && c.tagName !== 'DevicePresets') walk(c);
+        walk(c);
       }
     };
     walk(el);

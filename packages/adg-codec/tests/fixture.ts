@@ -24,7 +24,7 @@ function macroSlots(mapped: Record<number, number> = {}, colors: Record<number, 
   let xml = '';
   for (let i = 0; i < 16; i++) {
     const value = mapped[i] ?? 0;
-    xml += `<MacroControls.${i}><LomId Value="0" /><Manual Value="${value}" /><MidiControllerRange><Min Value="0" /><Max Value="127" /></MidiControllerRange></MacroControls.${i}>`;
+    xml += `<MacroControls.${i}><LomId Value="0" /><Manual Value="${value}" /><MidiControllerRange><Min Value="0" /><Max Value="127" /></MidiControllerRange><AutomationTarget Id="0"><LockEnvelope Value="0" /></AutomationTarget><ModulationTarget Id="0"><LockEnvelope Value="0" /></ModulationTarget></MacroControls.${i}>`;
     xml += `<MacroDisplayNames.${i} Value="Macro ${i + 1}" />`;
     xml += `<MacroColor.${i} Value="${colors[i] ?? 0}" />`;
     // The rest of the per-slot families (SCHEMA.md Q7), all 16 of each, as
@@ -83,6 +83,8 @@ export function buildFixtureXml(opts: FixtureOptions = {}): string {
                     ${keyMidiXml(0)}
                     <Manual Value="25.4" />
                     <MidiControllerRange><Min Value="0" /><Max Value="100" /></MidiControllerRange>
+                    <AutomationTarget Id="0"><LockEnvelope Value="0" /></AutomationTarget>
+                    <ModulationTarget Id="0"><LockEnvelope Value="0" /></ModulationTarget>
                   </Timeable>
                 </ParamA>
                 <ParamB>
@@ -91,6 +93,8 @@ export function buildFixtureXml(opts: FixtureOptions = {}): string {
                     <LomId Value="0" />
                     <Manual Value="0" />
                     <MidiControllerRange><Min Value="0" /><Max Value="1" /></MidiControllerRange>
+                    <AutomationTarget Id="0"><LockEnvelope Value="0" /></AutomationTarget>
+                    <ModulationTarget Id="0"><LockEnvelope Value="0" /></ModulationTarget>
                   </Timeable>
                 </ParamB>
                 <ParamC>
@@ -100,6 +104,8 @@ export function buildFixtureXml(opts: FixtureOptions = {}): string {
                     ${keyMidiXml(0)}
                     <Manual Value="60" />
                     <MidiControllerRange><Min Value="0" /><Max Value="127" /></MidiControllerRange>
+                    <AutomationTarget Id="0"><LockEnvelope Value="0" /></AutomationTarget>
+                    <ModulationTarget Id="0"><LockEnvelope Value="0" /></ModulationTarget>
                   </Timeable>
                 </ParamC>
               </TestSynth>
@@ -127,6 +133,8 @@ export function buildFixtureXml(opts: FixtureOptions = {}): string {
                             ${keyMidiXml(0)}
                             <Manual Value="0" />
                             <MidiControllerRange><Min Value="0" /><Max Value="1" /></MidiControllerRange>
+                            <AutomationTarget Id="0"><LockEnvelope Value="0" /></AutomationTarget>
+                            <ModulationTarget Id="0"><LockEnvelope Value="0" /></ModulationTarget>
                           </Timeable>
                         </InnerParam>
                       </InnerSynth>
@@ -185,6 +193,8 @@ export function buildDrumFixtureXml(): string {
                           ${keyMidiXml(0)}
                           <Manual Value="0" />
                           <MidiControllerRange><Min Value="0" /><Max Value="1" /></MidiControllerRange>
+                          <AutomationTarget Id="0"><LockEnvelope Value="0" /></AutomationTarget>
+                          <ModulationTarget Id="0"><LockEnvelope Value="0" /></ModulationTarget>
                         </Timeable>
                       </InnerParam>
                     </InnerSynth>
