@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * adg-inspect: schema investigation, plus a CLI harness for the codec.
+ * adg-tool: schema investigation, plus a CLI harness for the codec.
  *
- *   adg-inspect unpack rack.adg [--raw] > rack.xml
- *   adg-inspect diff A.adg B.adg
- *   adg-inspect mappings rack.adg
- *   adg-inspect move rack.adg <from> <to> out.adg
+ *   adg-tool unpack rack.adg [--raw] > rack.xml
+ *   adg-tool diff A.adg B.adg
+ *   adg-tool mappings rack.adg
+ *   adg-tool move rack.adg <from> <to> out.adg
  *
  * `unpack`/`diff` predate the codec and stay independent of it deliberately
  * (Node's own zlib, a regex strip) - they're what SCHEMA.md itself was built
@@ -63,11 +63,11 @@ const [cmd, ...args] = process.argv.slice(2);
 if (cmd === 'unpack') {
   const raw = args.includes('--raw');
   const file = args.find((a) => !a.startsWith('--'));
-  if (!file) throw new Error('usage: adg-inspect unpack <file.adg> [--raw]');
+  if (!file) throw new Error('usage: adg-tool unpack <file.adg> [--raw]');
   process.stdout.write(unpack(file, raw) + '\n');
 } else if (cmd === 'diff') {
   const [a, b] = args;
-  if (!a || !b) throw new Error('usage: adg-inspect diff <A.adg> <B.adg>');
+  if (!a || !b) throw new Error('usage: adg-tool diff <A.adg> <B.adg>');
   const [la, lb] = [unpack(a, false).split('\n'), unpack(b, false).split('\n')];
   // Deliberately naive line diff: enough to spot a mapping subtree appearing.
   const setB = new Set(lb);
@@ -76,13 +76,15 @@ if (cmd === 'unpack') {
   for (const l of lb) if (!setA.has(l)) console.log(`+ ${l}`);
 } else if (cmd === 'mappings') {
   const [file] = args;
-  if (!file) throw new Error('usage: adg-inspect mappings <file.adg>');
+  if (!file) throw new Error('usage: adg-tool mappings <file.adg>');
   const rack = Rack.parse(new Uint8Array(readFileSync(file)));
   console.log(`${rack.name} - ${rack.macroCount} visible macros`);
   for (const macro of rack.macros) {
-    for (const { targetName, rangeMin, rangeMax, inverted } of macro.bindings) {
-      console.log(`  Macro ${macro.index + 1} (${macro.name}) -> ${targetName}  [${rangeMin}..${rangeMax}]${inverted ? ' inverted' : ''}`);
-    }
+    if (macro.bindings.length === 0) continue;
+    const targets = macro.bindings
+      .map(({ targetName, rangeMin, rangeMax, inverted }) => `${targetName} [${rangeMin}..${rangeMax}]${inverted ? ' inverted' : ''}`)
+      .join(', ');
+    console.log(`  Macro ${macro.index + 1} (${macro.name}) -> ${targets}`);
   }
   if (rack.variations.length) {
     console.log(`${rack.variations.length} variation(s): ${rack.variations.map((v) => v.name).join(', ')}`);
@@ -90,7 +92,7 @@ if (cmd === 'unpack') {
 } else if (cmd === 'move') {
   const [file, fromStr, toStr, outFile] = args;
   if (!file || !fromStr || !toStr || !outFile) {
-    throw new Error('usage: adg-inspect move <file.adg> <from-macro-1-based> <to-macro-1-based> <out.adg>');
+    throw new Error('usage: adg-tool move <file.adg> <from-macro-1-based> <to-macro-1-based> <out.adg>');
   }
   const rack = Rack.parse(new Uint8Array(readFileSync(file)));
   const result = moveMapping(rack, Number(fromStr) - 1, Number(toStr) - 1);
@@ -102,6 +104,6 @@ if (cmd === 'unpack') {
   writeFileSync(outFile, rack.serialize());
   console.log(`wrote ${outFile} - macro ${fromStr} moved to macro ${toStr}`);
 } else {
-  console.error('usage: adg-inspect <unpack|diff|mappings|move> ...');
+  console.error('usage: adg-tool <unpack|diff|mappings|move> ...');
   process.exit(2);
 }

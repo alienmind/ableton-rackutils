@@ -1,5 +1,5 @@
 {
-  "name": "@rackutils/adg-inspect",
+  "name": "@rackutils/adg-tool",
   "private": true,
   "version": "0.0.1",
   "type": "module",

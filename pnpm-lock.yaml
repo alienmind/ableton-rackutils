@@ -120,7 +120,7 @@ importers:
         specifier: ^3.0.0
         version: 3.2.7(@types/node@24.13.3)(jsdom@25.0.1)(tsx@4.23.12)
 
-  tools/adg-inspect:
+  tools/adg-tool:
     dependencies:
       '@rackutils/adg-codec':
         specifier: workspace:*

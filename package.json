@@ -11,9 +11,9 @@
     "build:device": "pnpm --filter @rackutils/m4l-device build",
     "install:device": "pnpm build:device && pnpm --filter @rackutils/m4l-device install:device",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit -p packages/adg-codec && tsc --noEmit -p apps/site && tsc --noEmit -p tools/adg-inspect && pnpm --filter @rackutils/m4l-device exec tsc -b",
+    "typecheck": "tsc --noEmit -p packages/adg-codec && tsc --noEmit -p apps/site && tsc --noEmit -p tools/adg-tool && pnpm --filter @rackutils/m4l-device exec tsc -b",
     "test": "pnpm -r test",
-    "adg-inspect": "tsx tools/adg-inspect/src/index.ts"
+    "adg-tool": "tsx tools/adg-tool/src/index.ts"
   },
   "devDependencies": {
     "@types/node": "^24.12.4",
