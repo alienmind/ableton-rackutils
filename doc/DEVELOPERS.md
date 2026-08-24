@@ -94,6 +94,26 @@ fires real DOM events at it. The first cut of the UI shipped with every
 interaction broken and every render test green - markup was never the
 question.
 
+### Neither of them runs in a browser, and that has cost real bugs
+
+Both run under jsdom, which is not Chrome. Two bugs got through with a fully
+green suite:
+
+- **The XML declaration** (`SCHEMA.md` Q12). jsdom's `XMLSerializer` omits it,
+  Chrome's includes it. The codec added one unconditionally, so in the real app
+  every document had two, `Rack.clone()` threw on reparse, and every single
+  edit failed silently. 89 tests passed throughout.
+- **HTML5 drag-and-drop.** Worked in jsdom, did nothing in Chrome.
+
+So when a change touches DOM serialization or pointer/drag behaviour, **drive
+a real browser before believing the suite**. There is no browser test in the
+repo yet - it was done ad hoc with Playwright against `pnpm dev`, loading a
+real `.adg` through the file input and asserting on the DOM afterwards. Adding
+that as a checked-in smoke test is worth doing; it is not done.
+
+The general shape of the lesson: a test suite cannot falsify an assumption
+about the environment it is itself running in.
+
 Of the codec's 78, 60 are synthetic and always run; 18 run against real
 Ableton-saved racks in
 `packages/adg-codec/tests/fixtures/*.adg`, which are gitignored - they skip

@@ -124,16 +124,35 @@ untouched):
 
 ### 5.2 Built so far
 
-The horizontal skeleton, in the same pass that fixed the interaction bugs:
-device panels at `--device-height: 169px` in a horizontally scrolling
-`.device-strip`, collapse-to-vertical-strip for both devices and nested racks,
-macros in two rows, chain and pad lanes as named rows, and Live's darker
-panel/line palette in place of the first cut's card look.
+**A rack is one row.** A rack panel is a thin title bar over a body of fixed
+height (`--device-height: 169px`), and that body holds the macro panel, the
+chain list, and the selected chain's devices running rightward. Nested racks
+render inline in that strip, so depth extends sideways, never downward. The
+page scrolls horizontally, as Live's chain does.
+
+**Only the selected chain's devices are drawn.** This is the load-bearing part
+and it was the first cut's real mistake: rendering every chain's devices
+stacked turned a four-pad drum rack into a page-height wall of panels with
+scrollbars in it. Live shows one chain at a time, and doing the same collapses
+the whole problem.
+
+Also: collapse-to-vertical-title-strip for devices and nested racks, macros in
+two rows (2x4 at 8, 2x8 at 16), a pad grid beside the chain rows for drum
+racks, and Live's darker panel/line palette.
+
+Measured after the rework, on `drum-pads.adg` in a real browser: the editor is
+213px tall (one rack panel at 186px), against 651px before.
 
 ### 5.3 Still to do
 
 - **The knob itself** - still the placeholder arc. This is Part 1's job and
   Part 1 is still on hold.
+- **Chain rows are not coloured**, and Live colours them. `DocumentColorIndex`
+  is present on branch presets in the real fixtures but is not modelled, and
+  needs the same palette confirmation as `MacroColor.N` (Part 1.3).
+- **Drag a parameter onto a knob to bind it.** Today binding is click-to-arm
+  then click-a-knob, which the project owner found unobvious. The pointer-drag
+  machinery from `useMacroDrag` is in place to support the direct gesture.
 - **Macro Variations panel.** The codec reads variations already
   (`rack.variations`); nothing renders them.
 - **Chain colours.** Live colours each chain row; `DocumentColorIndex` exists
