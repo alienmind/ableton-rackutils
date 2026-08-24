@@ -80,9 +80,9 @@ if (cmd === 'unpack') {
   const rack = Rack.parse(new Uint8Array(readFileSync(file)));
   console.log(`${rack.name} - ${rack.macroCount} visible macros`);
   for (const macro of rack.macros) {
-    if (!macro.binding) continue;
-    const { targetName, rangeMin, rangeMax, inverted } = macro.binding;
-    console.log(`  Macro ${macro.index + 1} (${macro.name}) -> ${targetName}  [${rangeMin}..${rangeMax}]${inverted ? ' inverted' : ''}`);
+    for (const { targetName, rangeMin, rangeMax, inverted } of macro.bindings) {
+      console.log(`  Macro ${macro.index + 1} (${macro.name}) -> ${targetName}  [${rangeMin}..${rangeMax}]${inverted ? ' inverted' : ''}`);
+    }
   }
   if (rack.variations.length) {
     console.log(`${rack.variations.length} variation(s): ${rack.variations.map((v) => v.name).join(', ')}`);

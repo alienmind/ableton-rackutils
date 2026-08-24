@@ -28,8 +28,18 @@ export const UNSET_MACRO_VALUE = -1;
 export interface Macro {
   index: number; // 0-based slot
   name: string;
+  /** `MacroColor.N`, the palette index Live's colour picker writes. */
+  color: number;
   value: number; // stored position, 0..127
-  binding: Binding | null;
+  /**
+   * A macro can drive SEVERAL parameters at once - completely normal Live
+   * usage (turn one knob, several things move), confirmed the hard way: an
+   * earlier version of this codec assumed at most one target per macro and
+   * `moveMapping` silently left a macro's second target behind on a real
+   * rack. Constraint 5 (one macro per PARAMETER) is a real rule; there is no
+   * such rule the other way round. Empty array, never null, when unmapped.
+   */
+  bindings: Binding[];
 }
 
 export interface Binding {
@@ -134,9 +144,10 @@ export class Rack {
     for (let i = 0; i < MACRO_SLOTS; i++) {
       const mc = child(device, `MacroControls.${i}`);
       const name = childValue(device, `MacroDisplayNames.${i}`) ?? `Macro ${i + 1}`;
+      const color = Number(childValue(device, `MacroColor.${i}`) ?? 0);
       const value = Number(childValue(mc, 'Manual') ?? 0);
-      const keyMidi = bindings.get(i) ?? null;
-      macros.push({ index: i, name, value, binding: keyMidi ? this.describeBinding(keyMidi) : null });
+      const keyMidis = bindings.get(i) ?? [];
+      macros.push({ index: i, name, color, value, bindings: keyMidis.map((km) => this.describeBinding(km)) });
     }
     return macros;
   }
@@ -186,18 +197,22 @@ export class Rack {
   /**
    * @internal Every KeyMidi belonging to THIS rack's own macros (Channel=16,
    * owning rack resolves to this.deviceEl per the structural walk), keyed by
-   * macro index. Nested racks' own macro mappings are excluded even though
-   * they reuse the same index space - see the class doc comment.
+   * macro index. A macro index can map to SEVERAL KeyMidi elements - a macro
+   * driving multiple parameters at once is normal Live usage, not an edge
+   * case. Nested racks' own macro mappings are excluded even though they
+   * reuse the same index space - see the class doc comment.
    */
-  collectMacroBindings(): Map<number, Element> {
+  collectMacroBindings(): Map<number, Element[]> {
     const bp = this.branchPresetsEl;
-    const result = new Map<number, Element>();
+    const result = new Map<number, Element[]>();
     if (!bp) return result;
     for (const keyMidi of Array.from(bp.getElementsByTagName('KeyMidi'))) {
       if (childValue(keyMidi, 'Channel') !== '16') continue; // not a macro mapping (SCHEMA.md Q1)
       if (this.owningRackDevice(keyMidi) !== this.deviceEl) continue; // belongs to a nested rack's own macro
       const index = Number(childValue(keyMidi, 'NoteOrController'));
-      result.set(index, keyMidi);
+      const list = result.get(index);
+      if (list) list.push(keyMidi);
+      else result.set(index, [keyMidi]);
     }
     return result;
   }

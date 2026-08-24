@@ -23,9 +23,11 @@ const ok = (warnings: string[] = []): MutationResult => ({ ok: true, warnings })
 const fail = (warning: string): MutationResult => ({ ok: false, warnings: [warning] });
 
 /**
- * Move the binding at `from` to `to`. If `to` is already mapped its binding
- * is cleared and reported in warnings. Not a node move (SCHEMA.md Q3): the
- * KeyMidi stays on the same target parameter, only its NoteOrController
+ * Move ALL of `from`'s bindings to `to` - a macro can drive several
+ * parameters at once (normal Live usage), so this moves every one of them,
+ * not just the first found. If `to` already had bindings of its own, all of
+ * those are cleared and reported in warnings. Not a node move (SCHEMA.md Q3):
+ * each KeyMidi stays on its own target parameter, only its NoteOrController
  * value changes.
  */
 export function moveMapping(rack: Rack, from: number, to: number): MutationResult {
@@ -33,16 +35,16 @@ export function moveMapping(rack: Rack, from: number, to: number): MutationResul
   assertSlot(from);
   assertSlot(to);
   const bindings = rack.collectMacroBindings();
-  const fromKeyMidi = bindings.get(from);
-  if (!fromKeyMidi) return fail(`macro ${from + 1} has no mapping to move`);
+  const fromKeyMidis = bindings.get(from) ?? [];
+  if (fromKeyMidis.length === 0) return fail(`macro ${from + 1} has no mapping to move`);
 
   const warnings: string[] = [];
-  const toKeyMidi = bindings.get(to);
-  if (toKeyMidi) {
-    warnings.push(`cleared existing binding on macro ${to + 1}`);
-    removeKeyMidi(toKeyMidi);
+  const toKeyMidis = bindings.get(to) ?? [];
+  if (toKeyMidis.length > 0) {
+    warnings.push(`cleared ${toKeyMidis.length} existing binding${toKeyMidis.length > 1 ? 's' : ''} on macro ${to + 1}`);
+    for (const km of toKeyMidis) removeKeyMidi(km);
   }
-  setChildValue(fromKeyMidi, 'NoteOrController', to);
+  for (const km of fromKeyMidis) setChildValue(km, 'NoteOrController', to);
 
   permuteVariations(rack, (values) => {
     values[to] = values[from];
@@ -51,20 +53,21 @@ export function moveMapping(rack: Rack, from: number, to: number): MutationResul
   return ok(warnings);
 }
 
-/** Exchange bindings, names, stored values, and all variation values between two slots. */
+/** Exchange ALL bindings (in both directions), names, colors, stored values, and all variation values between two slots - a full slot swap, not just what each macro drives. */
 export function swapMacros(rack: Rack, a: number, b: number): MutationResult {
   if (a === b) return ok();
   assertSlot(a);
   assertSlot(b);
 
   const bindings = rack.collectMacroBindings();
-  const aKeyMidi = bindings.get(a);
-  const bKeyMidi = bindings.get(b);
-  if (aKeyMidi) setChildValue(aKeyMidi, 'NoteOrController', b);
-  if (bKeyMidi) setChildValue(bKeyMidi, 'NoteOrController', a);
+  const aKeyMidis = bindings.get(a) ?? [];
+  const bKeyMidis = bindings.get(b) ?? [];
+  for (const km of aKeyMidis) setChildValue(km, 'NoteOrController', b);
+  for (const km of bKeyMidis) setChildValue(km, 'NoteOrController', a);
 
   const device = rack.deviceEl;
   swapChildValue(device, `MacroDisplayNames.${a}`, device, `MacroDisplayNames.${b}`);
+  swapChildValue(device, `MacroColor.${a}`, device, `MacroColor.${b}`);
   swapChildValue(child(device, `MacroControls.${a}`), 'Manual', child(device, `MacroControls.${b}`), 'Manual');
 
   permuteVariations(rack, (values) => {
@@ -74,9 +77,11 @@ export function swapMacros(rack: Rack, a: number, b: number): MutationResult {
 }
 
 /**
- * Bind a parameter to a macro. Clears any macro already driving that
- * parameter (Constraint 5: a parameter can only be driven by one macro) and
- * any binding already on this macro slot.
+ * Bind a parameter to a macro, ADDING to whatever else that macro already
+ * drives - a macro controlling several parameters at once is normal Live
+ * usage, not something to clear. Clears any DIFFERENT macro already driving
+ * this parameter (Constraint 5: a parameter can only be driven by one
+ * macro - that rule runs the other way round from the one above).
  */
 export function bindParameter(
   rack: Rack,
@@ -89,25 +94,18 @@ export function bindParameter(
   if (!targetEl) return fail(`target "${target.name}" not found - it may belong to a stale snapshot`);
 
   const warnings: string[] = [];
-  const bindings = rack.collectMacroBindings();
 
   // Constraint 5: the target may already be driven by a different macro.
   const targetContainer = child(targetEl, 'Timeable') ?? targetEl;
   const existingOnTarget = child(targetContainer, 'KeyMidi');
   if (existingOnTarget) {
     const previousMacro = Number(childValue(existingOnTarget, 'NoteOrController'));
+    if (previousMacro === macroIndex) return ok(); // already bound to this exact macro, nothing to do
     warnings.push(`cleared macro ${previousMacro + 1}'s binding on this parameter`);
     removeKeyMidi(existingOnTarget);
     permuteVariations(rack, (values) => {
       values[previousMacro] = UNSET_MACRO_VALUE;
     });
-  }
-
-  // This macro slot may already drive something else.
-  const existingOnMacro = bindings.get(macroIndex);
-  if (existingOnMacro && existingOnMacro !== existingOnTarget) {
-    warnings.push(`cleared macro ${macroIndex + 1}'s previous binding`);
-    removeKeyMidi(existingOnMacro);
   }
 
   const keyMidi = createKeyMidi(rack.document, macroIndex);
@@ -126,11 +124,12 @@ export function bindParameter(
   return ok(warnings);
 }
 
+/** Clears ALL of this macro's bindings, not just one. */
 export function unbindMacro(rack: Rack, macroIndex: number): MutationResult {
   assertSlot(macroIndex);
-  const keyMidi = rack.collectMacroBindings().get(macroIndex);
-  if (!keyMidi) return ok();
-  removeKeyMidi(keyMidi);
+  const keyMidis = rack.collectMacroBindings().get(macroIndex) ?? [];
+  if (keyMidis.length === 0) return ok();
+  for (const km of keyMidis) removeKeyMidi(km);
   permuteVariations(rack, (values) => {
     values[macroIndex] = UNSET_MACRO_VALUE;
   });
