@@ -27,6 +27,18 @@ export interface ContractSetting {
 export interface ContractOptionSpec {
   id: string;
   label: string;
+  /**
+   * The feature can be added more than once, each instance pointing at a
+   * different nested rack. Chain select on a drum rack is one per pad
+   * (SCHEMA.md Q24); everything else is one per rack.
+   */
+  repeatable?: boolean;
+  /**
+   * The feature applies INSIDE a nested rack, and the settings column offers
+   * which one. On a drum rack that is the only way it means anything: a pad
+   * answers to a note, so a selector on the drum rack itself does nothing.
+   */
+  targetsNestedRack?: boolean;
   /** The codec's half of it. `namePattern` and `colorIndex` here are DEFAULTS; the convention may override both. */
   device: ContractDevice;
   settings?: readonly ContractSetting[];
@@ -47,11 +59,13 @@ export const CONTRACT_OPTIONS: readonly ContractOptionSpec[] = [
   {
     id: 'select',
     label: 'Chain Select',
+    repeatable: true,
+    targetsNestedRack: true,
     // No device: the chain selector is a parameter of the rack itself
     // (SCHEMA.md Q15), and `donors/KD.adg` carries exactly this by hand as
     // KICK SEL.
     device: { parameter: 'ChainSelector', namePattern: '{name} SEL', colorIndex: 13 },
-    note: 'Only does something on a rack with more than one chain.',
+    note: 'Splits the selector range evenly across the chains so the knob picks one. A drum rack has to point this at a pad: its own pads answer to notes, not to a selector.',
   },
   {
     id: 'utility',
