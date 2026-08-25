@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import type { Chain } from '@rackutils/adg-codec';
+import { ColorPicker } from './ColorPicker';
 import { macroColor } from './macroColors';
 import { noteName } from './noteName';
 
@@ -8,6 +10,7 @@ export interface ChainListProps {
   onSelect: (index: number) => void;
   /** Drum racks label rows with the pad's note and show them as a pad grid alongside. */
   drum: boolean;
+  onRecolor: (chainPath: string, colorIndex: number) => void;
 }
 
 /**
@@ -17,7 +20,8 @@ export interface ChainListProps {
  * has. Rendering every chain's devices stacked was the first cut's mistake and
  * is what made a drum rack overflow the page.
  */
-export function ChainList({ chains, selected, onSelect, drum }: ChainListProps) {
+export function ChainList({ chains, selected, onSelect, drum, onRecolor }: ChainListProps) {
+  const [picking, setPicking] = useState<string | null>(null);
   // Pads are laid out by note, ascending. A real rack stores them in the
   // opposite order (92, 91, 90 in `drum-pads.adg`), so document order would
   // put the grid backwards. The ORIGINAL index travels with each entry -
@@ -66,6 +70,27 @@ export function ChainList({ chains, selected, onSelect, drum }: ChainListProps) 
           >
             {drum && chain.receivingNote !== null && <span className="chain-note">{noteName(chain.receivingNote)}</span>}
             <span className="chain-row-name">{chain.name || 'Chain'}</span>
+            <span
+              className="chain-swatch"
+              role="button"
+              tabIndex={0}
+              title="Colour"
+              onClick={(e) => {
+                e.stopPropagation();
+                setPicking((p) => (p === chain.path ? null : chain.path));
+              }}
+              onKeyDown={(e) => e.key === 'Enter' && setPicking((p) => (p === chain.path ? null : chain.path))}
+            />
+            {picking === chain.path && (
+              <ColorPicker
+                current={chain.colorIndex ?? -1}
+                onPick={(i) => {
+                  onRecolor(chain.path, i);
+                  setPicking(null);
+                }}
+                onClose={() => setPicking(null)}
+              />
+            )}
           </button>
         ))}
       </div>

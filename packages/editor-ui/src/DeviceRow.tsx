@@ -52,7 +52,7 @@ export function DeviceRow({ device, rackPath, macroColors, collapsed: collapsedF
 
   if (collapsed) {
     return (
-      <div className="device-panel collapsed" title={device.name}>
+      <div className="panel device-panel collapsed" title={device.name}>
         <button type="button" className="device-title-strip" onClick={() => setCollapsed(false)}>
           {device.name}
         </button>
@@ -61,7 +61,7 @@ export function DeviceRow({ device, rackPath, macroColors, collapsed: collapsedF
   }
 
   return (
-    <div className="device-panel">
+    <div className="panel device-panel">
       <header className="device-title">
         <button type="button" className="device-collapse" onClick={() => setCollapsed(true)} title="Collapse">
           -

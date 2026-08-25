@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Rack, bindParameter, type MutationResult } from '@rackutils/adg-codec';
 import { RackPanel } from './RackPanel';
 import { EditorProvider, resolveRackPath, type ArmedParam, type RackPath } from './context';
+import { MappingTable } from './MappingTable';
 import { PatchCable } from './PatchCable';
 import { useParamDrag } from './useParamDrag';
 
@@ -118,8 +119,12 @@ export function RackEditor({ rack, onChange, liveValues }: RackEditorProps) {
         )}
 
         <div className="rack-editor-scroll">
-          <RackPanel rack={rack} rackPath={[]} depth={0} />
+          <div className="rack-row">
+            <RackPanel rack={rack} rackPath={[]} depth={0} />
+          </div>
         </div>
+        <MappingTable rack={rack} />
+
         <PatchCable drag={paramDrag} echo={cableEcho} onEchoDone={clearCableEcho} />
       </div>
     </EditorProvider>

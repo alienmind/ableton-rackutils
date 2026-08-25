@@ -43,12 +43,17 @@ describe('RackEditor', () => {
     expect(html).toContain('mapped-params');
   });
 
-  test('renders a nested rack as a rack, with its own header and macro bank', () => {
+  test('renders a nested rack as a rack, flat in the same row as its parent', () => {
     const html = render(Rack.parse(buildFixtureBytes()));
     expect(html).toContain('Nested Rack');
-    // Two rack panels: the root, and the nested one one level down.
-    expect(html.match(/class="rack-panel/g) ?? []).toHaveLength(2);
+    // Two rack control panels, the root's and the nested one's, as SIBLINGS -
+    // a nested rack rendered inside its parent is what used to cascade the
+    // layout downward and force scrollbars.
+    expect(html.match(/class="panel rack-panel/g) ?? []).toHaveLength(2);
     expect(html).toContain('depth-1');
+    // Boundary markers say which panels belong to which rack, one pair each.
+    expect(html.match(/rack-boundary start/g) ?? []).toHaveLength(2);
+    expect(html.match(/rack-boundary end/g) ?? []).toHaveLength(2);
   });
 });
 

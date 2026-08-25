@@ -8,6 +8,8 @@
     "jsdom": "^25.0.0"
   },
   "devDependencies": {
-    "@types/jsdom": "^21.1.7"
+    "@types/jsdom": "^21.1.7",
+    "@types/pngjs": "^6.0.5",
+    "pngjs": "^7.0.0"
   }
 }

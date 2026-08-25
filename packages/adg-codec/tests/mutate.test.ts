@@ -7,13 +7,14 @@ import {
   renameMacro,
   renameRack,
   reorderMacro,
+  setChainColor,
   setMacroColor,
   setMacroCount,
   swapMacros,
   unbindMacro,
   unbindOne,
 } from '../src/mutate';
-import { buildFixtureBytes } from './fixture';
+import { buildDrumFixtureBytes, buildFixtureBytes } from './fixture';
 
 /** Per-slot fields the typed model deliberately doesn't surface (annotations, defaults, the exclude flags) - read straight off the DOM to check a reorder carried them. */
 const slotField = (rack: Rack, field: string, index: number) => childValue(rack.deviceEl, `${field}.${index}`);
@@ -348,5 +349,35 @@ describe('clone isolation', () => {
     moveMapping(clone, 0, 1);
     expect(clone.macros[0].bindings).toHaveLength(0);
     expect(rack.macros[0].bindings).toHaveLength(2);
+  });
+});
+
+describe('setChainColor', () => {
+  test('sets the colour and stops Live treating it as auto-assigned', () => {
+    const rack = Rack.parse(buildDrumFixtureBytes());
+    const chain = rack.chains[0];
+    expect(setChainColor(rack, chain.path, 12).ok).toBe(true);
+
+    const roundTripped = Rack.parse(rack.serialize());
+    expect(roundTripped.chains[0].colorIndex).toBe(12);
+    // AutoColored must flip: Live recolours auto-coloured chains, which would
+    // silently discard a colour the user picked.
+    expect(roundTripped.chains[0].autoColored).toBe(false);
+  });
+
+  test('leaves the other chains alone', () => {
+    const rack = Rack.parse(buildDrumFixtureBytes());
+    const before = rack.chains.map((c) => c.colorIndex);
+    setChainColor(rack, rack.chains[1].path, 5);
+    const after = Rack.parse(rack.serialize()).chains.map((c) => c.colorIndex);
+    expect(after[0]).toBe(before[0]);
+    expect(after[1]).toBe(5);
+    expect(after[2]).toBe(before[2]);
+  });
+
+  test('fails cleanly on an unresolvable path, and rejects a bad index', () => {
+    const rack = Rack.parse(buildDrumFixtureBytes());
+    expect(setChainColor(rack, '99/99', 3).ok).toBe(false);
+    expect(() => setChainColor(rack, rack.chains[0].path, -2)).toThrow(RangeError);
   });
 });

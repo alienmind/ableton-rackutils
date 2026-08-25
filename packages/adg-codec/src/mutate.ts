@@ -130,6 +130,24 @@ export function setMacroColor(rack: Rack, macroIndex: number, colorIndex: number
 }
 
 /**
+ * Set a chain's colour (`DocumentColorIndex`, SCHEMA.md Q13) and mark it as
+ * chosen rather than auto-assigned. Live sets `AutoColored` to false the
+ * moment a user picks a colour by hand; leaving it true would invite Live to
+ * recolour the chain again and quietly discard the choice.
+ *
+ * `chainPath` is a `Chain.path` from the SAME rack handle - paths are relative
+ * to the rack they came from (see `Rack.subRack`).
+ */
+export function setChainColor(rack: Rack, chainPath: string, colorIndex: number): MutationResult {
+  if (!Number.isInteger(colorIndex) || colorIndex < 0) throw new RangeError(`colour index ${colorIndex} is not a non-negative integer`);
+  const branch = rack.resolveTarget(chainPath);
+  if (!branch) return fail(`no chain at "${chainPath}" - it may belong to a stale snapshot`);
+  setChildValue(branch, 'DocumentColorIndex', colorIndex);
+  setChildValue(branch, 'AutoColored', false);
+  return ok();
+}
+
+/**
  * Remove ONE of a macro's bindings, leaving its others alone - the narrow
  * sibling of `unbindMacro`, for a macro driving several parameters where only
  * one row's "x" was clicked. Refuses if the parameter at `targetPath` is not

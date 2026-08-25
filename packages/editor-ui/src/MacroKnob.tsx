@@ -40,6 +40,7 @@ export function MacroKnob(props: MacroKnobProps) {
   const [picking, setPicking] = useState(false);
 
   const mapped = macro.bindings.length > 0;
+  const first = macro.bindings[0];
   const color = macroColor(macro.color);
   const angle = valueToDegrees(macro.value);
 
@@ -104,18 +105,23 @@ export function MacroKnob(props: MacroKnobProps) {
         />
       )}
 
+      {/* One line, however many targets there are. A macro driving six
+          parameters used to render six rows inside a 58px knob and shove the
+          whole grid apart; the full list is in the mapping table below. */}
       {mapped && (
         <ul className="macro-knob-targets">
-          {macro.bindings.map((binding) => (
-            <li key={binding.targetPath}>
-              <span className="target-name" title={`${binding.targetName} [${binding.rangeMin}..${binding.rangeMax}]${binding.inverted ? ' inverted' : ''}`}>
-                {binding.targetName}
-              </span>
-              <button type="button" className="unbind" onClick={() => onUnbindOne(binding.targetPath)} title="Unbind this parameter only">
-                x
-              </button>
-            </li>
-          ))}
+          <li key={first.targetPath}>
+            <span
+              className="target-name"
+              title={macro.bindings.map((b) => `${b.targetName} [${b.rangeMin}..${b.rangeMax}]${b.inverted ? ' inverted' : ''}`).join('\n')}
+            >
+              {first.targetName}
+            </span>
+            <button type="button" className="unbind" onClick={() => onUnbindOne(first.targetPath)} title={`Unbind ${first.targetName}`}>
+              x
+            </button>
+          </li>
+          {macro.bindings.length > 1 && <li className="more-targets">+{macro.bindings.length - 1}</li>}
         </ul>
       )}
     </div>

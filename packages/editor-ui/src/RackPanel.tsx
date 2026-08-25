@@ -1,5 +1,15 @@
 import { useEffect, useState } from 'react';
-import { bindParameter, renameMacro, renameRack, reorderMacro, setMacroColor, setMacroCount, swapMacros, unbindOne } from '@rackutils/adg-codec';
+import {
+  bindParameter,
+  renameMacro,
+  renameRack,
+  reorderMacro,
+  setChainColor,
+  setMacroColor,
+  setMacroCount,
+  swapMacros,
+  unbindOne,
+} from '@rackutils/adg-codec';
 import type { DeviceNode, Rack } from '@rackutils/adg-codec';
 import { ChainList } from './ChainList';
 import { DeviceRow } from './DeviceRow';
@@ -84,7 +94,7 @@ export function RackPanel({ rack, rackPath, depth, collapsible, forceCollapsed }
 
   if (collapsible && !open) {
     return (
-      <div className="rack-panel collapsed" title={rack.name}>
+      <div className="panel rack-panel collapsed" title={rack.name}>
         <button type="button" className="device-title-strip rack-strip" onClick={() => setOpen(true)}>
           {rack.name}
         </button>
@@ -93,7 +103,9 @@ export function RackPanel({ rack, rackPath, depth, collapsible, forceCollapsed }
   }
 
   return (
-    <section className={`rack-panel depth-${Math.min(depth, 3)}${isDrumRack ? ' drum-rack' : ''}`}>
+    <>
+      <div className={`rack-boundary start depth-${Math.min(depth, 3)}`} aria-hidden="true" />
+      <section className={`panel rack-panel depth-${Math.min(depth, 3)}${isDrumRack ? ' drum-rack' : ''}`}>
       <RackHeader
         name={rack.name}
         kind={isDrumRack ? 'Drum Rack' : rack.deviceEl.tagName.replace('GroupDevice', ' Rack')}
@@ -137,14 +149,25 @@ export function RackPanel({ rack, rackPath, depth, collapsible, forceCollapsed }
         />
         )}
 
-        {chains.length > 0 && (
-          <>
-            {showChains && <ChainList chains={chains} selected={selectedChain} onSelect={setSelectedChain} drum={isDrumRack} />}
-            <div className="device-strip">{chain ? chain.devices.map(renderDevice) : null}</div>
-          </>
+        {showChains && chains.length > 0 && (
+          <ChainList
+            chains={chains}
+            selected={selectedChain}
+            onSelect={setSelectedChain}
+            drum={isDrumRack}
+            onRecolor={(chainPath, colorIndex) => apply(rackPath, (r) => setChainColor(r, chainPath, colorIndex))}
+          />
         )}
       </div>
-    </section>
+      </section>
+
+      {/* The rack's devices are SIBLINGS, not children: they continue the same
+          row to the right. Nesting a nested rack inside this element is what
+          made racks cascade downward and the row grow. */}
+      {chain ? chain.devices.map(renderDevice) : null}
+
+      <div className={`rack-boundary end depth-${Math.min(depth, 3)}`} aria-hidden="true" />
+    </>
   );
 }
 

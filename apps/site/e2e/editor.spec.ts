@@ -17,7 +17,11 @@ async function loadRack(page: Page, kind: 'instrument' | 'drum' = 'instrument') 
  * nested rack renders its own macro bank and chain rows - an unscoped
  * `.macro-knob` matches both racks' knobs and the assertions become nonsense.
  */
-const rootBody = (page: Page) => page.locator('.rack-editor-scroll > .rack-panel > .rack-body');
+// The ROOT rack's own control panel. Every rack's panel is now a sibling in
+// `.rack-row` rather than nested inside its parent, so "the root" is the first
+// rack panel in the row, not the outermost element.
+const rootPanel = (page: Page) => page.locator('.rack-row > .panel.rack-panel').first();
+const rootBody = (page: Page) => rootPanel(page).locator('> .rack-body');
 const rootKnobs = (page: Page) => rootBody(page).locator('> .macro-bank-wrap .macro-knob');
 const rootDials = (page: Page) => rootBody(page).locator('> .macro-bank-wrap .macro-knob-dial');
 const rootChainRows = (page: Page) => rootBody(page).locator('> .chain-list .chain-row');
@@ -151,8 +155,7 @@ test('a drum rack renders pads and keeps the whole rack on one row', async ({ pa
   // stays one device row tall. The height invariant is asserted on its own
   // below; here it is enough that the page does not scroll vertically to
   // reach the rack.
-  const rootPanel = page.locator('.rack-editor-scroll > .rack-panel');
-  expect((await rootPanel.boundingBox())!.height).toBeLessThanOrEqual(169 + 17 + 2);
+  expect((await page.locator('.rack-row').boundingBox())!.height).toBeLessThanOrEqual(169 + 17 + 2);
 });
 
 test('dragging a parameter onto a knob binds it', async ({ page }) => {
@@ -190,8 +193,8 @@ const ROW_HEIGHT = 169 + 17; // device row + title bar
 
 test('a rack stays one device row tall, whatever the side buttons do', async ({ page }) => {
   await loadRack(page, 'drum');
-  const rootPanel = page.locator('.rack-editor-scroll > .rack-panel');
-  const height = async () => (await rootPanel.boundingBox())!.height;
+  const row = page.locator('.rack-row');
+  const height = async () => (await row.boundingBox())!.height;
 
   expect(await height()).toBeLessThanOrEqual(ROW_HEIGHT + 2);
 
@@ -312,4 +315,37 @@ test('a mapped parameter wears the colour of the macro driving it', async ({ pag
   }, knobColour);
 
   expect(chipColour).toBe(asRgb);
+});
+
+test('every rack sits in one flat row, nested racks included', async ({ page }) => {
+  // The structural fix: a nested rack is a SIBLING panel, not a child. When it
+  // was a child its title bar started below its parent's, racks cascaded
+  // downward, and depth was bounded by how many fit vertically.
+  await loadRack(page);
+  const tops = await page.locator('.rack-row > .panel').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
+  expect(tops.length).toBeGreaterThan(1);
+  expect(new Set(tops).size).toBe(1);
+
+  // Two rack panels - root and nested - each wrapped in boundary markers.
+  await expect(page.locator('.rack-row > .panel.rack-panel')).toHaveCount(2);
+  await expect(page.locator('.rack-boundary.start')).toHaveCount(2);
+});
+
+test('the mapping table lists rack, macro, device and parameter', async ({ page }) => {
+  await loadRack(page);
+  const row = page.locator('.mapping-rows > li').first();
+  await expect(row.locator('.mapping-rack')).toContainText('Test Rack');
+  await expect(row.locator('.mapping-macro')).toContainText('Macro 1');
+  // The fixture's macro 1 drives two parameters; they stack under it.
+  await expect(row.locator('.mapping-targets li')).toHaveCount(2);
+  await expect(row.locator('.mapping-device').first()).toContainText('TestSynth');
+  await expect(row.locator('.mapping-param').first()).toContainText('Param');
+});
+
+test('a knob shows one target and a count, however many it drives', async ({ page }) => {
+  // Six target names inside a 58px knob is what pushed the grid apart.
+  await loadRack(page);
+  const knob = rootKnobs(page).first();
+  await expect(knob.locator('.macro-knob-targets li')).toHaveCount(2); // one target + the "+1"
+  await expect(knob.locator('.more-targets')).toHaveText('+1');
 });

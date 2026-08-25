@@ -148,6 +148,22 @@ panel is two rows. The title bar carries only the rack's name and - on the
 root rack - **undo and redo**, which are global: one history across every rack
 level, because a mutation on a nested rack edits the same document.
 
+**Every panel lives in ONE flat row.** A rack's controls, its devices, and any
+nested rack's controls and devices are all siblings at the same top edge.
+Nesting is shown by boundary brackets between them, not by containment - which
+is how Live does it, and the reason a chain can be arbitrarily deep without
+growing downward. The previous structure rendered a nested rack INSIDE its
+parent's panel, so its title bar began below the parent's: racks cascaded down
+the page, depth was capped by how many title bars fit vertically, and
+horizontal scrollbars appeared inside scrollbars. Depth now costs width only.
+
+**Mappings have their own section below the row**, listing
+`rack -> macro -> device -> parameter` with a macro's several parameters
+stacked under it. The knobs cannot carry this: a macro can drive any number of
+parameters, and rendering them all inside a 58px knob pushed the grid apart on
+any realistic rack. The knob shows the first target and a `+N`; the table has
+the rest, including nested racks, which are otherwise several clicks deep.
+
 **A rack is exactly one device row tall, always**, and this is enforced rather
 than emergent: `height`, not `min-height`. It regressed twice, most recently
 when hiding the chain list let a panel grow to fit its content and a 16-pad

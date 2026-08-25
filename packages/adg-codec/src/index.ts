@@ -13,5 +13,6 @@ export {
   renameRack,
   setMacroCount,
   setMacroColor,
+  setChainColor,
 } from './mutate';
 export type { MutationResult } from './mutate';
