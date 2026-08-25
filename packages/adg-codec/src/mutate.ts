@@ -589,23 +589,52 @@ export function removeDevice(rack: Rack, devicePath: string): MutationResult {
  * it reuses `reorderMacro`, so variation values move on the single tested path
  * (Constraint 4).
  *
- * The visible count comes back down by two, matching the step
- * `insertMacroSlots` went up by, and never below what it takes to show every
- * macro that is still mapped - hiding a macro that still drives something is
- * how a rack loses a knob with no explanation (SCHEMA.md Q7).
+ * The visible count comes down by exactly ONE, and is allowed to land on an
+ * odd number on the way: taking three slots off a bank of twelve has to end at
+ * nine before it can be rounded to eight, and rounding at every step would
+ * take two off each time and end at six. `applyContract` evens it out when the
+ * batch is done, which is the only place that knows the batch is done.
+ *
+ * Never below what it takes to show every macro that is still mapped - hiding
+ * a macro that still drives something is how a rack loses a knob with no
+ * explanation (SCHEMA.md Q7).
  */
 export function removeMacroSlot(rack: Rack, macroIndex: number): MutationResult {
   assertSlot(macroIndex);
   const warnings = unbindMacro(rack, macroIndex).warnings;
   reorderMacro(rack, macroIndex, MACRO_SLOTS - 1);
   clearMacroSlot(rack, MACRO_SLOTS - 1);
+  renumberDefaultNames(rack, macroIndex);
 
+  setMacroCount(rack, Math.max(visibleFloor(rack), rack.macroCount - 1));
+  return ok(warnings);
+}
+
+/**
+ * Round the visible macro count DOWN to even, never hiding a macro that still
+ * drives something.
+ *
+ * The end of a batch. `removeMacroSlot` takes slots off one at a time and lets
+ * the count sit on an odd number in between - taking three off a bank of
+ * twelve has to pass through nine to reach eight - and an odd
+ * `NumVisibleMacroControls` loads and draws the grid wrong (SCHEMA.md Q19). So
+ * whoever ends a batch of removals calls this; `applyContract` does it for the
+ * batches it runs.
+ */
+export function evenMacroCount(rack: Rack): MutationResult {
+  const count = rack.macroCount;
+  return setMacroCount(rack, Math.max(visibleFloor(rack), count - (count % 2)));
+}
+
+/**
+ * The fewest macros a rack can show without hiding one that still drives
+ * something, rounded up to even (SCHEMA.md Q19).
+ */
+export function visibleFloor(rack: Rack): number {
   const mapped = rack.collectMacroBindings();
   const highest = Math.max(-1, ...Array.from(mapped.keys()).filter((i) => (mapped.get(i) ?? []).length > 0));
-  const floor = Math.max(2, highest + 1 + ((highest + 1) % 2));
-  const shrunk = rack.macroCount - 1;
-  setMacroCount(rack, Math.max(floor, shrunk - (shrunk % 2)));
-  return ok(warnings);
+  const needed = highest + 1;
+  return Math.max(2, needed + (needed % 2));
 }
 
 /**
@@ -621,6 +650,24 @@ export function resetMacro(rack: Rack, macroIndex: number): MutationResult {
   const warnings = unbindMacro(rack, macroIndex).warnings;
   clearMacroSlot(rack, macroIndex);
   return ok(warnings);
+}
+
+/**
+ * Put the default names back in step with their slots, from `from` upwards.
+ *
+ * The rotation that empties a slot carries names down with it, so a bank that
+ * had `Macro 14`, `Macro 15`, `Macro 16` sitting empty at the top ends up
+ * reading `Macro 16` three times. Only slots that are empty AND still carry a
+ * default name are touched: a name somebody typed is theirs, wherever it
+ * lands.
+ */
+function renumberDefaultNames(rack: Rack, from: number): void {
+  const bindings = rack.collectMacroBindings();
+  for (let i = from; i < MACRO_SLOTS; i++) {
+    if ((bindings.get(i) ?? []).length > 0) continue;
+    const name = childValue(rack.deviceEl, `MacroDisplayNames.${i}`) ?? '';
+    if (/^Macro \d+$/.test(name)) setChildValue(rack.deviceEl, `MacroDisplayNames.${i}`, `Macro ${i + 1}`);
+  }
 }
 
 /** Write the untouched-slot defaults over one slot. Does NOT unbind: callers do that first, deliberately. */
@@ -699,4 +746,29 @@ function alreadyDistributed(chains: readonly Element[]): boolean {
     seen.add(`${childValue(range, 'Min')}:${childValue(range, 'Max')}`);
   }
   return seen.size === chains.length;
+}
+
+/**
+ * Give every macro that only drives THIS chain the chain's own colour.
+ *
+ * Colour is how a rack of racks stays readable: colour the Rumble pad brown
+ * and the knobs that move Rumble should be brown too, or the colour says
+ * nothing once the knobs are in one bank at the top. Live does not do this;
+ * it is the same argument the contract makes for naming.
+ *
+ * Only macros whose bindings ALL land inside the chain are touched. One that
+ * also drives something elsewhere belongs to no single chain - that is what a
+ * macro across chains IS - and recolouring it would claim otherwise.
+ */
+export function colorChainMacros(rack: Rack, chainPath: string, colorIndex: number): MutationResult {
+  const chain = rack.resolveTarget(chainPath);
+  if (!chain) return fail(`no chain at "${chainPath}" - it may belong to a stale snapshot`);
+
+  const bindings = rack.collectMacroBindings();
+  for (const [macroIndex, keyMidis] of bindings) {
+    if (keyMidis.length === 0) continue;
+    if (!keyMidis.every((km) => chain.contains(rack.targetParameterOf(km)))) continue;
+    setMacroColor(rack, macroIndex, colorIndex);
+  }
+  return ok();
 }

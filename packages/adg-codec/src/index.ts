@@ -15,6 +15,7 @@ export {
   removeDevice,
   removeMacroSlot,
   resetMacro,
+  evenMacroCount,
   distributeChainSelector,
   setDeviceValue,
   renameMacro,
@@ -23,6 +24,7 @@ export {
   insertMacroSlots,
   setMacroColor,
   setChainColor,
+  colorChainMacros,
 } from './mutate';
 export type { MutationResult, InsertDeviceResult, InsertedDevice } from './mutate';
 export { applyContract, inspectContract, removeContractOption, macroNameFor } from './contract';

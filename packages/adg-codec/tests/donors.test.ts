@@ -14,7 +14,9 @@ import { describe, expect, test } from 'vitest';
 import { MACRO_SLOTS, Rack, UNSET_MACRO_VALUE } from '../src/model';
 import { applyContract, inspectContract, removeContractOption, macroNameFor } from '../src/contract';
 import {
+  colorChainMacros,
   distributeChainSelector,
+  evenMacroCount,
   insertDeviceInEveryChain,
   insertMacroSlots,
   moveMapping,
@@ -725,6 +727,9 @@ describe('unticking an option (doc/PLAN.md 4.3.1)', () => {
 
     applyContract(rack, [FILTER], { name: 'BS', renameTheRack: false });
     expect(removeContractOption(rack, FILTER, { name: 'BS' }).ok).toBe(true);
+    // Removal takes slots off one at a time and leaves the parity to the end
+    // of the batch, which here is one call.
+    evenMacroCount(rack);
 
     const after = Rack.parse(rack.serialize());
     expect(after.macroCount).toBe(before.count);
@@ -889,5 +894,34 @@ describe('a feature that lands in a pad rack (doc/PLAN.md 4.3.2)', () => {
     expect(result.slots).toEqual([0]);
     expect(again.macroCount).toBe(rack.macroCount);
     expect(inspectContract(again, [{ ...feature, targetRack: padAgain.path }])[0].state).toBe('satisfied');
+  });
+});
+
+describe('colour follows the chain (SCHEMA.md Q13)', () => {
+  test('a chain colour reaches the macros that only drive that chain', () => {
+    const rack = Rack.parse(load('KD.adg'));
+    // The Rumble pad. Its four macros drive nothing outside it, and the drum
+    // rack's own macro 2 drives an AutoFilter in the Kick pad instead.
+    const rumble = rack.chains[1];
+    expect(colorChainMacros(rack, rumble.path, 41).ok).toBe(true);
+
+    const after = Rack.parse(rack.serialize());
+    const inRumble = (index: number) =>
+      after.macros[index].bindings.every((b) => after.resolveTarget(rumble.path)!.contains(after.resolveTarget(b.targetPath)!));
+
+    for (const macro of after.macros) {
+      if (macro.bindings.length === 0) continue;
+      if (inRumble(macro.index)) expect(macro.color).toBe(41);
+      else expect(macro.color).not.toBe(41);
+    }
+  });
+
+  test('a macro that also drives something else keeps its own colour', () => {
+    const rack = Rack.parse(load('BS.adg'));
+    // BS.adg's macro 4 drives four parameters across BOTH chains, so it
+    // belongs to neither - which is what a macro across chains is.
+    const before = rack.macros[3].color;
+    colorChainMacros(rack, rack.chains[0].path, 41);
+    expect(Rack.parse(rack.serialize()).macros[3].color).toBe(before);
   });
 });
