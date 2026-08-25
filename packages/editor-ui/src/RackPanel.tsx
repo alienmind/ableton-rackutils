@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   bindParameter,
   renameMacro,
@@ -8,7 +8,6 @@ import {
   setMacroColor,
   setMacroCount,
   swapMacros,
-  unbindOne,
 } from '@rackutils/adg-codec';
 import type { DeviceNode, Rack } from '@rackutils/adg-codec';
 import { ChainList } from './ChainList';
@@ -19,6 +18,7 @@ import { VariationsPanel } from './VariationsPanel';
 import { MacroBank } from './MacroBank';
 import { RackHeader } from './RackHeader';
 import { samePath, useEditor, type RackPath } from './context';
+import { useParentToggle } from './useParentToggle';
 
 export interface RackPanelProps {
   rack: Rack;
@@ -43,10 +43,14 @@ export interface RackPanelProps {
  * is this same component, rendered inline in its parent's device strip.
  */
 export function RackPanel({ rack, rackPath, depth, collapsible, forceCollapsed }: RackPanelProps) {
-  const [open, setOpen] = useState(!collapsible || depth <= 1);
-  useEffect(() => {
-    if (collapsible) setOpen(!forceCollapsed);
-  }, [forceCollapsed, collapsible]);
+  // Nested racks start COLLAPSED, as vertical title strips. A rack's contents
+  // are worth a click; opening every level by default filled the row with
+  // panels nobody asked for and pushed the rack you came to look at off the
+  // screen. The parent's collapse-all button still drives this when it moves.
+  const [collapsedByParent, setCollapsedByParent] = useParentToggle(Boolean(collapsible), forceCollapsed);
+  const open = !collapsedByParent;
+  const setOpen = (next: boolean | ((o: boolean) => boolean)) =>
+    setCollapsedByParent(!(typeof next === 'function' ? next(open) : next));
   const [selectedChain, setSelectedChain] = useState(0);
   // The six toggles Live puts down the rack's left edge.
   const [showMacros, setShowMacros] = useState(true);
@@ -145,7 +149,6 @@ export function RackPanel({ rack, rackPath, depth, collapsible, forceCollapsed }
           onBindArmed={bindHere}
           onRename={(i, name) => apply(rackPath, (r) => renameMacro(r, i, name))}
           onRecolor={(i, colorIndex) => apply(rackPath, (r) => setMacroColor(r, i, colorIndex))}
-          onUnbindOne={(i, targetPath) => apply(rackPath, (r) => unbindOne(r, i, targetPath))}
         />
         )}
 

@@ -44,7 +44,8 @@ and one edited file has been round-tripped through Live by hand.
   169px device height, recursive racks, drum pads, pointer drag to reorder or
   swap, drag-a-parameter-to-bind drawn as a patch cable, inline rename, Live's
   real 70-colour palette for macros and chains, global undo/redo, and a mapping
-  table listing every rack -> macro -> device -> parameter. 25 tests.
+  table listing every rack -> macro -> device -> parameter, each row with its
+  own unbind control. 24 tests.
 - **`apps/site` - the editor, plus a getting-started guide** walking through
   saving a rack out of Live and dragging it in. 20 Playwright specs against a
   real Chromium, run in CI.
@@ -819,6 +820,9 @@ Concretely:
 - **Only the selected chain's devices are drawn.** Live shows one chain at a
   time, and doing the same is what keeps the row a row: rendering every chain's
   devices turned a four-pad drum rack into a page-height wall.
+- **Nested racks and devices start collapsed**, as vertical title strips.
+  Opening everything by default pushed the rack you came to look at off the
+  screen.
 - **The rack's left edge carries Live's button column**: show/hide macros, add
   two, remove two, Macro Variations, collapse devices, show/hide chains.
 - **Colour goes on the label**, not the dial. Live's knob arc is the same blue

@@ -1,5 +1,7 @@
+import { unbindOne } from '@rackutils/adg-codec';
 import type { Rack } from '@rackutils/adg-codec';
 import { collectMappings } from './mappings';
+import { useEditor } from './context';
 
 export interface MappingTableProps {
   rack: Rack;
@@ -21,6 +23,7 @@ export interface MappingTableProps {
  * in one read, including nested racks, which are otherwise several clicks deep.
  */
 export function MappingTable({ rack }: MappingTableProps) {
+  const { apply } = useEditor();
   const rows = collectMappings(rack);
 
   if (rows.length === 0) {
@@ -55,6 +58,17 @@ export function MappingTable({ rack }: MappingTableProps) {
                   <span className="mapping-device">{t.device}</span>
                   <span className="mapping-arrow">-&gt;</span>
                   <span className="mapping-param">{t.parameter}</span>
+                  {/* Unbinds THIS parameter only. A macro often drives several
+                      and the others must survive (SCHEMA.md, the multi-target
+                      bugfix) - `unbindMacro` would clear the lot. */}
+                  <button
+                    type="button"
+                    className="mapping-unbind"
+                    title={`Unbind ${t.parameter} from ${row.macroName}`}
+                    onClick={() => apply(row.rackPath, (r) => unbindOne(r, row.macroIndex, t.targetPath))}
+                  >
+                    x
+                  </button>
                 </li>
               ))}
             </ul>

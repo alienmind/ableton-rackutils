@@ -43,6 +43,9 @@ afterEach(() => {
 
 const click = (el: Element) => act(() => el.dispatchEvent(new MouseEvent('click', { bubbles: true })));
 
+/** Devices render collapsed to a title strip; open the first one to reach its parameters. */
+const openFirstDevice = () => click(container.querySelector('.device-panel.collapsed .device-title-strip')!);
+
 /**
  * Pointer drag, the way `useMacroDrag` implements it: press on a knob's dial,
  * move, release over another knob. The drop target is resolved with
@@ -88,8 +91,12 @@ describe('macro drag and drop', () => {
 });
 
 describe('clicking things', () => {
-  test('the x on a mapped target unbinds that one target', () => {
-    const unbind = container.querySelector('.macro-knob-targets .unbind')!;
+  test('the x in the mapping table unbinds that one target', () => {
+    // The knob no longer lists what it drives - a macro can drive any number
+    // of parameters and naming them in a 58px knob pushed the grid apart. The
+    // table carries the list and the unbind control with it.
+    expect(container.querySelector('.macro-knob-targets')).toBeNull();
+    const unbind = container.querySelector('.mapping-unbind')!;
     expect(unbind).toBeTruthy();
     click(unbind);
     expect(rack.macros[0].bindings).toHaveLength(1);
@@ -107,6 +114,7 @@ describe('clicking things', () => {
 
   test('arming a parameter then clicking a knob binds it', () => {
     // ParamB is unmapped, so it lives behind "more" until that is expanded.
+    openFirstDevice();
     click(container.querySelector('.more-toggle')!);
     const paramB = [...container.querySelectorAll('.param')].find((p) => p.textContent === 'ParamB');
     expect(paramB).toBeTruthy();
@@ -132,6 +140,7 @@ describe('dragging a parameter onto a knob', () => {
   }
 
   test('binds it, without needing the arm step', () => {
+    openFirstDevice();
     click(container.querySelector('.more-toggle')!);
     const paramB = [...container.querySelectorAll('.param')].find((p) => p.textContent === 'ParamB')!;
     dragParamToKnob(paramB, 4);
@@ -141,6 +150,7 @@ describe('dragging a parameter onto a knob', () => {
   test('a drag does not also arm the parameter it started from', () => {
     // Both gestures start with a press on the same button, so the click
     // handler has to tell them apart or every drag would leave something armed.
+    openFirstDevice();
     click(container.querySelector('.more-toggle')!);
     const paramB = [...container.querySelectorAll('.param')].find((p) => p.textContent === 'ParamB')!;
     dragParamToKnob(paramB, 4);
@@ -150,8 +160,11 @@ describe('dragging a parameter onto a knob', () => {
   test('refuses a drop onto another rack knob (SCHEMA.md Q2)', () => {
     // The nested rack's knobs carry a different data-rack-path. A KeyMidi
     // belongs to the nearest enclosing rack, so this mapping cannot exist.
+    openFirstDevice();
     click(container.querySelector('.more-toggle')!);
     const paramB = [...container.querySelectorAll('.param')].find((p) => p.textContent === 'ParamB')!;
+    // The nested rack starts collapsed to a strip; open it so it has knobs.
+    click(container.querySelector('.rack-panel.collapsed .rack-strip')!);
     const nestedKnobs = container.querySelectorAll('.macro-bank-wrap[data-rack-path]:not([data-rack-path=""]) .macro-knob');
     expect(nestedKnobs.length).toBeGreaterThan(0);
 
