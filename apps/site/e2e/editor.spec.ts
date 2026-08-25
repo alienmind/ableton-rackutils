@@ -87,7 +87,7 @@ test('the x in the mapping table unbinds just that one target', async ({ page })
   // unbind control with it.
   await loadRack(page);
   await expect(page.locator('.macro-knob-targets')).toHaveCount(0);
-  const targets = page.locator('.mapping-targets li');
+  const targets = page.locator('.mapping-grid tbody tr');
   const before = await targets.count();
   expect(before).toBeGreaterThan(1);
   await page.locator('.mapping-unbind').first().click();
@@ -113,7 +113,7 @@ test('arming a parameter then clicking a knob binds it', async ({ page }) => {
   await page.locator('.param', { hasText: 'ParamB' }).first().click();
   await rootDials(page).nth(3).click();
   // Confirmed in the mapping table: the knob no longer names what it drives.
-  await expect(page.locator('.mapping-rows > li', { hasText: 'Macro 4' }).locator('.mapping-param')).toContainText('ParamB');
+  await expect(page.locator('.mapping-grid tbody tr', { hasText: 'Macro 4' }).locator('.col-name')).toContainText('ParamB');
 });
 
 test('macros are numbered across then down', async ({ page }) => {
@@ -180,7 +180,7 @@ test('dragging a parameter onto a knob binds it', async ({ page }) => {
   const knob = rootKnobs(page).nth(5);
   await dragBetween(page, param, knob);
 
-  await expect(page.locator('.mapping-rows > li', { hasText: 'Macro 6' }).locator('.mapping-param')).toContainText('ParamB');
+  await expect(page.locator('.mapping-grid tbody tr', { hasText: 'Macro 6' }).locator('.col-name')).toContainText('ParamB');
   // The drag must not also leave the parameter armed.
   await expect(page.locator('.armed-note')).toHaveCount(0);
 });
@@ -292,7 +292,7 @@ test('a patch cable hangs from the parameter while dragging, and lands on the kn
   expect(await cable.evaluate((el) => getComputedStyle(el).stroke)).toBe(knobColour);
 
   await page.mouse.up();
-  await expect(page.locator('.mapping-rows > li', { hasText: 'Macro 6' }).locator('.mapping-param')).toContainText('ParamB');
+  await expect(page.locator('.mapping-grid tbody tr', { hasText: 'Macro 6' }).locator('.col-name')).toContainText('ParamB');
   // The cable settles and then takes itself off screen.
   await expect(page.locator('.patch-cable')).toHaveCount(0, { timeout: 4000 });
 });
@@ -302,7 +302,7 @@ test('a cable dropped on nothing retracts and binds nothing', async ({ page }) =
   await openFirstDevice(page);
   await page.locator('.more-toggle').first().click();
   const param = page.locator('.param', { hasText: 'ParamB' }).first();
-  const before = await page.locator('.mapping-targets li').count();
+  const before = await page.locator('.mapping-grid tbody tr').count();
 
   await param.hover();
   await page.mouse.down();
@@ -311,7 +311,7 @@ test('a cable dropped on nothing retracts and binds nothing', async ({ page }) =
   await page.mouse.up();
 
   await expect(page.locator('.patch-cable')).toHaveCount(0, { timeout: 4000 });
-  expect(await page.locator('.mapping-targets li').count()).toBe(before);
+  expect(await page.locator('.mapping-grid tbody tr').count()).toBe(before);
 });
 
 test('a mapped parameter wears the colour of the macro driving it', async ({ page }) => {
@@ -355,15 +355,20 @@ test('every rack sits in one flat row, nested racks included', async ({ page }) 
   await expect(page.locator('.rack-boundary.start')).toHaveCount(1);
 });
 
-test('the mapping table lists rack, macro, device and parameter', async ({ page }) => {
+test('the mapping table lists macro, path, name and range', async ({ page }) => {
   await loadRack(page);
-  const row = page.locator('.mapping-rows > li').first();
-  await expect(row.locator('.mapping-rack')).toContainText('Test Rack');
-  await expect(row.locator('.mapping-macro')).toContainText('Macro 1');
-  // The fixture's macro 1 drives two parameters; they stack under it.
-  await expect(row.locator('.mapping-targets li')).toHaveCount(2);
-  await expect(row.locator('.mapping-device').first()).toContainText('TestSynth');
-  await expect(row.locator('.mapping-param').first()).toContainText('Param');
+  // Scoped to the root rack: the nested rack has a Macro 1 of its own.
+  const rows = page
+    .locator('.mapping-grid tbody tr')
+    .filter({ has: page.locator('.col-path', { hasText: 'Test Rack' }) })
+    .filter({ has: page.locator('.col-macro', { hasText: 'Macro 1' }) });
+  // The fixture's macro 1 drives two parameters, one row each, Live's layout.
+  await expect(rows).toHaveCount(2);
+  const row = rows.first();
+  await expect(row.locator('.col-macro')).toContainText('Macro 1');
+  await expect(row.locator('.col-path')).toContainText('Test Rack');
+  await expect(row.locator('.col-path')).toContainText('TestSynth');
+  await expect(row.locator('.col-name')).toContainText('Param');
 });
 
 test('devices and nested racks start collapsed', async ({ page }) => {
@@ -382,4 +387,23 @@ test('the unbind buttons line up on the right edge', async ({ page }) => {
   const rights = await page.locator('.mapping-unbind').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().right)));
   expect(rights.length).toBeGreaterThan(1);
   expect(new Set(rights).size).toBe(1);
+});
+
+test('the mapping table edits a range and inverts it', async ({ page }) => {
+  // Ranges have no UI in Live's own right-click menu (SCHEMA.md Q4), so this
+  // table is the only place they can be authored. Browser-only because the
+  // edit has to survive a real serialize/reparse cycle.
+  await loadRack(page);
+  const row = page.locator('.mapping-grid tbody tr', { hasText: 'ParamA' }).first();
+  const min = row.locator('.mapping-range').first();
+  const max = row.locator('.mapping-range').nth(1);
+
+  await min.fill('20');
+  await min.press('Enter');
+  await expect(min).toHaveValue('20');
+
+  await row.locator('.mapping-invert').click();
+  await expect(min).toHaveValue('100');
+  await expect(max).toHaveValue('20');
+  await expect(row.locator('.mapping-invert')).toHaveClass(/is-inverted/);
 });
