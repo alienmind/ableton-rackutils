@@ -72,7 +72,10 @@ Two findings came out of it:
   binding sits on `ChainSelector`, a sibling of `BranchPresets`, where the
   codec was not looking. That is a correctness bug, `doc/PLAN.md` 4.0.
 - **Targets need not match across chains.** Macro 3 drives a different
-  parameter of a different device in each chain. One knob, one musical idea.
+  parameter of a different device in each chain. The codec must keep reading
+  that; the contract does not author it (`doc/PLAN.md` 4.3.3).
 
-Also carries hand-picked macro colours, which are Q13 data points.
+Its hand-picked macro colours closed SCHEMA.md Q13: index 13 is white and index
+69, the last swatch in Live's picker, is grey, so grid position is the stored
+index.
 

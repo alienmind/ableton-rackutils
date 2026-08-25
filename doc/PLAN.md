@@ -69,12 +69,10 @@ editing, batch library operations - is out. See Parked.
 1. **Fix rack-level bindings** (4.0). A shipped correctness bug that corrupts
    any rack whose macro drives the chain selector.
 2. **VST dependency view** (4.1). Read-only, cheap, useful on its own.
-3. **Confirm the colour index mapping** (4.2). Every colour convention rests on
-   it, and the editor already writes colours today.
-4. **The contract, one device end to end** (4.3). Utility Gain only, applied
+3. **The contract, one device end to end** (4.3). Utility Gain only, applied
    across every chain. Prove the donor pipeline and the insertion hygiene on
    the simplest possible case before building any options strip.
-5. **Offline** (4.5). The flight case is real and the PWA is a tenth of the
+4. **Offline** (4.5). The flight case is real and the PWA is a tenth of the
    cost of the device.
 
 Use it on real racks throughout. Every bug this project has hit came from that,
@@ -323,20 +321,12 @@ Needs one schema finding, since no recorded question covers plugin devices:
 save a rack containing one VST3 and one AU, unpack, record the element names in
 `SCHEMA.md`. Do not guess them from the names above.
 
-### 4.2 Confirm the colour index mapping (SCHEMA.md Q13)
+### 4.2 Colour index mapping - CLOSED
 
-`MacroColor.N` and `DocumentColorIndex` are palette indices. Live's own 70
-colours are sampled pixel-by-pixel from a screenshot of its picker by `pnpm
-adg-palette` into `packages/editor-ui/src/livePalette.ts`.
-
-**Unconfirmed:** whether a swatch's position in that grid is the number Live
-stores. Grid order and stored index are two different things until a diff
-proves otherwise. Colour three or four macros and chains distinctly by hand in
-Live, save, and check which index landed where.
-
-This is not a cosmetic chore. `swapMacros` moves a colour, `setMacroColor`
-writes one, and the contract (4.3) assigns colours by convention. All three are
-wrong today if the order is wrong.
+Answered: grid position is the stored index (SCHEMA.md Q13), confirmed at both
+ends of the grid against `donors/BS.adg`. `livePalette.ts` can be indexed
+directly and `macroColor()` already did. `-1` means no colour set, not an
+index.
 
 ### 4.3 The contract: device options above the rack
 
@@ -418,10 +408,13 @@ one macro to every instance. A macro driving several parameters at once is
 already normal in this codec - `Macro.bindings` is an array and every mutation
 operates on all of them - so the mechanism exists.
 
-Nothing about this needs the parameters to match. `LPF` (macro 3) drives
+**The contract inserts symmetrically: same device, same parameter, every
+chain.** A hand-built rack can be asymmetric - `BS.adg`'s `LPF` drives
 `Filter_Frequency` on a `Drift` in one chain and `Freq` on an `Eq8` band in the
-other. One knob, one musical idea, whatever each chain needs to do to deliver
-it.
+other - and the codec must keep reading and preserving that. The contract just
+does not author it. Wanting the same treatment on both chains is served by
+inserting the same device twice, which is symmetric and simpler to reason
+about.
 
 **Why not a parent rack.** Wrapping is the cheap answer and anyone can do it by
 hand in Live in a few seconds, so a tool that does it adds nothing. It also
@@ -438,11 +431,10 @@ offer the wrap rather than performing it silently, and the parent must match
 what it wraps - `InstrumentGroupDevice` around an instrument rack,
 `AudioEffectGroupDevice` around an effect rack.
 
-**Open question this raises.** When a chain already has the device (a
-`StereoGain` at the end of chain 1 but not chain 2), the option is partially
-satisfied. Reuse the one that is there, insert into the chain that lacks it,
-and bind the macro to both. The UI should show partial satisfaction as its own
-state, distinct from present and absent.
+**Partial satisfaction.** A `StereoGain` at the end of chain 1 but not chain 2
+is neither present nor absent. Reuse the one that is there, insert into the
+chain that lacks it, and bind the macro to both. Worth its own state in the UI
+so the user can see what the tool is about to add.
 
 #### 4.3.4 Insertion hygiene, which is mandatory
 
@@ -633,13 +625,12 @@ macOS runners bill roughly 10x Linux), and the exact output paths for the
 |---|---|---|
 | 1 | 4.0 rack-level binding fix | Silent corruption on any rack with a chain-selector macro |
 | 2 | 4.1 VST dependency view | None, but it is the cheapest useful thing left |
-| 3 | 4.2 colour index confirmation | Wrong colours written to files |
-| 4 | 4.3 contract, Utility Gain only, plus the slot-shift mutation | The whole direction stays unproven |
-| 5 | 4.5 offline | No authoring on a flight |
-| 6 | 4.3 remaining devices | Contract covers one case only |
-| 7 | 4.4 editor open items | Feature gaps only |
-| 8 | 4.6 save in place | Current download flow works |
-| 9 | 4.7 device bundle | Site already delivers everything |
+| 3 | 4.3 contract, Utility Gain only, plus the slot-shift mutation | The whole direction stays unproven |
+| 4 | 4.5 offline | No authoring on a flight |
+| 5 | 4.3 remaining devices | Contract covers one case only |
+| 6 | 4.4 editor open items | Feature gaps only |
+| 7 | 4.6 save in place | Current download flow works |
+| 8 | 4.7 device bundle | Site already delivers everything |
 
 ### Open risks
 
@@ -650,17 +641,16 @@ macOS runners bill roughly 10x Linux), and the exact output paths for the
 2. **Insertion produces a rack that loads and behaves wrong** (4.3.4). The
    worst failure mode available. Mitigated only by the hygiene checklist and by
    loading every new device type in Live by hand.
-3. **Colour index order (4.2).** Unverified, and the contract assigns colours.
-4. **Range inversion semantics (SCHEMA.md Q4).** The editor writes inverted
+3. **Range inversion semantics (SCHEMA.md Q4).** The editor writes inverted
    ranges and the only direct evidence that Live honours `Min > Max` is
    patchbay's Live 12.4.3 note. Confirm with our own diff.
-5. **The macro shift can have nowhere to go** (4.3.1). A rack using all 16
+4. **The macro shift can have nowhere to go** (4.3.1). A rack using all 16
    slots cannot take the contract's macros without being wrapped. `PD.adg` is
    exactly that case, so it will be hit immediately.
-6. **Live closes the gap.** The whole value proposition of Job 1 is that Live
+5. **Live closes the gap.** The whole value proposition of Job 1 is that Live
    cannot move a macro mapping. Its Macro Mappings panel is recent and sits
    directly adjacent. Worth rechecking on each Live release.
-7. **Asset paths in the bundled build (4.7).** The most likely device-side
+6. **Asset paths in the bundled build (4.7).** The most likely device-side
    failure is a blank window from absolute paths resolving against the
    filesystem root.
 

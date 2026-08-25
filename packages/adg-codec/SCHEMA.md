@@ -358,42 +358,31 @@ containment model (which doesn't care about depth at all) covers it.
 
 ---
 
-## Q13. Where is a chain's colour stored?
+## Q13. Where is a chain's colour stored, and is grid position the stored index?
 
-Live colours each chain row in a rack's chain list, and the UI reproduces that
-(`doc/PLAN.md` Part 5).
+**Answered. A swatch's position in Live's picker IS the number Live stores.**
 
-**Answer, confirmed present in all four fixtures:** `DocumentColorIndex` on the
-branch preset, alongside `AutoColored`.
+`MacroColor.N` on the rack device, and `DocumentColorIndex` on a chain, are
+indices into Live's 70-colour picker, counted in reading order from 0.
 
-```xml
-<DrumBranchPreset>
-  <Name Value="Riser Faze" />
-  <DocumentColorIndex Value="3" />
-  <AutoColored Value="true" />
-  ...
-</DrumBranchPreset>
-```
+Confirmed against `donors/BS.adg`, whose macro colours were picked by hand and
+reported by their author:
 
-Like `MacroColor.N` (Q7), it is a **palette index, not a colour**, and this
-project still has no confirmed index -> hex table - that is `doc/PLAN.md` Part 5, on hold. The UI renders it through the same placeholder palette and is
-labelled as such.
+| Macro | `MacroColor.N` | Author picked | `livePalette.ts` at that index |
+|---|---|---|---|
+| 1 (BS SELECT) | 13 | white | `#ffffff` |
+| 5 (BS GAIN) | 69 | grey, the LAST swatch in the picker | `#3c3c3c` |
 
-**Weaker evidence than the other answers here, and worth saying so.** Every
-chain in every fixture is `AutoColored="true"` and every chain within a file
-carries the SAME index (9, 9, 9 in `drum-nested.adg`; 3, 3, 3, 3 in
-`drum-pads.adg`). So:
+Two points settle it. The last swatch storing 69 in a 70-colour palette rules
+out any offset and any reversal; an interior point landing on white at 13 rules
+out a row permutation that happened to fix the ends.
 
-- That the field holds a colour is inference from its name plus Live's UI, not
-  from a diff where a colour was changed and the value moved.
-- Whether it varies per chain in a rack where the user coloured chains by hand
-  has never been observed here.
+So `pnpm adg-palette`'s pixel-sampled grid can be indexed directly, which is
+what `macroColor()` already assumed.
 
-To settle it: take a rack, colour two chains differently by hand in Live, save,
-and diff. Until then the codec reads the field and the UI shows it, and neither
-should be trusted to be showing Live's actual colour.
-
----
+**`-1` means no colour set**, not an index. Macro 9 in the same rack stores -1
+and reads grey in Live, so the default rendering is grey. `macroColor()` falls
+through to a neutral for any index it does not hold, which covers it.
 
 ## Q12. Does `XMLSerializer` emit the XML declaration?
 
@@ -634,29 +623,3 @@ A path fix is needed alongside: `pathOf`/`resolveTarget` are rooted at
 
 Third time this pattern has held. Q11 was the same lesson: the synthetic
 fixture modelled only the shape the codec already assumed.
-
-## Q13 data points, not yet an answer
-
-`donors/BS.adg` carries hand-picked macro colours, reported by its author as:
-macro 1 white, macro 5 grey, macro 9 grey. The stored values are:
-
-| Macro | Name | `MacroColor.N` | Author says |
-|---|---|---|---|
-| 1 | BS SELECT | 13 | white |
-| 2 | Dist | 9 | - |
-| 3 | LPF | 3 | - |
-| 4 | Pluck / Long | 0 | - |
-| 5 | BS GAIN | 69 | grey |
-| 6-8 | ARP * | 39 | - |
-| 9 | GATE ON/OFF | -1 | grey |
-
-**`-1` means no colour set.** Macro 9 reads grey in Live while storing -1, so
-the default rendering is grey and -1 is not an index into the palette.
-`macroColor()` already falls through to a neutral for it, which is right by
-accident rather than by design.
-
-Not enough to settle Q13: it needs the swatch POSITIONS the author clicked, not
-the colour names, since the question is whether grid position equals stored
-index. But 69 being the highest index in a 70-colour palette and reading grey is
-consistent with the greys sitting at the end of Live's picker.
-
