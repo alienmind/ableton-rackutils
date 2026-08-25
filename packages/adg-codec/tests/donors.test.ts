@@ -11,7 +11,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
-import { Rack } from '../src/model';
+import { MACRO_SLOTS, Rack } from '../src/model';
+import { applyContract, macroNameFor } from '../src/contract';
 import { insertDeviceInEveryChain, insertMacroSlots, moveMapping, reorderMacro, unbindMacro } from '../src/mutate';
 
 const load = (name: string) => new Uint8Array(readFileSync(join(__dirname, '..', 'donors', name)));
@@ -191,5 +192,86 @@ describe('inserting a contract device across every chain (doc/PLAN.md 4.3.3)', (
     const result = insertDeviceInEveryChain(rack, 'FilterEQ3');
     expect(result.ok).toBe(false);
     expect(result.warnings[0]).toContain('adg-harvest');
+  });
+});
+
+describe('applyContract on BS.adg (doc/PLAN.md 4.3)', () => {
+  const UTILITY_GAIN = { deviceTag: 'StereoGain', parameter: 'Gain', namePattern: '{name} GAIN', colorIndex: 69 };
+  const GATE = { deviceTag: 'Gate', parameter: 'On', namePattern: '{name} GATE', colorIndex: 39 };
+
+  test('fills the name pattern from the rack name', () => {
+    expect(macroNameFor('{name} GAIN', 'BS')).toBe('BS GAIN');
+  });
+
+  test('recognises a convention the rack already follows and does not shift', () => {
+    const rack = Rack.parse(load('BS.adg'));
+    const before = rack.macros.map((m) => m.bindings.length);
+    // BS GAIN already drives Gain on the StereoGain in both chains, which is
+    // exactly what this option asks for.
+    const result = applyContract(rack, [UTILITY_GAIN]);
+
+    expect(result.ok).toBe(true);
+    expect(result.slots).toEqual([4]);
+    expect(Rack.parse(rack.serialize()).macros.map((m) => m.bindings.length)).toEqual(before);
+  });
+
+  test('renames and recolours the slot it recognised', () => {
+    const rack = Rack.parse(load('BS.adg'));
+    applyContract(rack, [{ ...UTILITY_GAIN, namePattern: '{name} OUT', colorIndex: 13 }]);
+
+    const macro = Rack.parse(rack.serialize()).macros[4];
+    expect(macro.name).toBe('AlienMind Bass OUT');
+    expect(macro.color).toBe(13);
+  });
+
+  test('puts a new option in the leading slot and drives every chain', () => {
+    const rack = Rack.parse(load('BS.adg'));
+    // AutoFilter2 is in no chain of BS.adg, so this is the insert path.
+    const result = applyContract(rack, [
+      { deviceTag: 'AutoFilter2', parameter: 'Filter_Frequency', namePattern: '{name} FILTER', colorIndex: 3 },
+    ]);
+
+    expect(result.ok).toBe(true);
+    expect(result.slots).toEqual([0]);
+
+    const after = Rack.parse(rack.serialize());
+    expect(after.macros[0].name).toBe('AlienMind Bass FILTER');
+    expect(after.macros[0].color).toBe(3);
+    // One binding per chain, which is what the parallel shape means.
+    expect(after.macros[0].bindings).toHaveLength(after.chains.length);
+    expect(after.macros[0].bindings.map((b) => b.targetName)).toEqual(['Filter_Frequency', 'Filter_Frequency']);
+  });
+
+  test('shifts the rack own macros right rather than overwriting them', () => {
+    const rack = Rack.parse(load('BS.adg'));
+    const before = rack.macros.map((m) => m.name);
+    applyContract(rack, [
+      { deviceTag: 'AutoFilter2', parameter: 'Filter_Frequency', namePattern: '{name} FILTER' },
+    ]);
+
+    const after = Rack.parse(rack.serialize()).macros.map((m) => m.name);
+    for (let i = 0; i + 1 < MACRO_SLOTS; i++) expect(after[i + 1]).toBe(before[i]);
+  });
+
+  test('is safe to re-run: the second pass changes nothing', () => {
+    const rack = Rack.parse(load('BS.adg'));
+    applyContract(rack, [UTILITY_GAIN, GATE]);
+    const once = rack.serialize();
+
+    const again = Rack.parse(once);
+    const result = applyContract(again, [UTILITY_GAIN, GATE]);
+    expect(result.ok).toBe(true);
+
+    const names = (bytes: Uint8Array) => Rack.parse(bytes).macros.map((m) => `${m.name}:${m.bindings.length}`);
+    expect(names(again.serialize())).toEqual(names(once));
+  });
+
+  test('refuses on a full rack instead of losing a macro', () => {
+    const rack = Rack.parse(load('PD.adg'));
+    const result = applyContract(rack, [
+      { deviceTag: 'AutoFilter2', parameter: 'Filter_Frequency', namePattern: '{name} FILTER' },
+    ]);
+    expect(result.ok).toBe(false);
+    expect(result.warnings[0]).toContain('no room');
   });
 });
