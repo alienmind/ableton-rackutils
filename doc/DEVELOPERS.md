@@ -60,7 +60,7 @@ pointer back to the file it came from, so the user must pick the file).
 
 ## Current state
 
-v0.3.0 beta. The codec is built and tested, the site renders the editor through
+v0.2.0 released, 0.3.0 on the branch. The codec is built and tested, the site renders the editor through
 `packages/editor-ui` with the rack features strip on top of it, and the device
 carries the same editor offline. Racks it edited - and racks the contract
 authored - have been loaded back into Live by hand. Full detail, and what to do

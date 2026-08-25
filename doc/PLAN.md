@@ -1,8 +1,9 @@
 # ableton-rackutils: Implementation Plan (v6)
 
-**Product status: v0.3.0, beta.** The editor works end to end, racks the
-contract authored have been loaded back into Live, and the device now carries
-the same editor offline. Still young: keep backups.
+**Product status: v0.2.0 released, 0.3.0 on the branch.** The editor works end
+to end, racks the contract authored have been loaded back into Live, and the
+device now carries the same editor offline. Version numbers are the
+maintainer's to cut; nothing here bumps one. Still young: keep backups.
 
 Canonical plan for `ableton-rackutils`, a toolkit for Ableton rack preset
 (`.adg`) files. Lives in the repo so the project is self-contained: clone it
