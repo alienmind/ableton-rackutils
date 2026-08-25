@@ -11,7 +11,8 @@
  * stops writing a `KeyMidi` change with stale `MacroSnapshot` values sitting
  * right next to it.
  */
-import { child, childValue, createValueEl, elementChildren, insertAfterLomId, setChildValue } from './dom';
+import { child, childValue, createValueEl, elementChildren, insertAfterLomId, parseXmlDoc, setChildValue } from './dom';
+import { DONOR_DEVICES } from './donorLibrary.generated';
 import { MACRO_SLOTS, Rack, UNSET_MACRO_VALUE, type ParamRef } from './model';
 
 export interface MutationResult {
@@ -418,3 +419,76 @@ function createKeyMidi(doc: Document, macroIndex: number): Element {
   el.appendChild(createValueEl(doc, 'ControllerMapMode', 0));
   return el;
 }
+
+/** Where one inserted (or reused) device landed. */
+export interface InsertedDevice {
+  /** Path of the device's `AbletonDevicePreset`, relative to the rack (see `Rack.pathOf`). */
+  path: string;
+  /** True when an existing device at the end of the chain was reused rather than a new one added. */
+  reused: boolean;
+}
+
+export interface InsertDeviceResult extends MutationResult {
+  devices: InsertedDevice[];
+}
+
+/**
+ * Put `deviceTag` at the end of EVERY chain, reusing one already there.
+ *
+ * The contract applies in parallel across a rack's chains rather than by
+ * wrapping the rack in a parent (doc/PLAN.md 4.3.3): `donors/BS.adg` has a
+ * Utility at the end of each of its two chains with one macro driving both.
+ * Wrapping is the cheap answer anyone can do by hand in Live, and it costs a
+ * menu dive on Push to reach the knobs it hides.
+ *
+ * A chain that already ends in the device keeps it, so running this twice
+ * inserts nothing the second time and the result is the same either way.
+ *
+ * Device XML is copied from a harvested donor, never generated (Constraint 7).
+ * The copy's `Id` is set from its position in the chain, which is what an `Id`
+ * means (SCHEMA.md Q16); its interior ids stay at 0, as Live writes them.
+ */
+export function insertDeviceInEveryChain(rack: Rack, deviceTag: string): InsertDeviceResult {
+  const donorXml = DONOR_DEVICES[deviceTag];
+  if (!donorXml) {
+    return { ok: false, warnings: [`no donor for "${deviceTag}" - save one into packages/adg-codec/donors and run pnpm adg-harvest`], devices: [] };
+  }
+
+  const bp = rack.branchPresetsEl;
+  const chains = bp ? elementChildren(bp) : [];
+  if (chains.length === 0) return { ok: false, warnings: ['rack has no chains'], devices: [] };
+
+  const devices: InsertedDevice[] = [];
+  const warnings: string[] = [];
+
+  for (const chain of chains) {
+    const presets = child(chain, 'DevicePresets');
+    if (!presets) {
+      warnings.push(`chain "${childValue(chain, 'Name') ?? ''}" has no DevicePresets and was skipped`);
+      continue;
+    }
+
+    const existing = elementChildren(presets);
+    const last = existing[existing.length - 1];
+    if (last && deviceTagOfPreset(last) === deviceTag) {
+      devices.push({ path: rack.pathOf(last), reused: true });
+      continue;
+    }
+
+    const parsed = parseXmlDoc(donorXml).documentElement;
+    const copy = rack.document.importNode(parsed, true) as Element;
+    presets.appendChild(copy);
+    // Id is a position in the sibling list, not a handle (SCHEMA.md Q16), so
+    // it is set AFTER appending, from where the element actually landed.
+    copy.setAttribute('Id', String(elementChildren(presets).length - 1));
+    devices.push({ path: rack.pathOf(copy), reused: false });
+  }
+
+  return { ok: true, warnings, devices };
+}
+
+/** The device tag an `AbletonDevicePreset` wraps. */
+function deviceTagOfPreset(preset: Element): string | null {
+  return child(preset, 'Device')?.firstElementChild?.tagName ?? null;
+}
+

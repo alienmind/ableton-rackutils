@@ -623,3 +623,39 @@ A path fix is needed alongside: `pathOf`/`resolveTarget` are rooted at
 
 Third time this pattern has held. Q11 was the same lesson: the synthetic
 fixture modelled only the shape the codec already assumed.
+
+---
+
+## Q16. What does an `Id` attribute mean?
+
+Asked while inserting a harvested device: what `Id` should the new element get?
+
+**Answer: `Id` is the element's index within its own sibling list, not a
+document-wide handle.** Confirmed against `donors/BS.adg`:
+
+```
+BranchPresets children          Id = 0, 1
+DevicePresets children (chain 0) Id = 0, 1, 2, 3, 4, 5, 6
+DevicePresets children (chain 1) Id = 0, 1, 2, 3, 4, 5, 6
+everything inside a device       Id = 0
+```
+
+The file holds 1318 `Id` attributes and 57 distinct values. 1255 of them are
+`0`. The same value repeats freely across different lists, so uniqueness is
+per-parent and nothing else.
+
+**This corrects a pre-SCHEMA guess.** `doc/PLAN.md`'s original Phase 2.4 said
+to "allocate above the current maximum" and never reuse an id, which was
+written before any of this was measured and is the opposite of what Live does.
+Following it would have numbered an inserted device somewhere in the hundreds
+while its siblings ran 0 to 6.
+
+**Consequence for insertion.** Append the device, then set its `Id` from where
+it landed - `siblingCount - 1` - and leave its interior at 0. `maxId()` in
+`normalize.ts` survives from the same guess and is not used for insertion.
+
+The elements Ableton regenerates on every save (`Id`, `PointeeId`, `LomId`,
+`LomIdView`) are filtered from diffs for readability, which is a separate point
+recorded in `doc/PLAN.md` D1. Filtering them does not mean they can be written
+carelessly.
+

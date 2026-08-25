@@ -441,7 +441,8 @@ Pasting a donor into a rack is not enough. `clone.py` in patchbay is an
 enumerated list of what breaks, each entry there because a file was rejected or
 silently corrupted:
 
-- ids assigned to inserted devices, never reused, allocated above the maximum
+- an inserted device's `Id` set from its position in the chain, since that is
+  what an `Id` is (SCHEMA.md Q16), with its interior left at 0
 - session ids zeroed
 - empty `Int64` fields filled
 - legacy path elements stripped

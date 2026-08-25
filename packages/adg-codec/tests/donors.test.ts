@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { Rack } from '../src/model';
-import { insertMacroSlots, moveMapping, reorderMacro, unbindMacro } from '../src/mutate';
+import { insertDeviceInEveryChain, insertMacroSlots, moveMapping, reorderMacro, unbindMacro } from '../src/mutate';
 
 const load = (name: string) => new Uint8Array(readFileSync(join(__dirname, '..', 'donors', name)));
 
@@ -123,5 +123,73 @@ describe('making room for contract macros on real racks (doc/PLAN.md 4.3.1)', ()
     expect(result.ok).toBe(false);
     // This is the case doc/PLAN.md 4.3.3 hands to a parent rack.
     expect(Rack.parse(rack.serialize()).macros[15].bindings.length).toBeGreaterThan(0);
+  });
+});
+
+describe('inserting a contract device across every chain (doc/PLAN.md 4.3.3)', () => {
+  const chainDeviceTags = (rack: Rack) =>
+    rack.chains.map((chain) => chain.devices.map((d) => d.type));
+
+  test('BS.adg already ends both chains in a Utility, so both are reused', () => {
+    const rack = Rack.parse(load('BS.adg'));
+    const before = chainDeviceTags(rack);
+    const result = insertDeviceInEveryChain(rack, 'StereoGain');
+
+    expect(result.ok).toBe(true);
+    expect(result.devices).toHaveLength(2);
+    expect(result.devices.every((d) => d.reused)).toBe(true);
+    expect(chainDeviceTags(Rack.parse(rack.serialize()))).toEqual(before);
+  });
+
+  test('adds one per chain when the device is absent, at the end', () => {
+    const rack = Rack.parse(load('BS.adg'));
+    const result = insertDeviceInEveryChain(rack, 'AutoFilter2');
+
+    expect(result.ok).toBe(true);
+    expect(result.devices.every((d) => d.reused)).toBe(false);
+    for (const tags of chainDeviceTags(Rack.parse(rack.serialize()))) {
+      expect(tags[tags.length - 1]).toBe('AutoFilter2');
+    }
+  });
+
+  test('is idempotent: a second run reuses what the first added', () => {
+    const rack = Rack.parse(load('BS.adg'));
+    insertDeviceInEveryChain(rack, 'AutoFilter2');
+    const afterFirst = chainDeviceTags(Rack.parse(rack.serialize()));
+
+    const second = insertDeviceInEveryChain(rack, 'AutoFilter2');
+    expect(second.devices.every((d) => d.reused)).toBe(true);
+    expect(chainDeviceTags(Rack.parse(rack.serialize()))).toEqual(afterFirst);
+  });
+
+  test('numbers the inserted device by its position in the chain (SCHEMA.md Q16)', () => {
+    const rack = Rack.parse(load('BS.adg'));
+    insertDeviceInEveryChain(rack, 'AutoFilter2');
+
+    const doc = Rack.parse(rack.serialize()).document;
+    for (const presets of Array.from(doc.getElementsByTagName('DevicePresets'))) {
+      const ids = Array.from(presets.children).map((el) => el.getAttribute('Id'));
+      // Id is an index into the sibling list, so a chain reads 0,1,2,... with
+      // the new device continuing the run rather than jumping past the
+      // document maximum.
+      expect(ids).toEqual(ids.map((_, i) => String(i)));
+    }
+  });
+
+  test('the inserted device carries no macro binding from the donor', () => {
+    const rack = Rack.parse(load('BS.adg'));
+    const before = rack.macros.reduce((n, m) => n + m.bindings.length, 0);
+    insertDeviceInEveryChain(rack, 'Gate');
+
+    // The donor Gate was bound to BS.adg's own GATE ON/OFF macro. Harvesting
+    // strips KeyMidi, so a fresh copy drives nothing until it is bound.
+    expect(Rack.parse(rack.serialize()).macros.reduce((n, m) => n + m.bindings.length, 0)).toBe(before);
+  });
+
+  test('refuses a device with no donor rather than inventing one', () => {
+    const rack = Rack.parse(load('BS.adg'));
+    const result = insertDeviceInEveryChain(rack, 'FilterEQ3');
+    expect(result.ok).toBe(false);
+    expect(result.warnings[0]).toContain('adg-harvest');
   });
 });

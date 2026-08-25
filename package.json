@@ -15,7 +15,8 @@
     "test": "pnpm -r test",
     "adg-tool": "tsx tools/adg-tool/src/index.ts",
     "test:e2e": "pnpm --filter @rackutils/site test:e2e",
-    "adg-palette": "tsx tools/adg-tool/src/palette.ts"
+    "adg-palette": "tsx tools/adg-tool/src/palette.ts",
+    "adg-harvest": "tsx tools/adg-tool/src/harvest.ts"
   },
   "devDependencies": {
     "@types/node": "^24.12.4",
