@@ -3,10 +3,12 @@ import { childValue } from '../src/dom';
 import { Rack } from '../src/model';
 import {
   bindParameter,
+  invertBindingRange,
   moveMapping,
   renameMacro,
   renameRack,
   reorderMacro,
+  setBindingRange,
   setChainColor,
   setMacroColor,
   setMacroCount,
@@ -379,5 +381,57 @@ describe('setChainColor', () => {
     const rack = Rack.parse(buildDrumFixtureBytes());
     expect(setChainColor(rack, '99/99', 3).ok).toBe(false);
     expect(() => setChainColor(rack, rack.chains[0].path, -2)).toThrow(RangeError);
+  });
+});
+
+describe('binding ranges (SCHEMA.md Q4)', () => {
+  const firstBinding = (rack: Rack) => rack.macros[0].bindings[0];
+
+  test('setBindingRange writes Min and Max on that target only', () => {
+    const rack = Rack.parse(buildFixtureBytes());
+    const [a, b] = rack.macros[0].bindings;
+    expect(setBindingRange(rack, 0, a.targetPath, { min: 20, max: 80 }).ok).toBe(true);
+
+    const after = Rack.parse(rack.serialize()).macros[0].bindings;
+    const moved = after.find((x) => x.targetPath === a.targetPath)!;
+    const other = after.find((x) => x.targetPath === b.targetPath)!;
+    expect([moved.rangeMin, moved.rangeMax]).toEqual([20, 80]);
+    expect([other.rangeMin, other.rangeMax]).toEqual([b.rangeMin, b.rangeMax]);
+  });
+
+  test('invertBindingRange swaps Min and Max, and reports inverted', () => {
+    const rack = Rack.parse(buildFixtureBytes());
+    const before = firstBinding(rack);
+    expect(invertBindingRange(rack, 0, before.targetPath).ok).toBe(true);
+
+    const after = Rack.parse(rack.serialize()).macros[0].bindings.find(
+      (x) => x.targetPath === before.targetPath,
+    )!;
+    expect(after.rangeMin).toBe(before.rangeMax);
+    expect(after.rangeMax).toBe(before.rangeMin);
+    expect(after.inverted).toBe(true);
+  });
+
+  test('inverting twice is the identity', () => {
+    const rack = Rack.parse(buildFixtureBytes());
+    const path = firstBinding(rack).targetPath;
+    const before = firstBinding(rack);
+    invertBindingRange(rack, 0, path);
+    invertBindingRange(rack, 0, path);
+
+    const after = Rack.parse(rack.serialize()).macros[0].bindings.find((x) => x.targetPath === path)!;
+    expect([after.rangeMin, after.rangeMax, after.inverted]).toEqual([
+      before.rangeMin,
+      before.rangeMax,
+      false,
+    ]);
+  });
+
+  test('refuses a target this macro does not drive', () => {
+    const rack = Rack.parse(buildFixtureBytes());
+    const path = firstBinding(rack).targetPath;
+    expect(setBindingRange(rack, 5, path, { min: 0, max: 1 }).ok).toBe(false);
+    expect(invertBindingRange(rack, 5, path).ok).toBe(false);
+    expect(setBindingRange(rack, 0, '99/99', { min: 0, max: 1 }).ok).toBe(false);
   });
 });

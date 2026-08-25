@@ -9,6 +9,8 @@ export {
   bindParameter,
   unbindMacro,
   unbindOne,
+  setBindingRange,
+  invertBindingRange,
   renameMacro,
   renameRack,
   setMacroCount,

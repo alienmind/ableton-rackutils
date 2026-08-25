@@ -228,6 +228,63 @@ export function bindParameter(
   return ok(warnings);
 }
 
+/**
+ * Set the range a macro drives a single parameter over. `min > max` inverts
+ * it and Live honours that (SCHEMA.md Q4), so inversion is a swap of the two
+ * numbers rather than a separate flag.
+ *
+ * Values are in the target parameter's own units, not 0..127: the transfer
+ * function is `value = min + (macro / 127) * (max - min)`.
+ */
+export function setBindingRange(
+  rack: Rack,
+  macroIndex: number,
+  targetPath: string,
+  range: { min: number; max: number },
+): MutationResult {
+  assertSlot(macroIndex);
+  const keyMidi = findBinding(rack, macroIndex, targetPath);
+  if (typeof keyMidi === 'string') return fail(keyMidi);
+
+  const container = keyMidi.parentElement!;
+  let rangeEl = child(container, 'MidiControllerRange');
+  if (!rangeEl) {
+    rangeEl = rack.document.createElement('MidiControllerRange');
+    container.insertBefore(rangeEl, keyMidi.nextSibling);
+  }
+  setChildValue(rangeEl, 'Min', range.min);
+  setChildValue(rangeEl, 'Max', range.max);
+  return ok();
+}
+
+/** Swap Min and Max on one binding, so the macro drives it backwards. */
+export function invertBindingRange(rack: Rack, macroIndex: number, targetPath: string): MutationResult {
+  assertSlot(macroIndex);
+  const keyMidi = findBinding(rack, macroIndex, targetPath);
+  if (typeof keyMidi === 'string') return fail(keyMidi);
+
+  const rangeEl = child(keyMidi.parentElement!, 'MidiControllerRange');
+  if (!rangeEl) return fail('that binding has no stored range to invert');
+  const min = Number(childValue(rangeEl, 'Min') ?? 0);
+  const max = Number(childValue(rangeEl, 'Max') ?? 127);
+  setChildValue(rangeEl, 'Min', max);
+  setChildValue(rangeEl, 'Max', min);
+  return ok();
+}
+
+/** The KeyMidi for one macro-to-parameter binding, or the reason there is none. */
+function findBinding(rack: Rack, macroIndex: number, targetPath: string): Element | string {
+  const targetEl = rack.resolveTarget(targetPath);
+  if (!targetEl) return `no parameter at "${targetPath}" - it may belong to a stale snapshot`;
+
+  const container = child(targetEl, 'Timeable') ?? targetEl;
+  const keyMidi = child(container, 'KeyMidi');
+  if (!keyMidi || childValue(keyMidi, 'Channel') !== '16') return 'that parameter is not driven by a macro';
+  const owner = Number(childValue(keyMidi, 'NoteOrController'));
+  if (owner !== macroIndex) return `that parameter is driven by macro ${owner + 1}, not macro ${macroIndex + 1}`;
+  return keyMidi;
+}
+
 /** Clears ALL of this macro's bindings, not just one. */
 export function unbindMacro(rack: Rack, macroIndex: number): MutationResult {
   assertSlot(macroIndex);
