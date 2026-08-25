@@ -33,7 +33,10 @@ for (const dir of uiDirs) {
 
   const outDir = path.join(root, "dist", "ui", dir);
   const surface = await loadSurface(root, dir);
-  const windows = surface?.windows ? Object.keys(surface.windows) : [];
+  // A `site:` window has no entry to bundle: its content is a prebuilt
+  // directory delivered beside the .amxd (doc/PLAN.md 4.7), and asking vite to
+  // build it lands on `src/app/<device>/undefined`.
+  const windows = surface?.windows ? Object.keys(surface.windows).filter((id) => surface.windows[id].entry) : [];
   if (!windows.length) continue;
 
   renameSync(path.join(outDir, "index.html"), path.join(outDir, "_device.html"));

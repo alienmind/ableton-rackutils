@@ -227,14 +227,7 @@ header h1 {
 
 .companion-card:hover { border-color: #6ea8ff; }
 
-.companion-card-soon {
-  color: #9a9aa5;
-  cursor: default;
-}
-
-.companion-card-soon:hover { border-color: #2e313a; }
-
-.soon-badge {
+.version-badge {
   padding: 0.1rem 0.4rem;
   border-radius: 999px;
   background: #2e313a;
@@ -245,6 +238,16 @@ header h1 {
 .companion-card img {
   height: 28px;
   width: auto;
+}
+
+.companion { margin-top: 1rem; }
+
+.companion-note {
+  max-width: 44rem;
+  margin: 0.4rem 0 0;
+  color: #9a9aa5;
+  font-size: 0.8rem;
+  line-height: 1.5;
 }
 
 /* The Max for Live window is small and has no room for landing chrome: no

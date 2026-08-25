@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+import { FALLBACK_RELEASE_URL, latestCompanion, type CompanionRelease } from './companion/download';
 import step1 from './assets/guide/saving-rack-01.png';
 import step2 from './assets/guide/saving-rack-02.png';
 import step3 from './assets/guide/saving-rack-03.png';
@@ -12,6 +14,47 @@ import maxForLive from './assets/guide/max4live.png';
  * in the User Library, which is not where anyone looks. The old copy explained
  * what the tool does; a first-time user needs to be told what to do.
  */
+/**
+ * The device: the same editor, bundled, so it runs inside Live with no browser
+ * and no network (doc/PLAN.md 4.7). It adds no editing capability, so the card
+ * says what it adds and what it costs - an .amxd is executable content and
+ * installing one is a real trust decision, which is why the source and the
+ * build that produced it are linked from here.
+ *
+ * The link points at the newest VERSIONED release, resolved live, and falls
+ * back to the releases page: GitHub's unauthenticated API is rate-limited per
+ * IP and fails for reasons that have nothing to do with the user.
+ */
+function CompanionDownload() {
+  const [release, setRelease] = useState<CompanionRelease | null>(null);
+  useEffect(() => {
+    let live = true;
+    void latestCompanion().then((r) => live && setRelease(r));
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  return (
+    <div className="companion">
+      <a className="companion-card" href={release?.url ?? FALLBACK_RELEASE_URL} target="_blank" rel="noreferrer">
+        <img src={maxForLive} alt="Max for Live" />
+        <span>Max for Live Companion Device</span>
+        {release && <span className="version-badge">{release.version}</span>}
+      </a>
+      <p className="companion-note">
+        The same editor, offline, inside Live - needs Live 12 and Max for Live. Unpack the zip whole: the
+        device reads the folder next to it, and the installer scripts put both in your User Library. On a
+        Mac, macOS quarantines anything downloaded, and the installer clears that flag. Built by{' '}
+        <a href="https://github.com/alienmind/ableton-rackutils/blob/main/.github/workflows/release-device.yml">
+          this workflow
+        </a>{' '}
+        from <a href="https://github.com/alienmind/ableton-rackutils">this source</a>.
+      </p>
+    </div>
+  );
+}
+
 export function GettingStarted({ compact }: { compact: boolean }) {
   if (compact) return null;
 
@@ -49,13 +92,7 @@ export function GettingStarted({ compact }: { compact: boolean }) {
         </li>
       </ol>
 
-      {/* The device is a scaffold: it builds and loads, and does nothing useful
-          yet. No download link until it does. */}
-      <div className="companion-card companion-card-soon">
-        <img src={maxForLive} alt="Max for Live" />
-        <span>Max for Live Companion Device</span>
-        <span className="soon-badge">Soon!</span>
-      </div>
+      <CompanionDownload />
     </section>
   );
 }
