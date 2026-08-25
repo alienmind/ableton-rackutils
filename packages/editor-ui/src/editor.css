@@ -865,7 +865,10 @@
   font-size: 9px;
 }
 
-/* A macro's several parameters stack under it rather than wrapping across. */
+/* A macro's several parameters stack under it rather than wrapping across.
+   The list takes the remaining width so each row's unbind button can sit hard
+   against the right edge, in one column, instead of trailing whatever the
+   parameter name happened to be. */
 .mapping-targets {
   list-style: none;
   margin: 0;
@@ -873,6 +876,8 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .mapping-targets li {
@@ -881,12 +886,38 @@
   gap: 5px;
 }
 
+.mapping-targets li .mapping-unbind {
+  margin-left: auto;
+}
+
 .mapping-device {
   color: var(--edit-dim);
   min-width: 90px;
 }
 
-.mapping-param { color: var(--edit-text); }
+.mapping-param {
+  color: var(--edit-text);
+  min-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mapping-unbind {
+  background: #3a3d45;
+  color: var(--edit-text);
+  border: 1px solid var(--edit-line);
+  border-radius: 2px;
+  padding: 0 4px;
+  font-size: 9px;
+  line-height: 13px;
+  cursor: pointer;
+}
+
+.mapping-unbind:hover {
+  background: #7a3a3a;
+  border-color: #b05555;
+}
 
 .more-targets {
   color: var(--edit-dim);

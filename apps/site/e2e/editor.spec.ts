@@ -27,6 +27,11 @@ const rootDials = (page: Page) => rootBody(page).locator('> .macro-bank-wrap .ma
 const rootChainRows = (page: Page) => rootBody(page).locator('> .chain-list .chain-row');
 const macroNames = (page: Page) => rootKnobs(page).locator('.macro-knob-name').allTextContents();
 
+/** Devices render as collapsed title strips; open the first to reach its parameters. */
+async function openFirstDevice(page: Page) {
+  await page.locator('.device-panel.collapsed .device-title-strip').first().click();
+}
+
 /**
  * Pointer drag, the gesture the UI actually uses - HTML5 drag-and-drop was the
  * first implementation and did nothing in a browser.
@@ -77,12 +82,15 @@ test('shift-dropping swaps the two macros instead', async ({ page }) => {
   expect(after[0]).toBe(before[3]);
 });
 
-test('the x on a mapped target unbinds just that one', async ({ page }) => {
+test('the x in the mapping table unbinds just that one target', async ({ page }) => {
+  // The knob no longer names what it drives: the table does, and carries the
+  // unbind control with it.
   await loadRack(page);
-  const targets = rootKnobs(page).locator('.macro-knob-targets li');
+  await expect(page.locator('.macro-knob-targets')).toHaveCount(0);
+  const targets = page.locator('.mapping-targets li');
   const before = await targets.count();
   expect(before).toBeGreaterThan(1);
-  await page.locator('.unbind').first().click();
+  await page.locator('.mapping-unbind').first().click();
   await expect(targets).toHaveCount(before - 1);
 });
 
@@ -100,10 +108,12 @@ test('picking a colour recolours the knob', async ({ page }) => {
 
 test('arming a parameter then clicking a knob binds it', async ({ page }) => {
   await loadRack(page);
+  await openFirstDevice(page);
   await page.locator('.more-toggle').first().click();
   await page.locator('.param', { hasText: 'ParamB' }).first().click();
   await rootDials(page).nth(3).click();
-  await expect(rootKnobs(page).nth(3).locator('.target-name')).toContainText('ParamB');
+  // Confirmed in the mapping table: the knob no longer names what it drives.
+  await expect(page.locator('.mapping-rows > li', { hasText: 'Macro 4' }).locator('.mapping-param')).toContainText('ParamB');
 });
 
 test('macros are numbered across then down', async ({ page }) => {
@@ -163,13 +173,14 @@ test('dragging a parameter onto a knob binds it', async ({ page }) => {
   // The gesture people reach for first. Binding used to be click-to-arm then
   // click-a-knob, which is discoverable only if you read the instructions.
   await loadRack(page);
+  await openFirstDevice(page);
   await page.locator('.more-toggle').first().click();
 
   const param = page.locator('.param', { hasText: 'ParamB' }).first();
   const knob = rootKnobs(page).nth(5);
   await dragBetween(page, param, knob);
 
-  await expect(knob.locator('.target-name')).toContainText('ParamB');
+  await expect(page.locator('.mapping-rows > li', { hasText: 'Macro 6' }).locator('.mapping-param')).toContainText('ParamB');
   // The drag must not also leave the parameter armed.
   await expect(page.locator('.armed-note')).toHaveCount(0);
 });
@@ -242,6 +253,7 @@ test('the macro count control is gone from the title bar', async ({ page }) => {
 
 test('a patch cable hangs from the parameter while dragging, and lands on the knob', async ({ page }) => {
   await loadRack(page);
+  await openFirstDevice(page);
   await page.locator('.more-toggle').first().click();
   const param = page.locator('.param', { hasText: 'ParamB' }).first();
   const knob = rootKnobs(page).nth(5);
@@ -280,16 +292,17 @@ test('a patch cable hangs from the parameter while dragging, and lands on the kn
   expect(await cable.evaluate((el) => getComputedStyle(el).stroke)).toBe(knobColour);
 
   await page.mouse.up();
-  await expect(knob.locator('.target-name')).toContainText('ParamB');
+  await expect(page.locator('.mapping-rows > li', { hasText: 'Macro 6' }).locator('.mapping-param')).toContainText('ParamB');
   // The cable settles and then takes itself off screen.
   await expect(page.locator('.patch-cable')).toHaveCount(0, { timeout: 4000 });
 });
 
 test('a cable dropped on nothing retracts and binds nothing', async ({ page }) => {
   await loadRack(page);
+  await openFirstDevice(page);
   await page.locator('.more-toggle').first().click();
   const param = page.locator('.param', { hasText: 'ParamB' }).first();
-  const before = await rootKnobs(page).locator('.target-name').allTextContents();
+  const before = await page.locator('.mapping-targets li').count();
 
   await param.hover();
   await page.mouse.down();
@@ -298,7 +311,7 @@ test('a cable dropped on nothing retracts and binds nothing', async ({ page }) =
   await page.mouse.up();
 
   await expect(page.locator('.patch-cable')).toHaveCount(0, { timeout: 4000 });
-  expect(await rootKnobs(page).locator('.target-name').allTextContents()).toEqual(before);
+  expect(await page.locator('.mapping-targets li').count()).toBe(before);
 });
 
 test('a mapped parameter wears the colour of the macro driving it', async ({ page }) => {
@@ -311,6 +324,8 @@ test('a mapped parameter wears the colour of the macro driving it', async ({ pag
   await page.locator('.color-picker .color-swatch').nth(9).click();
 
   const knobColour = await knob.evaluate((el) => getComputedStyle(el).getPropertyValue('--macro-color').trim());
+  // Devices start collapsed, so open one to see its parameter chips.
+  await openFirstDevice(page);
   const chip = page.locator('.mapped-params .param').first();
   const chipColour = await chip.evaluate((el) => getComputedStyle(el).backgroundColor);
 
@@ -335,9 +350,9 @@ test('every rack sits in one flat row, nested racks included', async ({ page }) 
   expect(tops.length).toBeGreaterThan(1);
   expect(new Set(tops).size).toBe(1);
 
-  // Two rack panels - root and nested - each wrapped in boundary markers.
-  await expect(page.locator('.rack-row > .panel.rack-panel')).toHaveCount(2);
-  await expect(page.locator('.rack-boundary.start')).toHaveCount(2);
+  // The nested rack is present as a collapsed strip, in the same row.
+  await expect(page.locator('.rack-row > .panel.rack-panel.collapsed')).toHaveCount(1);
+  await expect(page.locator('.rack-boundary.start')).toHaveCount(1);
 });
 
 test('the mapping table lists rack, macro, device and parameter', async ({ page }) => {
@@ -351,10 +366,20 @@ test('the mapping table lists rack, macro, device and parameter', async ({ page 
   await expect(row.locator('.mapping-param').first()).toContainText('Param');
 });
 
-test('a knob shows one target and a count, however many it drives', async ({ page }) => {
-  // Six target names inside a 58px knob is what pushed the grid apart.
+test('devices and nested racks start collapsed', async ({ page }) => {
+  // A chain opened flat is a wall of parameter lists, and every nested rack
+  // opening itself pushed the rack you came to look at off the screen.
   await loadRack(page);
-  const knob = rootKnobs(page).first();
-  await expect(knob.locator('.macro-knob-targets li')).toHaveCount(2); // one target + the "+1"
-  await expect(knob.locator('.more-targets')).toHaveText('+1');
+  await expect(page.locator('.device-panel.collapsed')).not.toHaveCount(0);
+  await expect(page.locator('.rack-panel.collapsed')).not.toHaveCount(0);
+  // Opening one is a click on its strip.
+  await openFirstDevice(page);
+  await expect(page.locator('.device-panel').first()).not.toHaveClass(/collapsed/);
+});
+
+test('the unbind buttons line up on the right edge', async ({ page }) => {
+  await loadRack(page);
+  const rights = await page.locator('.mapping-unbind').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().right)));
+  expect(rights.length).toBeGreaterThan(1);
+  expect(new Set(rights).size).toBe(1);
 });

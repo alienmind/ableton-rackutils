@@ -20,7 +20,6 @@ export interface MacroKnobProps {
   onClick: () => void;
   onRename: (name: string) => void;
   onRecolor: (colorIndex: number) => void;
-  onUnbindOne: (targetPath: string) => void;
 }
 
 /**
@@ -30,15 +29,18 @@ export interface MacroKnobProps {
  * Colour goes on the LABEL, not the dial - Live draws every knob's arc the
  * same blue whatever colour the macro is, and tinting the arc as well made a
  * rack look like a paint chart.
+ *
+ * The knob does NOT list what it drives. A macro can drive any number of
+ * parameters and naming them here pushed the grid apart; the mapping table
+ * below carries the full list, and the unbind control with it.
  */
 export function MacroKnob(props: MacroKnobProps) {
   const { macro, liveValue, armed, hidden, dragging, dropTarget, dropSwaps, bindTarget } = props;
-  const { onDragStart, onClick, onRename, onRecolor, onUnbindOne } = props;
+  const { onDragStart, onClick, onRename, onRecolor } = props;
   const [editing, setEditing] = useState(false);
   const [picking, setPicking] = useState<DOMRect | null>(null);
 
   const mapped = macro.bindings.length > 0;
-  const first = macro.bindings[0];
   const color = macroColor(macro.color);
   const angle = valueToDegrees(macro.value);
 
@@ -115,25 +117,6 @@ export function MacroKnob(props: MacroKnobProps) {
         />
       )}
 
-      {/* One line, however many targets there are. A macro driving six
-          parameters used to render six rows inside a 58px knob and shove the
-          whole grid apart; the full list is in the mapping table below. */}
-      {mapped && (
-        <ul className="macro-knob-targets">
-          <li key={first.targetPath}>
-            <span
-              className="target-name"
-              title={macro.bindings.map((b) => `${b.targetName} [${b.rangeMin}..${b.rangeMax}]${b.inverted ? ' inverted' : ''}`).join('\n')}
-            >
-              {first.targetName}
-            </span>
-            <button type="button" className="unbind" onClick={() => onUnbindOne(first.targetPath)} title={`Unbind ${first.targetName}`}>
-              x
-            </button>
-          </li>
-          {macro.bindings.length > 1 && <li className="more-targets">+{macro.bindings.length - 1}</li>}
-        </ul>
-      )}
     </div>
   );
 }

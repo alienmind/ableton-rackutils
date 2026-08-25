@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { DeviceNode, ParamRef } from '@rackutils/adg-codec';
 import { samePath, useEditor, type RackPath } from './context';
+import { useParentToggle } from './useParentToggle';
 
 export interface DeviceRowProps {
   device: DeviceNode;
@@ -28,8 +29,11 @@ export interface DeviceRowProps {
  * it is bound, with no list surgery anywhere (Part 2.5).
  */
 export function DeviceRow({ device, rackPath, macroColors, collapsed: collapsedFromRack }: DeviceRowProps) {
-  const [collapsed, setCollapsed] = useState(Boolean(collapsedFromRack));
-  useEffect(() => setCollapsed(Boolean(collapsedFromRack)), [collapsedFromRack]);
+  // Devices start collapsed: a chain of six devices opened flat is a wall of
+  // parameter lists, and the mapping table already says what each one
+  // contributes. Click a strip to open the one you want. The rack's
+  // collapse-all button still drives this, but only when it changes.
+  const [collapsed, setCollapsed] = useParentToggle(true, collapsedFromRack);
   const [showMore, setShowMore] = useState(false);
   const { armed, arm, startParamDrag } = useEditor();
   // Where the pointer went down on a parameter. A press that does not move is

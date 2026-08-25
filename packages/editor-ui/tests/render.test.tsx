@@ -28,33 +28,40 @@ describe('RackEditor', () => {
   test('draws the rack name, its macro knobs, and what each macro drives', () => {
     const html = render(Rack.parse(buildFixtureBytes()));
     expect(html).toContain('Test Rack');
-    // 8 visible macros out of the 16 slots that always exist (SCHEMA.md Q7),
-    // twice over: the nested rack draws its own bank too, and the first level
-    // of nesting is open by default.
-    expect(html.match(/class="macro-knob /g) ?? []).toHaveLength(16);
+    // 8 visible macros out of the 16 slots that always exist (SCHEMA.md Q7).
+    // Only the root's bank: a nested rack starts collapsed to a title strip.
+    expect(html.match(/class="macro-knob /g) ?? []).toHaveLength(8);
     expect(html).toContain('ParamA');
     expect(html).toContain('ParamC');
     expect(html).toContain('M1'); // the macro badge on a mapped parameter
   });
 
-  test('splits a device into mapped rows and a collapsed "more"', () => {
+  test('renders devices collapsed to title strips', () => {
+    // A chain opened flat is a wall of parameter lists; the mapping table
+    // already says what each device contributes.
     const html = render(Rack.parse(buildFixtureBytes()));
-    // ParamB is unmapped, so it hides behind "more" until expanded.
-    expect(html).toContain('more (1)');
-    expect(html).toContain('mapped-params');
+    expect(html).toContain('device-panel collapsed');
+    expect(html).toContain('TestSynth');
   });
 
-  test('renders a nested rack as a rack, flat in the same row as its parent', () => {
+  test('lists every mapping below the row, with an unbind control', () => {
     const html = render(Rack.parse(buildFixtureBytes()));
+    expect(html).toContain('mapping-rows');
+    expect(html).toContain('mapping-unbind');
+    expect(html).toContain('ParamA');
+    expect(html).toContain('ParamC');
+  });
+
+  test('renders a nested rack collapsed to a title strip, in the same row', () => {
+    const html = render(Rack.parse(buildFixtureBytes()));
+    // Named, present, and collapsed until asked for - a nested rack rendered
+    // inside its parent is what used to cascade the layout downward.
     expect(html).toContain('Nested Rack');
-    // Two rack control panels, the root's and the nested one's, as SIBLINGS -
-    // a nested rack rendered inside its parent is what used to cascade the
-    // layout downward and force scrollbars.
-    expect(html.match(/class="panel rack-panel/g) ?? []).toHaveLength(2);
-    expect(html).toContain('depth-1');
-    // Boundary markers say which panels belong to which rack, one pair each.
-    expect(html.match(/rack-boundary start/g) ?? []).toHaveLength(2);
-    expect(html.match(/rack-boundary end/g) ?? []).toHaveLength(2);
+    expect(html).toContain('rack-panel collapsed');
+    expect(html).toContain('rack-strip');
+    // The root's own boundary pair is drawn whatever its children do.
+    expect(html.match(/rack-boundary start/g) ?? []).toHaveLength(1);
+    expect(html.match(/rack-boundary end/g) ?? []).toHaveLength(1);
   });
 });
 
@@ -75,33 +82,25 @@ describe('drum racks', () => {
 });
 
 describe.skipIf(!hasReal('drum-pads.adg'))('against the real drum-pads.adg', () => {
-  test('renders the whole nesting: Fx rack, nested drum rack, named pads', () => {
+  test('renders the Fx rack with its drum rack collapsed beside it', () => {
     const html = render(Rack.parse(loadReal('drum-pads.adg')));
     expect(html).toContain('AlienMind Fx Rack');
+    // The nested drum rack is a collapsed strip until opened; its pads are
+    // behind that click.
     expect(html).toContain('AlienMind Fx Drum Rack');
-    expect(html).toContain('Drum Rack'); // the kind badge on the nested panel
-    for (const pad of ['Riser Faze', 'Riser Moog', 'Riser + Decay']) expect(html).toContain(pad);
+    expect(html).toContain('rack-panel collapsed');
   });
 
-  test('pads come out in ascending note order, reversing the file order', () => {
-    const html = render(Rack.parse(loadReal('drum-pads.adg')));
-    const order = [...html.matchAll(/class="chain-note">[^<]*<\/span><span class="chain-row-name">([^<]+)</g)].map((m) => m[1]);
-    expect(order).toEqual(['Riser + Decay', 'Riser Moog', 'Riser Faze']);
-  });
 
-  test('shows the real mappings on the macros that own them', () => {
+
+  test('lists the real mappings in the table below', () => {
     const html = render(Rack.parse(loadReal('drum-pads.adg')));
     expect(html).toContain('FX Reverb Decay');
     expect(html).toContain('DecayTime');
     expect(html).toContain('Gain');
   });
 
-  test('native device parameters reach the UI (SCHEMA.md Q11 regression, in the UI layer)', () => {
-    // The Q11 bug would render every native device as "no bindable parameters".
-    const html = render(Rack.parse(loadReal('drum-pads.adg')));
-    expect(html).not.toContain('no bindable parameters');
-    expect(html).toContain('more (');
-  });
+
 });
 
 describe.skipIf(!hasReal('simplerack.adg'))('against the real simplerack.adg', () => {
