@@ -72,8 +72,7 @@ editing, batch library operations - is out. See Parked.
 3. **The contract, one device end to end** (4.3). Utility Gain only, applied
    across every chain. Prove the donor pipeline and the insertion hygiene on
    the simplest possible case before building any options strip.
-4. **Offline** (4.5). The flight case is real and the PWA is a tenth of the
-   cost of the device.
+4. **Offline** (4.5). Done.
 
 Use it on real racks throughout. Every bug this project has hit came from that,
 not from tests - including a UI whose every interaction was broken while its
@@ -530,20 +529,21 @@ a donor and a tag established first.
   knows the native range per parameter, so importing it would supply this.
 - **Sorting the mapping table** by column header, as Live's own list does.
 
-### 4.5 Offline
+### 4.5 Offline - DONE
 
-`vite-plugin-pwa` with `registerType: 'autoUpdate'`, `scope` and `start_url`
-from `VITE_BASE`, `maximumFileSizeToCacheInBytes` raised, and
-`navigateFallbackDenylist: [/.*\.(adg|als|md|zip)$/i]` so the SPA fallback does
-not swallow non-HTML assets. Trackster already does exactly this.
+`vite-plugin-pwa` in `apps/site/vite.config.ts`, `registerType: 'autoUpdate'`,
+with `scope`, `start_url` and the manifest all taking `VITE_BASE` so one config
+still serves dev, Pages and the device bundle.
 
-Authoring racks offline on a flight is a real use of this tool, and the PWA
-delivers it in a browser tab for a fraction of what the device costs. Do it
-before the device, not after.
+Two things worth keeping:
 
-Skip the plugin entirely in the device build. Bundling already solves offline
-there, and a service worker only adds a caching layer that can serve stale UI
-after a device update.
+- **The default `globPatterns` omits `jpg`**, which is what the logo is, so the
+  first build precached 302 KiB and an offline load came back without it. It
+  precaches 9 entries and 2.7 MB now.
+- **`VITE_EMBED=1` skips the plugin entirely.** Bundling already solves offline
+  in the device, and a service worker there only adds a layer that can serve a
+  stale UI after a device update. `release-device.yml` carries a note to guard
+  on `sw.js` when embedding lands.
 
 ### 4.6 Save in place
 
@@ -626,11 +626,10 @@ macOS runners bill roughly 10x Linux), and the exact output paths for the
 | 1 | 4.0 rack-level binding fix | Silent corruption on any rack with a chain-selector macro |
 | 2 | 4.1 VST dependency view | None, but it is the cheapest useful thing left |
 | 3 | 4.3 contract, Utility Gain only, plus the slot-shift mutation | The whole direction stays unproven |
-| 4 | 4.5 offline | No authoring on a flight |
-| 5 | 4.3 remaining devices | Contract covers one case only |
-| 6 | 4.4 editor open items | Feature gaps only |
-| 7 | 4.6 save in place | Current download flow works |
-| 8 | 4.7 device bundle | Site already delivers everything |
+| 4 | 4.3 remaining devices | Contract covers one case only |
+| 5 | 4.4 editor open items | Feature gaps only |
+| 6 | 4.6 save in place | Current download flow works |
+| 7 | 4.7 device bundle | Site already delivers everything |
 
 ### Open risks
 
