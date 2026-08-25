@@ -825,22 +825,45 @@ macro index - applies to Ableton devices. A plugin carries an integer
 `PowerMacroControlIndex` for its own on/off, the same shape, and no Ableton
 device in any donor has that element.
 
-**Still unconfirmed: the mapped state.** Both indices read -1 in this file, so
-the parameter is exposed and NOT mapped. `MacroControlIndex` is named for
-exactly this job and is the only candidate present, but no file yet shows it
-holding a macro index. Map that exposed parameter to a macro, save, and diff.
+**Confirmed against `donors/BS-VST3-mapped.adg`**, the same rack with that
+parameter mapped to macro 13:
 
-**Consequence, and it is a latent bug.** `collectMacroBindings()` finds
-`KeyMidi` elements. It cannot see a plugin mapping, so `moveMapping`,
-`reorderMacro`, `swapMacros` and `insertMacroSlots` will not carry one when
-they move a macro: the index stays pointing at the vacated slot. Same class as
-Q15, one mechanism further out. No rack here exercises it, because none has a
-mapped plugin parameter - which is precisely why it has not been caught by a
-test.
+```xml
+<PluginParameterSettings>
+  <ParameterId Value="70" />
+  <Type Value="PluginFloatParameter" />
+  <MacroControlIndex Value="12" />     <!-- 0-based: macro 13 -->
+  <MidiControllerRange>
+    <MidiControllerRange>             <!-- nested twice, and only once mapped -->
+      <Min Value="0" />
+      <Max Value="1" />
+    </MidiControllerRange>
+  </MidiControllerRange>
+  <LomId Value="1232" />              <!-- non-zero once mapped -->
+</PluginParameterSettings>
+```
 
-Do not offer plugin parameters as bindable targets, and do not claim macro
-reordering is safe on a rack with a mapped plugin parameter, until this is
-resolved.
+Three things the mapped state adds: `MacroControlIndex` holds the 0-based macro
+index, the range appears as a `MidiControllerRange` nested inside another
+`MidiControllerRange` rather than the flat one an Ableton parameter uses (Q4),
+and `LomId` becomes non-zero.
+
+**Consequence, which was a real bug and is now fixed.**
+`collectMacroBindings()` finds `KeyMidi` elements and cannot see a plugin
+mapping, so every slot-changing mutation left the index pointing at the vacated
+slot. `Rack.collectPluginMacroRefs()` collects these separately and
+`moveMapping`, `swapMacros`, `insertMacroSlots` and `unbindMacro` all carry
+them now. Two details:
+
+- `moveMapping` used to refuse outright on a macro with no `KeyMidi`, which is
+  exactly what a macro driving only a plugin parameter looks like.
+- Unbinding writes -1 rather than removing the element. The parameter stays
+  exposed on the device, it just stops being driven.
+
+**Still open: the editor cannot SHOW these.** `Macro.bindings` is built from
+`KeyMidi` and a plugin binding has no `targetPath`, so the mapping table lists
+nothing for a macro that drives a plugin parameter. Correctness first; display
+is a separate change to the `Binding` model.
 
 ## Q21. What is EQ Three, and what are its band gains?
 

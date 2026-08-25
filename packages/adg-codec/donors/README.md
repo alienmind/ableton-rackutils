@@ -113,3 +113,13 @@ Two findings:
   (SCHEMA.md Q20). The macro index reads -1 here, so the mapped state is still
   unconfirmed.
 
+## `BS-VST3-mapped.adg`
+
+`BS-EQ3.adg` with the exposed plugin parameter actually mapped, to macro 13.
+The evidence that closed SCHEMA.md Q20: `MacroControlIndex` holds the 0-based
+macro index, the range nests a `MidiControllerRange` inside another one, and
+`LomId` goes non-zero.
+
+It is the only donor exercising the plugin binding path, so it is what the
+slot-changing mutations are tested against.
+

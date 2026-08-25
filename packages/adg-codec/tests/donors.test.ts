@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { MACRO_SLOTS, Rack } from '../src/model';
 import { applyContract, macroNameFor } from '../src/contract';
-import { insertDeviceInEveryChain, insertMacroSlots, moveMapping, reorderMacro, unbindMacro } from '../src/mutate';
+import { insertDeviceInEveryChain, insertMacroSlots, moveMapping, reorderMacro, swapMacros, unbindMacro } from '../src/mutate';
 
 const load = (name: string) => new Uint8Array(readFileSync(join(__dirname, '..', 'donors', name)));
 
@@ -435,6 +435,51 @@ describe('EQ Three, the three-macro option (doc/PLAN.md 4.3.2)', () => {
     expect(bindingNames(rack, 9)).toEqual(['GainLo']);
     expect(bindingNames(rack, 10)).toEqual(['GainMid']);
     expect(bindingNames(rack, 11)).toEqual(['GainHi']);
+  });
+});
+
+describe('a macro driving a plugin parameter (SCHEMA.md Q20)', () => {
+  /** The plugin binding is an integer on PluginParameterSettings, not a KeyMidi. */
+  const pluginMacro = (rack: Rack): number =>
+    Number(
+      Array.from(rack.document.getElementsByTagName('MacroControlIndex'))[0]?.getAttribute('Value') ?? NaN,
+    );
+
+  test('BS-VST3-mapped.adg binds its plugin parameter by index', () => {
+    const rack = Rack.parse(load('BS-VST3-mapped.adg'));
+    expect(pluginMacro(rack)).toBe(12);
+    // And it is invisible to the KeyMidi machinery, which is the whole problem.
+    expect(rack.macros[12].bindings).toHaveLength(0);
+  });
+
+  test('moving that macro carries the plugin binding with it', () => {
+    const rack = Rack.parse(load('BS-VST3-mapped.adg'));
+    expect(moveMapping(rack, 12, 14).ok).toBe(true);
+    expect(pluginMacro(Rack.parse(rack.serialize()))).toBe(14);
+  });
+
+  test('swapping carries it in both directions', () => {
+    const rack = Rack.parse(load('BS-VST3-mapped.adg'));
+    expect(swapMacros(rack, 12, 3).ok).toBe(true);
+    expect(pluginMacro(Rack.parse(rack.serialize()))).toBe(3);
+  });
+
+  test('shifting slots for a contract carries it too', () => {
+    const rack = Rack.parse(load('BS-VST3-mapped.adg'));
+    expect(insertMacroSlots(rack, 2).ok).toBe(true);
+    // The bug this guards: the index staying at 12 while its macro moved to 14,
+    // leaving the plugin driven by whatever landed on 12.
+    expect(pluginMacro(Rack.parse(rack.serialize()))).toBe(14);
+  });
+
+  test('unbinding clears it to -1 rather than deleting the exposed parameter', () => {
+    const rack = Rack.parse(load('BS-VST3-mapped.adg'));
+    expect(unbindMacro(rack, 12).ok).toBe(true);
+
+    const after = Rack.parse(rack.serialize());
+    expect(pluginMacro(after)).toBe(-1);
+    // The parameter stays exposed on the device, it just stops being driven.
+    expect(after.document.getElementsByTagName('PluginParameterSettings')).toHaveLength(1);
   });
 });
 

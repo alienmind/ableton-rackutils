@@ -36,16 +36,27 @@ export function moveMapping(rack: Rack, from: number, to: number): MutationResul
   assertSlot(from);
   assertSlot(to);
   const bindings = rack.collectMacroBindings();
+  // Plugin parameters bind by an index rather than a KeyMidi (SCHEMA.md Q20),
+  // so a macro can be driving something while having no KeyMidi at all.
+  const pluginRefs = rack.collectPluginMacroRefs();
   const fromKeyMidis = bindings.get(from) ?? [];
-  if (fromKeyMidis.length === 0) return fail(`macro ${from + 1} has no mapping to move`);
+  const fromPlugin = pluginRefs.get(from) ?? [];
+  if (fromKeyMidis.length === 0 && fromPlugin.length === 0) {
+    return fail(`macro ${from + 1} has no mapping to move`);
+  }
 
   const warnings: string[] = [];
   const toKeyMidis = bindings.get(to) ?? [];
-  if (toKeyMidis.length > 0) {
-    warnings.push(`cleared ${toKeyMidis.length} existing binding${toKeyMidis.length > 1 ? 's' : ''} on macro ${to + 1}`);
+  const toPlugin = pluginRefs.get(to) ?? [];
+  const cleared = toKeyMidis.length + toPlugin.length;
+  if (cleared > 0) {
+    warnings.push(`cleared ${cleared} existing binding${cleared > 1 ? 's' : ''} on macro ${to + 1}`);
     for (const km of toKeyMidis) removeKeyMidi(km);
+    // Cleared by writing -1: the parameter stays exposed, it stops being driven.
+    for (const el of toPlugin) el.setAttribute('Value', '-1');
   }
   for (const km of fromKeyMidis) setChildValue(km, 'NoteOrController', to);
+  for (const el of fromPlugin) el.setAttribute('Value', String(to));
 
   permuteVariations(rack, (values) => {
     values[to] = values[from];
@@ -71,6 +82,13 @@ export function swapMacros(rack: Rack, a: number, b: number): MutationResult {
   const bKeyMidis = bindings.get(b) ?? [];
   for (const km of aKeyMidis) setChildValue(km, 'NoteOrController', b);
   for (const km of bKeyMidis) setChildValue(km, 'NoteOrController', a);
+
+  // Same for plugin parameters, which bind by index (SCHEMA.md Q20).
+  const pluginRefs = rack.collectPluginMacroRefs();
+  const aPlugin = pluginRefs.get(a) ?? [];
+  const bPlugin = pluginRefs.get(b) ?? [];
+  for (const el of aPlugin) el.setAttribute('Value', String(b));
+  for (const el of bPlugin) el.setAttribute('Value', String(a));
 
   const device = rack.deviceEl;
   for (const field of PER_SLOT_FIELDS) swapChildValue(device, `${field}.${a}`, device, `${field}.${b}`);
@@ -335,8 +353,12 @@ function findBinding(rack: Rack, macroIndex: number, targetPath: string): Elemen
 export function unbindMacro(rack: Rack, macroIndex: number): MutationResult {
   assertSlot(macroIndex);
   const keyMidis = rack.collectMacroBindings().get(macroIndex) ?? [];
-  if (keyMidis.length === 0) return ok();
+  const pluginRefs = rack.collectPluginMacroRefs().get(macroIndex) ?? [];
+  if (keyMidis.length === 0 && pluginRefs.length === 0) return ok();
   for (const km of keyMidis) removeKeyMidi(km);
+  // A plugin binding is cleared by writing -1, not by removing the element:
+  // the parameter stays exposed, it just stops being driven (SCHEMA.md Q20).
+  for (const el of pluginRefs) el.setAttribute('Value', '-1');
   permuteVariations(rack, (values) => {
     values[macroIndex] = UNSET_MACRO_VALUE;
   });

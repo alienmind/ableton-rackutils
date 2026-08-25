@@ -270,6 +270,33 @@ export class Rack {
   }
 
   /**
+   * @internal Macro bindings that are NOT `KeyMidi`, keyed by macro index.
+   *
+   * A plugin parameter is driven by an integer `MacroControlIndex` on its
+   * `PluginParameterSettings`, and a plugin's own on/off by
+   * `PowerMacroControlIndex` on the preset (SCHEMA.md Q20). Neither is a
+   * `KeyMidi`, so `collectMacroBindings` cannot see them, and every
+   * slot-changing mutation has to move these too or leave them pointing at a
+   * vacated slot.
+   *
+   * `-1` means unmapped and is skipped.
+   */
+  collectPluginMacroRefs(): Map<number, Element[]> {
+    const result = new Map<number, Element[]>();
+    for (const tag of ['MacroControlIndex', 'PowerMacroControlIndex']) {
+      for (const el of Array.from(this.root.getElementsByTagName(tag))) {
+        if (this.owningRackDevice(el) !== this.deviceEl) continue;
+        const index = Number(el.getAttribute('Value'));
+        if (!Number.isInteger(index) || index < 0) continue;
+        const list = result.get(index);
+        if (list) list.push(el);
+        else result.set(index, [el]);
+      }
+    }
+    return result;
+  }
+
+  /**
    * @internal Which rack's macros a KeyMidi belongs to: walk up to the nearest
    * `GroupDevicePreset`, then take its `Device` child (SCHEMA.md Q2).
    *

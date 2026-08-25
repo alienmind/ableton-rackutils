@@ -668,11 +668,11 @@ macOS runners bill roughly 10x Linux), and the exact output paths for the
 
 ### Open risks
 
-1. **A mapped plugin parameter would be broken by a macro move** (SCHEMA.md
-   Q20). Plugin mappings use `MacroControlIndex`, not `KeyMidi`, so the codec
-   cannot see them and no slot-changing mutation carries them. Unexercised by
-   any donor, which is why no test catches it. Resolve before the editor offers
-   plugin parameters, or claims reordering is safe on a rack that has one.
+1. **A plugin binding is invisible in the editor** (SCHEMA.md Q20). Macro
+   moves carry it correctly now, tested against `BS-VST3-mapped.adg`, but
+   `Macro.bindings` is built from `KeyMidi` so the mapping table shows nothing
+   for a macro driving a plugin parameter. Showing it means widening the
+   `Binding` model, since a plugin binding has no `targetPath`.
 2. **"Loads in Live" is not "looks like a rack."** Both Q19 faults produced a
    valid file with working mappings that 122 passing tests could not see. Every
    new device the contract learns to insert gets opened in Live before it
