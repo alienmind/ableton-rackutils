@@ -189,7 +189,7 @@ describe('inserting a contract device across every chain (doc/PLAN.md 4.3.3)', (
 
   test('refuses a device with no donor rather than inventing one', () => {
     const rack = Rack.parse(load('BS.adg'));
-    const result = insertDeviceInEveryChain(rack, 'FilterEQ3');
+    const result = insertDeviceInEveryChain(rack, 'NoSuchDevice');
     expect(result.ok).toBe(false);
     expect(result.warnings[0]).toContain('adg-harvest');
   });
@@ -386,6 +386,55 @@ describe('one code, everywhere (doc/PLAN.md 4.3.1)', () => {
     const after = Rack.parse(rack.serialize());
     expect(after.macros[0].name).toBe('BS FILTER');
     expect(after.chains[0].devices.at(-1)!.name).toBe('BS AF');
+  });
+});
+
+describe('EQ Three, the three-macro option (doc/PLAN.md 4.3.2)', () => {
+  test('one device, three macros, one per band', () => {
+    const rack = Rack.parse(load('BS.adg'));
+    const result = applyContract(
+      rack,
+      [
+        { deviceTag: 'FilterEQ3', parameter: 'GainLo', namePattern: '{name} LO', colorIndex: 9 },
+        { deviceTag: 'FilterEQ3', parameter: 'GainMid', namePattern: '{name} MID', colorIndex: 3 },
+        { deviceTag: 'FilterEQ3', parameter: 'GainHi', namePattern: '{name} HI', colorIndex: 13 },
+      ],
+      { name: 'BS' },
+    );
+
+    expect(result.ok).toBe(true);
+    const after = Rack.parse(rack.serialize());
+    expect(after.macros.slice(0, 3).map((m) => m.name)).toEqual(['BS LO', 'BS MID', 'BS HI']);
+    for (const m of after.macros.slice(0, 3)) {
+      expect(m.bindings.map((b) => b.targetName)).toHaveLength(after.chains.length);
+    }
+  });
+
+  test('the three options share ONE EQ per chain, not three', () => {
+    const rack = Rack.parse(load('BS.adg'));
+    const before = rack.chains[0].devices.length;
+    applyContract(
+      rack,
+      [
+        { deviceTag: 'FilterEQ3', parameter: 'GainLo', namePattern: '{name} LO' },
+        { deviceTag: 'FilterEQ3', parameter: 'GainMid', namePattern: '{name} MID' },
+        { deviceTag: 'FilterEQ3', parameter: 'GainHi', namePattern: '{name} HI' },
+      ],
+      { name: 'BS' },
+    );
+
+    // The second and third options find the EQ the first inserted at the end
+    // of the chain and reuse it. Three EQs in a row would be wrong.
+    const after = Rack.parse(rack.serialize());
+    expect(after.chains[0].devices.length).toBe(before + 1);
+    expect(after.chains[0].devices.filter((d) => d.type === 'FilterEQ3')).toHaveLength(1);
+  });
+
+  test('BS-EQ3.adg maps its own EQ the same way, one macro per band', () => {
+    const rack = Rack.parse(load('BS-EQ3.adg'));
+    expect(bindingNames(rack, 9)).toEqual(['GainLo']);
+    expect(bindingNames(rack, 10)).toEqual(['GainMid']);
+    expect(bindingNames(rack, 11)).toEqual(['GainHi']);
   });
 });
 

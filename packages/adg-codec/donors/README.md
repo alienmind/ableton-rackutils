@@ -97,3 +97,19 @@ SCHEMA.md Q17:
 Also the only donor with three chains, which makes it the better fixture for
 anything that has to hold across more than a pair.
 
+## `BS-EQ3.adg`
+
+`BS-VST3.adg` with an EQ Three added to the plugin chain and its three band
+gains mapped to macros 10-12, plus one parameter of the VST3 exposed through
+Live's Configure mode.
+
+Two findings:
+
+- **EQ Three is `FilterEQ3`**, band gains `GainLo`, `GainMid`, `GainHi`, in
+  linear amplitude (SCHEMA.md Q21). It is the harvest source for the EQ Three
+  option, the last one that had no donor.
+- **An exposed plugin parameter is a `PluginParameterSettings`** carrying
+  `ParameterId`, `Type` and `MacroControlIndex` - an integer, not a `KeyMidi`
+  (SCHEMA.md Q20). The macro index reads -1 here, so the mapped state is still
+  unconfirmed.
+

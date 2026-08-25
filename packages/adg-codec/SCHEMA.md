@@ -795,3 +795,67 @@ Neither is a corruption: the file is valid and the mappings work. It is a
 reminder that "loads in Live" is not the same as "looks like a rack", and only
 opening it answers the second one.
 
+---
+
+## Q20. How is a plugin parameter exposed, and how does a macro drive it?
+
+Evidence: `donors/BS-EQ3.adg`, where one parameter of the Arturia VST3 was
+exposed through Live's Configure mode.
+
+**Exposing a parameter fills `ParameterSettings`**, which Q17 found empty:
+
+```xml
+<ParameterSettings>
+  <PluginParameterSettings>
+    <Index Value="0" />
+    <VisualIndex Value="0" />
+    <ParameterId Value="70" />              <!-- the plugin's own id -->
+    <Type Value="PluginFloatParameter" />
+    <MacroControlIndex Value="-1" />        <!-- the macro, -1 when unmapped -->
+    <MidiControllerRange />
+    <LomId Value="0" />
+  </PluginParameterSettings>
+</ParameterSettings>
+```
+
+**A plugin parameter is NOT driven by a `KeyMidi`.** Everything recorded in Q1
+through Q15 - `KeyMidi` with `Channel` 16 and `NoteOrController` carrying the
+macro index - applies to Ableton devices. A plugin carries an integer
+`MacroControlIndex` on the exposed parameter instead. `Vst3Preset` also carries
+`PowerMacroControlIndex` for its own on/off, the same shape, and no Ableton
+device in any donor has that element.
+
+**Still unconfirmed: the mapped state.** Both indices read -1 in this file, so
+the parameter is exposed and NOT mapped. `MacroControlIndex` is named for
+exactly this job and is the only candidate present, but no file yet shows it
+holding a macro index. Map that exposed parameter to a macro, save, and diff.
+
+**Consequence, and it is a latent bug.** `collectMacroBindings()` finds
+`KeyMidi` elements. It cannot see a plugin mapping, so `moveMapping`,
+`reorderMacro`, `swapMacros` and `insertMacroSlots` will not carry one when
+they move a macro: the index stays pointing at the vacated slot. Same class as
+Q15, one mechanism further out. No rack here exercises it, because none has a
+mapped plugin parameter - which is precisely why it has not been caught by a
+test.
+
+Do not offer plugin parameters as bindable targets, and do not claim macro
+reordering is safe on a rack with a mapped plugin parameter, until this is
+resolved.
+
+## Q21. What is EQ Three, and what are its band gains?
+
+`FilterEQ3`, confirmed in `donors/BS-EQ3.adg` where its three band gains are
+mapped to macros 10, 11 and 12:
+
+| Parameter | Range |
+|---|---|
+| `GainLo` | 0.0003162277571 .. 1.99526238 |
+| `GainMid` | same |
+| `GainHi` | same |
+
+Linear amplitude, not decibels, which is the usual trap when a contract wants
+a range in a unit a human recognises.
+
+This was the last contract option with no donor and no known tag. `pnpm
+adg-harvest` now lifts it, so all five options in `doc/PLAN.md` 4.3.2 have one.
+

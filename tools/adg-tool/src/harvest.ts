@@ -29,7 +29,7 @@ const DONORS = join(process.cwd(), 'packages', 'adg-codec', 'donors');
 const OUT = join(process.cwd(), 'packages', 'adg-codec', 'src', 'donorLibrary.generated.ts');
 
 /** Device tags the contract can insert. Growing this list means saving the device into a donor rack first. */
-const WANTED = ['StereoGain', 'Gate', 'Compressor2', 'AutoFilter2'];
+const WANTED = ['StereoGain', 'Gate', 'Compressor2', 'AutoFilter2', 'FilterEQ3'];
 
 /**
  * Dropped from a harvested device. A donor is wanted for its parameter list

@@ -393,7 +393,7 @@ slots. There is no room to insert anything, and `setMacroCount` cannot go past
 | Gate | `Gate` | `{name} GATE ON/OFF` | colour, sidechain switch | `PD.adg` |
 | Compressor | `Compressor2` | - | colour, sidechain switch | `PD.adg` |
 | AutoFilter | `AutoFilter2` | `{name} AUTOFILTER` | colour | `PD.adg` |
-| EQ Three | unknown tag | `{name} LO`, `{name} MID`, `{name} HI` | colour per band | **none** |
+| EQ Three | `FilterEQ3` | `{name} LO`, `{name} MID`, `{name} HI` | colour per band | `BS-EQ3.adg` |
 
 What `donors/PD.adg` establishes:
 
@@ -406,10 +406,12 @@ What `donors/PD.adg` establishes:
   `Global_StereoVoiceDepth`. The convention this feature automates already
   exists by hand, and one contract macro driving two parameters is normal.
 
-**EQ Three has no donor and its XML tag is unestablished.** Not in `PD.adg`,
-not in patchbay's `donors/` or `racks/`. `Eq8` is EQ Eight, a different device.
-Save one from Live, drop it in `packages/adg-codec/donors/`, and record the tag
-before this option can exist.
+**EQ Three is `FilterEQ3`**, with band gains `GainLo`, `GainMid` and `GainHi`
+in linear amplitude rather than decibels (SCHEMA.md Q21). Its three options
+share ONE device per chain: the second and third find the EQ the first
+inserted and reuse it.
+
+All five options now have a donor.
 
 #### 4.3.3 Where the devices go: in parallel, across every chain
 
@@ -666,27 +668,32 @@ macOS runners bill roughly 10x Linux), and the exact output paths for the
 
 ### Open risks
 
-1. **"Loads in Live" is not "looks like a rack."** Both Q19 faults produced a
+1. **A mapped plugin parameter would be broken by a macro move** (SCHEMA.md
+   Q20). Plugin mappings use `MacroControlIndex`, not `KeyMidi`, so the codec
+   cannot see them and no slot-changing mutation carries them. Unexercised by
+   any donor, which is why no test catches it. Resolve before the editor offers
+   plugin parameters, or claims reordering is safe on a rack that has one.
+2. **"Loads in Live" is not "looks like a rack."** Both Q19 faults produced a
    valid file with working mappings that 122 passing tests could not see. Every
    new device the contract learns to insert gets opened in Live before it
    ships, not just tested.
-2. **Bindings the codec cannot see** (4.0, fixed). Found once, on the rack's own
+3. **Bindings the codec cannot see** (4.0, fixed). Found once, on the rack's own
    parameters. The rack device may carry other bindable parameters beyond
    `ChainSelector`, so it is worth re-checking against a rack that maps several
    of them, not only `BS.adg`.
-3. **Insertion produces a rack that loads and behaves wrong** (4.3.4). The
+4. **Insertion produces a rack that loads and behaves wrong** (4.3.4). The
    worst failure mode available. Mitigated only by the hygiene checklist and by
    loading every new device type in Live by hand.
-4. **Range inversion semantics (SCHEMA.md Q4).** The editor writes inverted
+5. **Range inversion semantics (SCHEMA.md Q4).** The editor writes inverted
    ranges and the only direct evidence that Live honours `Min > Max` is
    patchbay's Live 12.4.3 note. Confirm with our own diff.
-5. **The macro shift can have nowhere to go** (4.3.1). A rack using all 16
+6. **The macro shift can have nowhere to go** (4.3.1). A rack using all 16
    slots cannot take the contract's macros without being wrapped. `PD.adg` is
    exactly that case, so it will be hit immediately.
-6. **Live closes the gap.** The whole value proposition of Job 1 is that Live
+7. **Live closes the gap.** The whole value proposition of Job 1 is that Live
    cannot move a macro mapping. Its Macro Mappings panel is recent and sits
    directly adjacent. Worth rechecking on each Live release.
-7. **Asset paths in the bundled build (4.7).** The most likely device-side
+8. **Asset paths in the bundled build (4.7).** The most likely device-side
    failure is a blank window from absolute paths resolving against the
    filesystem root.
 
