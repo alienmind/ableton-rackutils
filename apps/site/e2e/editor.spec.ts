@@ -255,6 +255,18 @@ test('a patch cable hangs from the parameter while dragging, and lands on the kn
   const [, y0, cy1] = d.match(/M [\d.-]+ ([\d.-]+) C [\d.-]+ ([\d.-]+)/)!.map(Number);
   expect(cy1).toBeGreaterThan(y0); // hanging, not a straight line
   await expect(cable).toHaveClass(/will-connect/);
+  // Over a knob, the cable takes that macro's colour rather than a generic one.
+  // Both read through getComputedStyle: the browser normalises an inline hex
+  // to rgb(), so comparing the raw custom property against it never matches.
+  const knobColour = await knob.evaluate((el) => {
+    const probe = document.createElement('span');
+    probe.style.color = getComputedStyle(el).getPropertyValue('--macro-color').trim();
+    document.body.appendChild(probe);
+    const rgb = getComputedStyle(probe).color;
+    probe.remove();
+    return rgb;
+  });
+  expect(await cable.evaluate((el) => getComputedStyle(el).stroke)).toBe(knobColour);
 
   await page.mouse.up();
   await expect(knob.locator('.target-name')).toContainText('ParamB');

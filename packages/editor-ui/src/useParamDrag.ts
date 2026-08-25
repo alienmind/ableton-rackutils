@@ -31,6 +31,8 @@ export interface ParamDragState {
   origin: Point | null;
   /** Where the free end currently is. Viewport coordinates. */
   pointer: Point | null;
+  /** The colour of the knob under the pointer, so the cable can take it. Null when over nothing. */
+  overColor: string | null;
 }
 
 /**
@@ -43,9 +45,11 @@ export interface CableEcho {
   from: Point;
   to: Point;
   connected: boolean;
+  /** The colour of the knob it landed on, so a connected cable matches it. */
+  color: string | null;
 }
 
-const IDLE: ParamDragState = { param: null, rackPath: null, overMacro: null, overForeignRack: false, origin: null, pointer: null };
+const IDLE: ParamDragState = { param: null, rackPath: null, overMacro: null, overForeignRack: false, origin: null, pointer: null, overColor: null };
 
 export interface UseParamDragOptions {
   onBind: (rackPath: RackPath, macroIndex: number, param: ParamRef) => void;
@@ -85,26 +89,29 @@ export function useParamDrag({ onBind }: UseParamDragOptions) {
       const origin = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
       active.current = { param, rackPath, origin };
       setEcho(null);
-      setState({ param, rackPath, overMacro: null, overForeignRack: false, origin, pointer: origin });
+      setState({ param, rackPath, overMacro: null, overForeignRack: false, origin, pointer: origin, overColor: null });
 
       const key = rackPath.join('|');
 
       const locate = (x: number, y: number) => {
         const el = document.elementFromPoint(x, y);
         const knob = el?.closest('[data-macro-index]') ?? null;
-        if (!knob) return { macro: null as number | null, foreign: false, knob };
+        if (!knob) return { macro: null as number | null, foreign: false, knob, color: null as string | null };
         const macro = Number(knob.getAttribute('data-macro-index'));
-        return { macro, foreign: rackPathUnder(knob) !== key, knob };
+        // The knob publishes its macro's colour as a custom property; the
+        // cable takes it so a patch reads as belonging to that macro.
+        const color = getComputedStyle(knob).getPropertyValue('--macro-color').trim() || null;
+        return { macro, foreign: rackPathUnder(knob) !== key, knob, color };
       };
 
       const move = (ev: PointerEvent) => {
-        const { macro, foreign } = locate(ev.clientX, ev.clientY);
-        setState((s) => ({ ...s, overMacro: macro, overForeignRack: foreign, pointer: { x: ev.clientX, y: ev.clientY } }));
+        const { macro, foreign, color } = locate(ev.clientX, ev.clientY);
+        setState((s) => ({ ...s, overMacro: macro, overForeignRack: foreign, overColor: color, pointer: { x: ev.clientX, y: ev.clientY } }));
       };
 
       const finish = (ev: PointerEvent) => {
         const dragged = active.current;
-        const { macro, foreign, knob } = locate(ev.clientX, ev.clientY);
+        const { macro, foreign, knob, color } = locate(ev.clientX, ev.clientY);
         stop();
         if (!dragged) return;
 
@@ -114,7 +121,7 @@ export function useParamDrag({ onBind }: UseParamDragOptions) {
         const bound = macro !== null && !foreign;
         const target = bound && knob ? centreOf(knob) : { x: ev.clientX, y: ev.clientY };
         echoId.current += 1;
-        setEcho({ id: echoId.current, from: dragged.origin, to: target, connected: bound });
+        setEcho({ id: echoId.current, from: dragged.origin, to: target, connected: bound, color: bound ? color : null });
         if (bound) handler.current(dragged.rackPath, macro, dragged.param);
       };
 

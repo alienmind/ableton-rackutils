@@ -165,7 +165,10 @@ behind the pointer. On release it either settles onto the knob with a decaying
 wobble or snaps back to the control it came from. The physics is one number -
 the sag depth - on a damped spring, because a hanging cable IS its sag: the
 curve is a cubic with both control points pushed straight down by it. The
-cable turns green over a knob it can bind to and red over one it cannot.
+cable takes the COLOUR OF THE KNOB it is over, so a patch reads as belonging
+to that macro; over a knob in another rack it turns red instead, because
+refusal is a state rather than a macro and has to say so whatever colour the
+knob is.
 `prefers-reduced-motion` skips the animation.
 
 Pull a parameter onto a macro knob. Click-to-arm still
