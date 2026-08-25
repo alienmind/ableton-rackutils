@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Macro } from '@rackutils/adg-codec';
 import { arcPath, KNOB_MAX_DEG, KNOB_MIN_DEG, valueToDegrees } from './arc';
 import { ColorPicker } from './ColorPicker';
-import { macroColor } from './macroColors';
+import { contrastInk, macroColor } from './macroColors';
 import { macroLabel } from './mappings';
 
 export interface MacroKnobProps {
@@ -65,7 +65,14 @@ export function MacroKnob(props: MacroKnobProps) {
   if (bindTarget) classes.push('bind-target');
 
   return (
-    <div className={classes.join(' ')} data-macro-index={macro.index} data-map-key={mapKeys} style={{ '--macro-color': color } as React.CSSProperties}>
+    <div
+      className={classes.join(' ')}
+      data-macro-index={macro.index}
+      data-map-key={mapKeys}
+      // The label sits ON the macro's colour, and the palette runs from near
+      // black to white, so the ink has to be picked per knob.
+      style={{ '--macro-color': color, '--macro-ink': contrastInk(color) } as React.CSSProperties}
+    >
       <div
         className="macro-knob-dial"
         onPointerDown={onDragStart}

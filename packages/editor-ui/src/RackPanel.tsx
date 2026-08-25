@@ -5,6 +5,7 @@ import {
   renameRack,
   reorderMacro,
   resetMacro,
+  colorChainMacros,
   setChainColor,
   setMacroColor,
   setMacroCount,
@@ -196,7 +197,16 @@ export function RackPanel({ rack, rackPath, depth, collapsible, forceCollapsed }
             selected={selectedChain}
             onSelect={setSelectedChain}
             drum={isDrumRack}
-            onRecolor={(chainPath, colorIndex) => apply(rackPath, (r) => setChainColor(r, chainPath, colorIndex))}
+            onRecolor={(chainPath, colorIndex) =>
+              apply(rackPath, (r) => {
+                // One edit, so one undo takes both back: the chain's colour
+                // and the colour of every macro that only drives that chain.
+                const chain = setChainColor(r, chainPath, colorIndex);
+                if (!chain.ok) return chain;
+                const macros = colorChainMacros(r, chainPath, colorIndex);
+                return { ok: macros.ok, warnings: [...chain.warnings, ...macros.warnings] };
+              })
+            }
           />
         )}
       </div>
