@@ -12,6 +12,9 @@ export {
   setBindingRange,
   invertBindingRange,
   insertDeviceInEveryChain,
+  removeDevice,
+  removeMacroSlot,
+  setDeviceValue,
   renameMacro,
   renameRack,
   setMacroCount,
@@ -20,6 +23,6 @@ export {
   setChainColor,
 } from './mutate';
 export type { MutationResult, InsertDeviceResult, InsertedDevice } from './mutate';
-export { applyContract, macroNameFor } from './contract';
-export type { ContractDevice, ContractOptions, ContractResult } from './contract';
+export { applyContract, inspectContract, removeContractOption, macroNameFor } from './contract';
+export type { ContractDevice, ContractOptions, ContractResult, ContractState, ContractStatus, DeviceValue } from './contract';
 export { DONOR_DEVICES } from './donorLibrary.generated';

@@ -517,3 +517,115 @@ function deviceTagOfPreset(preset: Element): string | null {
   return child(preset, 'Device')?.firstElementChild?.tagName ?? null;
 }
 
+
+/**
+ * Write one value inside an inserted device, addressed by the chain of tags
+ * from the device element down: `['BassMono', 'Manual']` on a `StereoGain`,
+ * `['SideChain', 'OnOff', 'Manual']` on a `Gate`.
+ *
+ * Every element on the way must already exist. A donor carries the device
+ * Live wrote, so a tag that is not there is a wrong tag rather than a missing
+ * feature, and creating it would produce a file that loads and behaves wrong -
+ * the failure mode this codec exists to avoid (Constraint 7).
+ */
+export function setDeviceValue(
+  rack: Rack,
+  devicePath: string,
+  path: readonly string[],
+  value: string | number | boolean,
+): MutationResult {
+  if (path.length === 0) throw new RangeError('setDeviceValue needs at least one tag');
+  const deviceEl = child(rack.resolveTarget(devicePath), 'Device')?.firstElementChild;
+  if (!deviceEl) return fail(`no device at "${devicePath}"`);
+
+  let node: Element | null = deviceEl;
+  for (const tag of path.slice(0, -1)) {
+    node = child(node, tag);
+    if (!node) return fail(`${deviceEl.tagName} has no "${path.join('/')}" to set`);
+  }
+  const leaf = path[path.length - 1];
+  if (!child(node, leaf)) return fail(`${deviceEl.tagName} has no "${path.join('/')}" to set`);
+  setChildValue(node, leaf, value);
+  return ok();
+}
+
+/**
+ * Take a device out of its chain, `Id`s of the siblings after it renumbered
+ * from their new positions (SCHEMA.md Q16).
+ *
+ * A macro binding lives INSIDE the parameter it drives (SCHEMA.md Q1), so
+ * removing a device takes its bindings with it. Any macro left driving
+ * nothing at all therefore has to give up its stored variation values as
+ * well, exactly as `unbindMacro` does - a value left in a slot that drives
+ * nothing is Constraint 4's corruption seen from the other side.
+ */
+export function removeDevice(rack: Rack, devicePath: string): MutationResult {
+  const preset = rack.resolveTarget(devicePath);
+  const presets = preset?.parentElement;
+  if (!preset || !presets || presets.tagName !== 'DevicePresets') {
+    return fail(`no device at "${devicePath}" - it may belong to a stale snapshot`);
+  }
+
+  const before = rack.collectMacroBindings();
+  presets.removeChild(preset);
+  elementChildren(presets).forEach((el, i) => el.setAttribute('Id', String(i)));
+
+  const after = rack.collectMacroBindings();
+  for (const macroIndex of before.keys()) {
+    if ((after.get(macroIndex) ?? []).length > 0) continue;
+    permuteVariations(rack, (values) => {
+      values[macroIndex] = UNSET_MACRO_VALUE;
+    });
+  }
+  return ok();
+}
+
+/**
+ * The inverse of `insertMacroSlots` for ONE slot: unbind it, rotate it out to
+ * the end of the bank so everything above it slides down, and clear it.
+ *
+ * Rotating rather than blanking in place is what keeps the contract's macros
+ * leading and contiguous when one option is unticked (doc/PLAN.md 4.3.1), and
+ * it reuses `reorderMacro`, so variation values move on the single tested path
+ * (Constraint 4).
+ *
+ * The visible count comes back down by two, matching the step
+ * `insertMacroSlots` went up by, and never below what it takes to show every
+ * macro that is still mapped - hiding a macro that still drives something is
+ * how a rack loses a knob with no explanation (SCHEMA.md Q7).
+ */
+export function removeMacroSlot(rack: Rack, macroIndex: number): MutationResult {
+  assertSlot(macroIndex);
+  const warnings = unbindMacro(rack, macroIndex).warnings;
+  reorderMacro(rack, macroIndex, MACRO_SLOTS - 1);
+
+  const device = rack.deviceEl;
+  for (const field of PER_SLOT_FIELDS) {
+    const el = child(device, `${field}.${MACRO_SLOTS - 1}`);
+    if (el) el.setAttribute('Value', MACRO_DEFAULTS[field] ?? '');
+  }
+  setChildValue(device, `MacroDisplayNames.${MACRO_SLOTS - 1}`, `Macro ${MACRO_SLOTS}`);
+  const controls = child(device, `MacroControls.${MACRO_SLOTS - 1}`);
+  if (controls) setChildValue(controls, 'Manual', 0);
+
+  const mapped = rack.collectMacroBindings();
+  const highest = Math.max(-1, ...Array.from(mapped.keys()).filter((i) => (mapped.get(i) ?? []).length > 0));
+  const floor = Math.max(2, highest + 1 + ((highest + 1) % 2));
+  const shrunk = rack.macroCount - 1;
+  setMacroCount(rack, Math.max(floor, shrunk - (shrunk % 2)));
+  return ok(warnings);
+}
+
+/**
+ * What an untouched macro slot carries in a rack Live wrote, read off the
+ * empty slots of `donors/BS.adg` (macros 10 to 16). `MacroDisplayNames` is
+ * not here because its default is the slot's own number.
+ */
+const MACRO_DEFAULTS: Record<string, string> = {
+  MacroDefaults: '0',
+  MacroAnnotations: '',
+  MacroColor: '-1',
+  ForceDisplayGenericValue: 'false',
+  ExcludeMacroFromRandomization: 'false',
+  ExcludeMacroFromSnapshots: 'false',
+};
