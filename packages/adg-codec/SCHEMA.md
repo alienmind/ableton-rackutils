@@ -543,3 +543,45 @@ rack type, especially drum racks, and resolve by NAME rather than assuming a
 fixed offset.
 
 **Answer:**
+
+---
+
+## Q14. Does a saved preset carry an external sidechain source?
+
+Asked because the contract (`doc/PLAN.md` 4.3) wants a Gate and a Compressor
+option, and the maintainer's own convention routes both to a separate track.
+
+**Answer: no. Live keeps the sidechain switch and drops the routing.**
+
+Confirmed against `donors/PD.adg`, whose Gate and Compressor were BOTH routed
+to a separate track in Live when the rack was saved. What the file holds:
+
+```xml
+<SideChain>
+  <OnOff>
+    <Manual Value="true" />          <!-- the switch survives -->
+  </OnOff>
+  <RoutedInput>
+    <Routable>
+      <Target Value="AudioIn/None" />
+      <UpperDisplayString Value="No Output" />
+      <LowerDisplayString Value="" />
+    </Routable>
+  </RoutedInput>
+</SideChain>
+```
+
+The whole document contains only `AudioIn/None` and `AudioOut/None` as routing
+values, and `No Output` as the only display string. Nothing anywhere else in
+the file names a track.
+
+This is what the format should do: a source names a track, and a preset has no
+tracks. It is recorded because the opposite is easy to assume from
+`UpperDisplayString` being a human-readable name, and because patchbay's notes
+on `RoutedInput/Routable` describe the mechanism without saying what survives a
+preset save.
+
+**Consequence.** A contract option may insert a Gate or a Compressor, switch
+its sidechain on, and bind a macro to it. It may NOT set the source, and the UI
+must not imply the routing came across. That stays one manual step per Set.
+

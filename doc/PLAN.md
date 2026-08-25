@@ -1,17 +1,11 @@
-# ableton-rackutils: Implementation Plan (v5)
+# ableton-rackutils: Implementation Plan (v6)
 
 **Product status: v0.1.0, beta.** The editor works end to end and the round
 trip through Live has been done on real racks. Still young: keep backups.
 
-Canonical plan for `ableton-rackutils`, a Swiss-army toolkit for Ableton rack
-preset (`.adg`) files. Lives in the repo so the project is self-contained:
-clone it and everything needed to continue is here.
-
-The first tool built on the toolkit is a macro mapping editor, and it is what
-this plan describes end to end, because it proves out the codec, the app shell,
-and the companion device pattern that later tools reuse. `adg-codec` and
-`editor-ui` are structured so a second rack-editing tool is an additional
-surface, not a rewrite.
+Canonical plan for `ableton-rackutils`, a toolkit for Ableton rack preset
+(`.adg`) files. Lives in the repo so the project is self-contained: clone it
+and everything needed to continue is here.
 
 Companion docs:
 - `doc/DEVELOPERS.md` - setup, repo layout, how to test, the pipeline. The
@@ -23,10 +17,35 @@ Companion docs:
 
 Handoff document. Written so another agent can pick this up cold. Read Part 2
 before writing any code: several intuitive designs are ruled out by facts about
-Ableton's API that are not obvious.
+Ableton's API and about the file format that are not obvious.
 
 What is already built is in the DONE section at the end, stated as outcomes.
-Everything between here and there is work not yet done.
+Everything between here and there is work not yet done. Ideas considered and
+dropped are in Parked, so nobody digs the same hole twice.
+
+---
+
+## What this is for
+
+**Two jobs, one file format.**
+
+**Job 1, built: reorganize the macros of a rack you already have.** Live has no
+way to move a mapping from macro 2 to macro 3, or to swap two macros. Its Macro
+Mappings panel shows you every mapping and lets you edit ranges, and gives you
+no way to move one. That gap is the reason this tool exists and it is the only
+part with an unarguable value proposition.
+
+**Job 2, the direction: author a rack to a contract.** A producer with one rack
+per track wants those racks to present the same interface: a gain macro always
+in the same slot, always named the same way, always the same colour. Live
+offers nothing for this, so it is done by hand, per rack, and drifts. The tool
+can materialize a convention instead: pick the pieces of the contract, and the
+rack comes out conforming.
+
+The two compose. Job 2 authors the rack, Job 1 adjusts it afterwards.
+
+Everything else considered - session scaffolding, a DSL front end, live LOM
+editing, batch library operations - is out. See Parked.
 
 ---
 
@@ -47,14 +66,18 @@ Everything between here and there is work not yet done.
 
 ## Next steps, in order
 
-1. **Use it on real racks.** Every bug this project has hit came from that,
-   not from tests - including a UI whose every interaction was broken while its
-   whole suite passed (SCHEMA.md Q12).
-2. **Confirm the colour index mapping** (Part 4.1). Everything colour-related
-   rests on it.
-3. **Finish the editor's open items** (Part 4.2).
-4. **Device editor UI** (Part 4.5): `apps/m4l-device` should render the same
-   `RackEditor`. The site is the product; the device is a convenience.
+1. **VST dependency view** (4.1). Read-only, cheap, useful on its own.
+2. **Confirm the colour index mapping** (4.2). Every colour convention rests on
+   it, and the editor already writes colours today.
+3. **The contract, one device end to end** (4.3). Utility Gain only. Prove the
+   donor pipeline and the insertion hygiene on the simplest possible case
+   before building any options strip.
+4. **Offline** (4.5). The flight case is real and the PWA is a tenth of the
+   cost of the device.
+
+Use it on real racks throughout. Every bug this project has hit came from that,
+not from tests - including a UI whose every interaction was broken while its
+whole suite passed (SCHEMA.md Q12).
 
 Default to a read-only or simulated mode for anything that writes over a user's
 file. The site downloads a copy and never touches the original.
@@ -62,9 +85,10 @@ file. The site downloads a copy and never touches the original.
 ### The test that matters is not automated
 
 Run a mutation, drag the result into Live, and look. Do it especially on a rack
-with Macro Variations (SCHEMA.md Q6). Three real bugs so far were invisible to
-the synthetic suite and one was invisible to the whole headless suite; see
-`doc/DEVELOPERS.md` for what each one was. Two rules came out of them:
+with Macro Variations (SCHEMA.md Q6), and on every new device type the contract
+learns to insert. Three real bugs so far were invisible to the synthetic suite
+and one was invisible to the whole headless suite; see `doc/DEVELOPERS.md` for
+what each one was. Two rules came out of them:
 
 - Test against the real fixtures, not only synthetic ones. A synthetic fixture
   written from the codec's own assumptions agrees with the codec's own bugs.
@@ -77,13 +101,14 @@ the synthetic suite and one was invisible to the whole headless suite; see
 
 ### The product in one sentence
 
-Load a saved Ableton rack preset (`.adg`), see its macros and its device tree,
-drag a mapping from one macro knob to another, save the modified file, reload
-it in Live.
+Load a saved Ableton rack preset (`.adg`), see it drawn the way Live draws it,
+reorganize its macros or apply a contract to it, save the result, load it back
+in Live.
 
 ### The shape of the product
 
-**A website, plus an optional download.**
+**A website. The device is the same website, bundled to run offline inside
+Live.**
 
 The website is the product. It is a static site on GitHub Pages. No account, no
 upload, no backend. The `.adg` is parsed, edited, and rebuilt entirely in the
@@ -92,92 +117,35 @@ loud on the landing page, because "drag your project files into a website"
 otherwise sounds alarming, and here it happens to be literally true that
 nothing is transmitted.
 
-The companion device is a convenience, not a requirement. Everything the tool
-does is possible without it, and it is not built yet.
+The Max for Live device adds no editing capability. It is a convenience: the
+same app, bundled, so it is reachable from inside Live with no browser and no
+network. Nothing about it is mandatory and nothing in the editor may depend on
+it.
 
-This ordering drives the whole plan: the codec runs client-side because the
-site has no server, and the device is built against a bridge that is allowed to
-be absent.
-
-### Tier 0: website only, nothing installed
-
-The complete workflow, no download, no Ableton required at the time of editing:
+### The workflow
 
 1. In Live, save the rack to disk: click the disk icon in the rack's title bar,
    or drag the rack into the browser. This produces an `.adg` in the User
    Library. Required, see Constraint 2.
-2. Open the site. Drag the `.adg` onto the page.
-3. The rack renders the way Live draws it. Drag macro 2 onto macro 3 to move
-   its mapping. Or drag a parameter onto a knob to bind it there.
-4. Click **Save a copy**. The browser downloads the modified `.adg`.
-5. In Live, drag the downloaded file from the browser onto the rack to reload
-   it.
+2. Open the site, or the device's window. Drag the `.adg` onto it.
+3. The rack renders the way Live draws it. Reorganize macros, or apply contract
+   options.
+4. Save. The browser downloads the modified `.adg`, or writes it in place where
+   the File System Access API is available (4.6).
+5. In Live, drag the file onto the rack to reload it.
 
-Works on a machine with no Ableton installed at all, and is the fallback
-whenever anything in Tier 1 misbehaves.
-
-### Tier 1: the companion device, editor included
-
-Not built. No browser tab at all: the device carries the same editor and adds
-what only Live can supply, knowing which rack is selected and what its
-parameters are doing right now.
-
-Install once:
-
-1. On the site, click **Download companion device**. Gets `rack-editor.amxd`.
-2. Drop it into the Ableton User Library, or drag it straight onto a track.
-   Audio effect with a passthrough chain, so it does not alter the sound of the
-   track it sits on.
-
-Then, per session:
-
-3. Click the rack in Live. The device shows its name, confirming the target,
-   and can enumerate its live device tree, so parameters can be picked from
-   what is actually loaded rather than from the file alone.
-4. Save the rack to disk as in Tier 0 step 1. The device pre-fills the expected
-   filename from the targeted device's name, as a suggestion to confirm, never
-   an automatic load (Constraint 2).
-5. Click **Open Editor**. A floating window appears, because the device view
-   itself is only 169px tall and does not scroll. Same editor as the website.
-6. Edit as in Tier 0. Macro knobs now show live positions alongside stored
-   values.
-7. Save. Writes straight back to the original path, no downloads folder.
-8. Reload in Live by dragging, or try the experimental reload button (Part
-   4.6).
-
-### The device bundles the site, it does not fetch it
-
-Worth stating up front because it collapses a lot of complexity: `m4l-jweb` can
-ship a web app offline inside the `.amxd`, and m4l-strudel already proves this
-at scale. That device runs the real `@strudel/core` engine headlessly inside a
-MIDI device, explicitly with no browser tab, plus a sample browser that
-downloads files next to the device. If a full live-coding engine and its sample
-universe fit in an `.amxd`, an XML editor certainly does.
-
-So the companion is not a thin remote that needs a live connection back to a
-website. It contains the entire editor. Same build artifact, two delivery
-targets:
-
-- **GitHub Pages** serves it as a website.
-- **The `.amxd`** bundles the same `dist/` and serves it from disk.
-
-Consequences that shape everything downstream:
-
-- No network dependency inside Live. Works on a plane, works airgapped.
-- No online/offline fallback logic, no version skew between a hosted UI and an
-  installed device, no CORS.
-- The cross-process bridge (Part 4.8) becomes optional rather than central,
-  since anyone who installs the device gets the full editor plus live data in
-  one process.
+Steps 1 and 5 are permanent. There is no API to save a rack preset to disk and
+no reliable way to script a hotswap, so both stay manual. See Parked.
 
 ### What this tool cannot do
 
 - It cannot change mappings on a rack live, in place, while Live is running.
-  Every edit goes through the file. Constraint 1 explains why.
-- It cannot find the rack's file automatically, even with the companion
-  installed. Constraint 2.
+  Every edit goes through the file. Constraint 1.
+- It cannot find the rack's file automatically. Constraint 2.
+- It cannot save the rack out of Live for you, or reload it for you.
 - It will not preserve mappings made after the rack was last saved to disk. The
   file is the source of truth.
+- It cannot invent a device. Constraint 7.
 
 ---
 
@@ -200,12 +168,9 @@ and the context menu reads "Remove Mapping to \<rack\> | \<chain\> |
 \<parameter\>", naming the target exactly. The limit is the API surface, not
 Live's knowledge.
 
-Compounding it: a Max for Live device reaches its own device chain far more
-readily than an arbitrary rack elsewhere in the set, and the rack the user
-wants to edit is generally not the one hosting the editor.
-
 Consequence: creating, moving, or deleting a binding is a file operation. There
-is no live API call for it. Everything in this plan follows from that.
+is no live API call for it. Everything in this plan follows from that, and it
+is why the device cannot read a rack that has not been saved.
 
 ### Constraint 2: A live device has no pointer to its source file
 
@@ -221,13 +186,11 @@ is worse than no file.
 ### Constraint 3: Macro index is not LOM parameter index
 
 For a rack device, `device.parameters[0]` is Device On. `parameters[1]` is
-typically Chain Selector. Macros follow after that. The offset is not
-guaranteed stable across rack types (drum racks and instrument racks differ).
+typically Chain Selector. Macros follow after that, and the offset is not
+guaranteed stable across rack types.
 
-Consequence: never assume `parameters[i]` is macro `i`. Build the mapping
-empirically at runtime by matching parameter names, and verify against a real
-rack before trusting it. Getting this wrong shows correct values on the wrong
-knobs, a subtle and confusing bug.
+Only matters if the device ever reads live parameter values, which is not
+currently planned. Recorded so it is not rediscovered.
 
 ### Constraint 4: Macro Variations are indexed by macro slot
 
@@ -250,11 +213,25 @@ Mutations must clear the previous owner when rebinding.
 
 Since Live 11 the visible macro count is adjustable. Do not hardcode 8 or 16.
 
+### Constraint 7: Device XML cannot be generated, only copied
+
+A stock Live device is hundreds of facts in the file. `Eq8` is 51 KB on its
+own; patchbay measured a Reverb at around 800 facts. Nothing can write one from
+a description, and a device assembled from imagination produces a file that
+loads without complaint and behaves wrong.
+
+Consequence: anything that ADDS a device to a rack needs a donor - a real
+instance, saved by Live, to copy from. This is patchbay's central finding
+(`donors/README.md`) and it governs the whole of 4.3. It is also why the
+contract's device list grows one hand-authored donor at a time rather than by
+writing code.
+
 ### Verification status
 
 Constraints 1 and 2 are well established. Constraints 4, 5 and 6 are confirmed
-in the file format by SCHEMA.md Q5, Q1 and Q7. Constraint 3 is a LOM fact and
-stays unverified until the device reads a real rack (SCHEMA.md Q9).
+in the file format by SCHEMA.md Q5, Q1 and Q7. Constraint 7 is confirmed by
+inspection of patchbay's donor set. Constraint 3 is a LOM fact and stays
+unverified because nothing currently needs it.
 
 ---
 
@@ -269,23 +246,19 @@ ableton-rackutils/
     editor-ui/          # shared React components. Zero Ableton deps.
   apps/
     site/               # the product. Static, deployed to GitHub Pages.
-    m4l-device/         # optional companion .amxd, built with m4l-jweb
+    m4l-device/         # the same site, bundled into an .amxd
   tools/
     adg-tool/           # CLI for schema investigation and codec exercise
 ```
 
-Rules that keep the tiers honest:
+Rules that keep the pieces honest:
 
 - `adg-codec` must not import React, and must run identically in Node (for
   tests) and browser.
-- `editor-ui` must not import anything from `@m4l-jweb`. It receives live data
-  as plain props, so it renders the same whether the companion is present or
-  absent.
+- `editor-ui` must not import anything from `@m4l-jweb`. The device adds no
+  capability, so no component may branch on whether it is present.
 - `apps/site` must never import from `apps/m4l-device`. The site has to build
   and deploy with the device removed entirely.
-- A `bridge-protocol` package of shared message types is only needed if Part
-  4.8 is ever built. Types only, no runtime dependency on either side, so the
-  two can be versioned independently.
 
 The build must stay a pure static build. No server-side rendering, no API
 routes, nothing that assumes a Node process at runtime.
@@ -294,7 +267,25 @@ routes, nothing that assumes a Node process at runtime.
 
 ## Part 4: Open work
 
-### 4.1 Confirm the colour index mapping (SCHEMA.md Q13)
+### 4.1 VST dependency view
+
+**Build this first.** Read-only, no donors, no insertion, no ambiguity, useful
+on its own.
+
+Walk the rack for plugin devices and list the unique plugins it needs:
+`PluginDevice`, `Vst3PluginInfo`, `VstPluginInfo` and the Audio Unit
+equivalents, each carrying a plugin name and a unique id. Show them as a strip
+above the rack.
+
+It answers a question nothing else answers: will this rack load on this
+machine, and what does it drag in. Useful for a rack downloaded from elsewhere,
+and for an old rack of your own built on a plugin you have since removed.
+
+Needs one schema finding, since no recorded question covers plugin devices:
+save a rack containing one VST3 and one AU, unpack, record the element names in
+`SCHEMA.md`. Do not guess them from the names above.
+
+### 4.2 Confirm the colour index mapping (SCHEMA.md Q13)
 
 `MacroColor.N` and `DocumentColorIndex` are palette indices. Live's own 70
 colours are sampled pixel-by-pixel from a screenshot of its picker by `pnpm
@@ -303,61 +294,214 @@ adg-palette` into `packages/editor-ui/src/livePalette.ts`.
 **Unconfirmed:** whether a swatch's position in that grid is the number Live
 stores. Grid order and stored index are two different things until a diff
 proves otherwise. Colour three or four macros and chains distinctly by hand in
-Live, save, and check which index landed where. Everything colour-related rests
-on this.
+Live, save, and check which index landed where.
 
-### 4.2 Editor UI open items
+This is not a cosmetic chore. `swapMacros` moves a colour, `setMacroColor`
+writes one, and the contract (4.3) assigns colours by convention. All three are
+wrong today if the order is wrong.
 
-- **Mapping table units.** Min and Max are shown as raw numbers. Live shows the
-  target parameter's own units (`20.0 Hz`, `-inf dB`, `35.0 %`), which are not
-  recoverable from the file for every parameter type. Sorting by column header
-  is absent too.
+### 4.3 The contract: device options above the rack
+
+The new direction. A rack comes in; the user ticks the pieces of their
+convention; the rack comes out conforming.
+
+#### 4.3.1 The interaction
+
+A horizontal strip of options above the rendered rack. Each option is one
+device the contract can guarantee, with its own settings. Ticking one
+materializes it: the device is added if absent, a macro is bound to the
+relevant parameter, named from a pattern, coloured, and placed in the slot the
+contract assigns it.
+
+Global settings sit alongside: the rack name (for example `BS`), written to the
+rack's name and used for the output filename.
+
+**A piece already present is detected, not duplicated.** If the rack already
+ends in a Utility, the option shows as satisfied, coloured differently, and the
+user can still edit its name, colour and slot. The tool reuses what is there.
+
+**The contract's macros take the FIRST slots, and the rack's own macros shift
+right.** That is what makes them familiar: whatever rack you open, the leading
+knobs are the ones you put there. Their order among themselves is the order of
+the options in the strip, so it is the same on every rack. The editor's
+existing drag-to-reorder stays available for exceptions.
+
+Shifting needs a new codec mutation - insert K empty slots at the front,
+displacing what is there - and it must permute variation values like every
+other slot-changing mutation (Constraint 4). `donors/PD.adg` carries a
+variation, so this is testable against a real rack from day one.
+
+**The shift can fail, and the donor proves it.** `PD.adg` already uses all 16
+slots. There is no room to insert anything, and `setMacroCount` cannot go past
+16 (Constraint 6). When the contract does not fit, the answer is the parent
+rack in 4.3.3, which brings a fresh 16.
+
+#### 4.3.2 The options, as specified
+
+| Option | Device | Macros | Settings | Donor |
+|---|---|---|---|---|
+| Utility Gain | `StereoGain` | `{name} GAIN` | colour, bass mono | `PD.adg` |
+| Gate | `Gate` | `{name} GATE ON/OFF` | colour, sidechain switch | `PD.adg` |
+| Compressor | `Compressor2` | - | colour, sidechain switch | `PD.adg` |
+| AutoFilter | `AutoFilter2` | `{name} AUTOFILTER` | colour | `PD.adg` |
+| EQ Three | unknown tag | `{name} LO`, `{name} MID`, `{name} HI` | colour per band | **none** |
+
+What `donors/PD.adg` establishes:
+
+- `StereoGain` carries `Gain`, `Mono`, `BassMono`, `BassMonoAudition` and
+  `BassMonoFrequency`, so the bass mono checkbox is two real parameters.
+- **Live 12 writes `AutoFilter2`, not `AutoFilter`.** patchbay's donor set has
+  the older tag. Insert what Live writes today.
+- The rack's own macro 9 is `GATE ON/OFF` bound to the Gate's `On`, and macro
+  16 is `PD GAIN` bound to both the Utility's `Gain` and Drift's
+  `Global_StereoVoiceDepth`. The convention this feature automates already
+  exists by hand, and one contract macro driving two parameters is normal.
+
+**EQ Three has no donor and its XML tag is unestablished.** Not in `PD.adg`,
+not in patchbay's `donors/` or `racks/`. `Eq8` is EQ Eight, a different device.
+Save one from Live, drop it in `packages/adg-codec/donors/`, and record the tag
+before this option can exist.
+
+#### 4.3.3 Where the devices go
+
+**Wrapping is a checkable option, not something the tool decides.**
+
+Unwrapped: append the devices at the end of the chain and shift the rack's own
+macros right (4.3.1). Cheaper, no nesting level added, and it is what a
+single-chain rack usually wants.
+
+Wrapped: produce a **new parent rack** holding the original rack followed by
+the contract's devices. The contract's macros live on the parent, one level
+above the original rack's own, so they can never collide and the convention is
+always on the outermost rack.
+
+Wrapping is the answer, not merely an alternative, in two cases:
+
+- **Parallel chains.** Chains are parallel and a rack has no post-sum device
+  slot, so a Utility "at the end" of a multi-chain rack can only mean after the
+  sum, which is outside the rack.
+- **No room to shift.** `PD.adg` uses all 16 slots, and the contract cannot
+  insert into a full rack.
+
+The tool should say which case applies rather than silently choosing. The
+parent must match the rack it wraps: `InstrumentGroupDevice` around an
+instrument rack, `AudioEffectGroupDevice` around an effect rack. `PD.adg` is an
+instrument rack; patchbay carries `AudioEffectGroupDevice` in 25 files.
+
+#### 4.3.4 Insertion hygiene, which is mandatory
+
+Pasting a donor into a rack is not enough. `clone.py` in patchbay is an
+enumerated list of what breaks, each entry there because a file was rejected or
+silently corrupted:
+
+- ids assigned to inserted devices, never reused, allocated above the maximum
+- session ids zeroed
+- empty `Int64` fields filled
+- legacy path elements stripped
+- unsourced samples stripped
+- a loadable check run before the file is handed to the user
+
+This is work, not discovery. But it is not optional: the failure mode of this
+feature is a rack that loads and behaves wrong, which is the worst outcome this
+project has.
+
+#### 4.3.5 Donors, and where they come from
+
+Constraint 7 says a device must be copied from a real instance. Donors live in
+`packages/adg-codec/donors/`, which is negated in `.gitignore` because `.adg`
+is otherwise excluded repo-wide.
+
+`PD.adg` is the first one and covers four of the five options: `StereoGain`,
+`Gate`, `Compressor2`, `AutoFilter2`. It also carries `Eq8`, `Delay`, `Reverb`
+and `Drift`, which are not options yet.
+
+Adding support for a new device means putting it in a rack in Live, saving,
+dropping the file there, and recording what it yields in that directory's
+README. No user-facing donor concept, no harvest UI.
+
+patchbay's `donors/README.md` records a trap worth knowing even though our
+layout differs: when two files can supply the same device, the tie-break must
+be deterministic. Theirs is filename-based and it bit them twice, because
+filename order is case-insensitive on Windows and case-sensitive elsewhere, so
+the same repo built different racks on different machines. With one harvest
+source per device there is no tie; if that stops being true, make the rule
+explicit before it matters.
+
+#### 4.3.6 The external sidechain source is not carried by a preset
+
+Asked: would free text be enough, matching the source track by name?
+
+**No, and this is now settled** - SCHEMA.md Q14. `donors/PD.adg` was saved with
+its Gate AND its Compressor both routed to a separate track, and the file keeps
+`SideChain/OnOff/Manual = true` while holding `Target = AudioIn/None` and
+`UpperDisplayString = No Output`. The entire document contains no routing value
+other than `AudioIn/None` and `AudioOut/None`. The switch survives the save;
+the source does not.
+
+**What the option can do:** insert the Gate or Compressor, switch its sidechain
+on, bind and name the macro. **What it cannot do:** set the source. That stays
+one manual step per Set, and the UI has to say so rather than implying the
+routing came across.
+
+#### 4.3.7 Remembering the convention
+
+The choices - colours, name patterns, which options are on, slot assignments -
+persist in `localStorage` so a second rack comes out like the first.
+
+Two caveats it has to answer:
+
+- `localStorage` is per browser and per origin, so conventions do not travel
+  between machines, and **the bundled device is a different origin from the
+  website**, so they do not travel there either.
+- One export/import button, writing the convention as a JSON file, fixes both
+  for about an hour of work. Build it with the storage, not after.
+
+#### 4.3.8 Build order within 4.3
+
+**One device end to end before any options strip UI.** Utility Gain: detect an
+existing `StereoGain` at the end of the chain, insert from donor if absent,
+bind `Gain`, name from pattern, colour, place in the contract's slot, run the
+loadable check, and load the result in Live.
+
+The strip is easy. The insertion is where this lives or dies, and that wants
+finding out on device one.
+
+Then Gate and Compressor (a device with no macro of its own in the Compressor's
+case, plus the sidechain switch), AutoFilter, and EQ Three last since it needs
+a donor and a tag established first.
+
+### 4.4 Editor open items
+
 - **Cables that persist on selection.** Clicking a macro or a parameter should
   show its existing patch cables, fading in and out rather than blinking. The
   machinery is in `PatchCable.tsx` and `useParamDrag.ts`; it currently draws
   only during a drag. Requested, not built.
-- **The knob** is still a placeholder arc rather than a redrawn Live knob.
-  Trackster's SVG knob components are the starting point.
-- **Macro Variations render read-only.** Creating, recalling and deleting one
-  need codec mutations that do not exist (4.3).
-- **Drum pads** are laid out 4 wide, bottom-up, showing every pad. Live's
-  16-pad scroll window is not reproduced because `PadScrollPosition`'s geometry
-  is unconfirmed (SCHEMA.md Q10). Needs a diff of a scrolled pad view.
-- **Absent entirely:** the chain selector strip, the Key/Vel/Chain zone editors,
-  the Rand/Map buttons.
+- **Mapping table units.** Min and Max show as raw numbers. Live shows the
+  target parameter's own units (`20.0 Hz`, `-inf dB`), which are not
+  recoverable from the file for every parameter type. patchbay's donor index
+  knows the native range per parameter, so importing it would supply this.
+- **Sorting the mapping table** by column header, as Live's own list does.
 
-### 4.3 Codec work still open
+### 4.5 Offline
 
-- **Variation mutations.** Create, recall, delete. Constraint 4 applies to all
-  three, and the vacated-slot semantics are already recorded in SCHEMA.md Q6.
-- **Case transforms for names** (rack/macro/device names - CAPITALIZE,
-  lowercase, CamelCase), applied automatically or on demand. The codec side is
-  `renameMacro`/`renameRack` with a transform applied first; the open part is
-  the UI surface to trigger it from.
-- **Automatic colour choice**: from a palette, by name, or "sticky" colours for
-  a given name or function that stay consistent across nested racks (every
-  "Filter" macro anywhere in a rack tree gets the same colour). The sticky case
-  needs a design decision first - a lookup table shipped with the tool, or user
-  configurable, and scoped per rack or globally - before it is a codec
-  function. Blocked on 4.1 either way.
-
-### 4.4 Site work still open
-
-Both of these are patterns trackster already solves; copy rather than rewrite.
-
-**Offline (PWA).** `vite-plugin-pwa` with `registerType: 'autoUpdate'`, `scope`
-and `start_url` from `VITE_BASE`, `maximumFileSizeToCacheInBytes` raised, and
+`vite-plugin-pwa` with `registerType: 'autoUpdate'`, `scope` and `start_url`
+from `VITE_BASE`, `maximumFileSizeToCacheInBytes` raised, and
 `navigateFallbackDenylist: [/.*\.(adg|als|md|zip)$/i]` so the SPA fallback does
-not swallow non-HTML assets. Someone mid-session with a DAW open should not be
-blocked by a flaky connection.
+not swallow non-HTML assets. Trackster already does exactly this.
+
+Authoring racks offline on a flight is a real use of this tool, and the PWA
+delivers it in a browser tab for a fraction of what the device costs. Do it
+before the device, not after.
 
 Skip the plugin entirely in the device build. Bundling already solves offline
 there, and a service worker only adds a caching layer that can serve stale UI
 after a device update.
 
-**File System Access API.** Better than the current download-a-copy flow.
+### 4.6 Save in place
+
 `showOpenFilePicker()` returns a handle writable through `createWritable()`, so
-the site can save the modified `.adg` over the original.
+the site can save the modified `.adg` over the original instead of downloading
+a copy the user then has to find.
 
 ```typescript
 const [handle] = await window.showOpenFilePicker({
@@ -372,10 +516,6 @@ await writable.write(rack.serialize());
 await writable.close();
 ```
 
-Consequences:
-
-- Save-in-place moves from Tier 1 to Tier 0. The companion is then purely about
-  targeting and live values.
 - Reuse trackster's `src/types/file-system-access.d.ts`.
 - Firefox and Safari support is weaker than Chromium's, so keep the `<input
   type="file">` plus download path as an automatic fallback, and detect rather
@@ -384,387 +524,172 @@ Consequences:
   Default to read-only, and require an explicit opt-in before any destructive
   write.
 
-**Pages gotchas not yet hit.** Add `.nojekyll` to the artifact root before any
-file or folder starting with an underscore ships, or it is silently dropped. If
-client-side routing is ever added, copy `index.html` to `404.html`, since Pages
-has no rewrite rules; better, do not add routing, one page is enough.
+### 4.7 The Max for Live device, as a bundle
 
-### 4.5 The companion device
+**It adds no editing capability. It is the same app, reachable without a
+browser and without a network.** Anyone who has the site has everything the
+device does.
 
-Nothing here blocks the product. The site already works. This makes targeting
-and parameter-picking easier for people who install it, and every capability
-below must degrade to absent without breaking the site. Until it does
-something, the site advertises it as "Soon!" rather than offering a download
-that would disappoint.
+The pattern is proven by `m4l-gugelhupf`, the author's own: an `.amxd` with a
+`-site` folder beside it holding the local copy of the web app, opened in a
+window.
 
-`m4l-jweb` is the author's own framework, so gaps here are build tasks rather
-than blockers.
+**The device view is minimal**, because it is 169px tall and does not scroll:
 
-#### 4.5.1 Framework capabilities needed
+- an **Open** button, which opens the editor in a pop-up window
+- optionally, **a list of the rack devices on this track**, so the user can see
+  which racks are candidates
 
-**Native file picker inside `jweb`.** Only matters for the UI running inside
-Live. Does `<input type="file">` open a real OS dialog, in both `pnpm dev` and
-an installed `.amxd`? If it cannot be made to work, fall back to accepting a
-typed path read via the Max side. Tier 0 is unaffected either way.
+Everything else happens in the window.
 
-**Runtime-chosen parameter watching.** `defineWatch()` as documented appears
-built for properties known at surface-definition time. Needed here: paths
-chosen by the user mid-session.
+**What "import racks from this track" can and cannot be.** LOM can enumerate
+the devices on the track the device sits on, so it can list rack names. It
+cannot read their mappings (Constraint 1) and it cannot find their files
+(Constraint 2). So the honest feature is: list the racks by name, and for each
+one either offer a matching `.adg` from the User Library or tell the user to
+save it first. It is a shortcut to the file picker, not a way to read a live
+rack. Do not let it imply otherwise in the UI.
 
-```typescript
-// One hook taking a list. Not one hook per parameter, hook count must not vary
-// with array length.
-function useLiveParameters(
-  devicePath: LomPath | null,
-  parameterIndices: number[],
-): Record<number, number>;
-```
+Bundling checklist, most of which the site already satisfies because it was
+designed backend-free:
 
-Implementation: a generic `live.observer` pool on the Max side that attaches
-and detaches by path at runtime, pushing changes over the existing bridge.
-
-**Device tree enumeration.** A plain async function, not a hook, since it is
-called on demand rather than subscribed to.
-
-```typescript
-interface LiveDeviceNode {
-  name: string;
-  className: string;
-  path: LomPath;
-  isRack: boolean;
-  parameters: { index: number; name: string }[];
-  chains: { name: string; devices: LiveDeviceNode[] }[];
-}
-
-function fetchDeviceTree(path: LomPath): Promise<LiveDeviceNode>;
-```
-
-Its main job here is resolving Constraint 3: matching macro names from the file
-against LOM parameter indices, so the live overlay lands on the right knobs.
-
-**Selected-device tracking.**
-
-```typescript
-function useSelectedDevice(): { name: string; path: LomPath } | null;
-```
-
-Backed by `song.view.selected_track.view.selected_device`, which is observable.
-The user clicks the device, which they were going to do anyway. An
-enable/disable toggle trick was considered and rejected: it has a real side
-effect (momentarily bypassing the device cuts held notes) and requires watching
-every sibling. If a toggle fallback is still wanted, observe `parameters[0]`
-(Device On), which is definitively a `DeviceParameter`, rather than
-`is_active`.
-
-#### 4.5.2 Device view
-
-169px, no scrolling. A launcher and a status line, nothing else.
-
-```tsx
-export default function App() {
-  const selected = useSelectedDevice();
-  const editorWindow = useWindow(surface, "editor");
-  return (
-    <div className="device-view">
-      <div className="target">{selected ? selected.name : "Select a rack in Live"}</div>
-      <button onClick={editorWindow.open} disabled={!selected}>Open Editor</button>
-    </div>
-  );
-}
-```
-
-#### 4.5.3 Editor window
-
-```tsx
-export default function Editor() {
-  const selected = useSelectedDevice();
-  const [rackTree, setRackTree] = useState<LiveDeviceNode | null>(null);
-  const [visibleMacros, setVisibleMacros] = useState<number[]>([]);
-
-  useEffect(() => {
-    if (selected) fetchDeviceTree(selected.path).then(setRackTree);
-  }, [selected?.path]);
-
-  // Constraint 3: resolve macro slot to LOM parameter index by name, do not
-  // assume they align. parameters[0] is Device On, not macro 0.
-  const paramIndices = useMemo(
-    () => visibleMacros.map(m => resolveMacroParamIndex(rackTree, m)).filter(i => i !== null),
-    [rackTree, visibleMacros],
-  );
-
-  const liveValues = useLiveParameters(selected?.path ?? null, paramIndices);
-
-  return (
-    <RackEditor
-      liveValues={liveValues}
-      suggestion={selected ? { path: guessPresetPath(selected.name), label: selected.name } : undefined}
-      onSave={(bytes, name) => saveToFile(name, bytes)}
-    />
-  );
-}
-```
-
-`guessPresetPath` globs the User Library for a filename match and returns a
-suggestion for the load dialog. It never reads the file (Constraint 2). If the
-rack was renamed or never saved, the suggestion is simply absent and the plain
-file picker still works.
-
-Render the live indicator as visually distinct from the stored value. They are
-different things (Constraint 1: the file has bindings and stored values, the
-LOM has current positions) and conflating them in the UI invites conflating
-them in the code.
-
-Attach live listeners only for currently visible macros, and detach on unmount.
-A deeply nested rack has hundreds of parameters and eagerly watching all of
-them will not end well.
-
-#### 4.5.4 Bundling the site into the device
-
-Build once, ship twice. The same `apps/site/dist` output is both the Pages
-artifact and the device payload, copied into `patcher/web` by the device build.
-Both build modes come from the single `VITE_BASE` env var the site config
-already reads, so there is no separate device config to keep in sync.
-`release-device.yml` passes `VITE_BASE: './'` and `VITE_EMBED: '1'`, then
-asserts no absolute asset paths survived into the bundle. An absolute
-`/ableton-rackutils/` path resolves against the filesystem root when loaded
-from disk inside `jweb` and 404s into a blank window.
-
-Checklist, most of which the site already satisfies because it was designed
-backend-free:
-
-- Relative asset paths.
-- No absolute-root fetches, no CDN imports at runtime. Everything vendored at
-  build time.
-- Hide the landing copy, the download button, and any Pages-specific analytics
-  when embedded. A build-time flag is cleaner than a URL parameter, since the
-  bundle already differs.
-- Skip the service worker (4.4).
-
-Version the two together. The device reports the bundled site version in its
-UI, so a bug report from inside Live is traceable to a commit.
+- Relative asset paths. `release-device.yml` passes `VITE_BASE: './'` and
+  asserts no absolute asset paths survived, because an absolute
+  `/ableton-rackutils/` path resolves against the filesystem root inside `jweb`
+  and 404s into a blank window.
+- No absolute-root fetches, no CDN imports at runtime. Everything vendored.
+- Hide the landing copy and anything Pages-specific when embedded. A build-time
+  flag, since the bundle already differs.
+- No service worker (4.5).
+- The device reports the bundled site version, so a bug report from inside Live
+  is traceable to a commit.
 
 Two open questions in `release-device.yml`, both marked in the file: whether the
 `m4l-jweb` device build needs macOS and a Max toolchain (currently assumed, and
 macOS runners bill roughly 10x Linux), and the exact output paths for the
 `.amxd` and the embedded web directory.
 
-### 4.6 Reload (experimental)
-
-Ableton's Browser API has real machinery here: browser items expose
-`is_loadable`, there is a `relation_to_hotswap_target` check and a
-hotswap-target-changed listener, and items load via `load_item`. This is the
-mechanism behind the yellow-border replace-in-place feature.
-
-Two unknowns, both requiring a spike:
-
-1. Can a script set the hotswap target itself, pointed at a chosen device,
-   without the user initiating hotswap first?
-2. Does `load_item` on a file just overwritten in place pick up the new bytes,
-   or serve a cached version until the library rescans?
-
-```typescript
-async function onReload(savedPath: string) {
-  const ok = await hotswap.loadFromBrowserItem(savedPath);
-  if (!ok) showMessage("Drag the saved file from the browser onto the rack to reload it.");
-}
-```
-
-Budget half a day. Ship the manual drag-back as the documented path regardless,
-since it always works and requires nothing from an undocumented API.
-
-### 4.7 Python control surface (optional)
-
-Only needed for two cases: a browser tab wanting live values with no Max
-patcher available to it, or watching parameters outside the current track. Not
-required for the device, 4.5 covers that.
-
-```python
-# RackWatcher/RackWatcher.py
-from _Framework.ControlSurface import ControlSurface
-
-class RackWatcher(ControlSurface):
-    def __init__(self, c_instance):
-        super().__init__(c_instance)
-        self._server = MinimalWebSocketServer(port=9700)
-        self._server.start()
-        self.schedule_message(1, self._tick)   # no threads available, cooperative only
-
-    def _tick(self):
-        for track in self.song().tracks:
-            for device in track.devices:
-                if not self._is_rack(device):
-                    continue
-                # Constraint 3: filter by name, do not assume parameters[i] is macro i.
-                macros = [
-                    {"index": i, "name": p.name, "value": p.value}
-                    for i, p in enumerate(device.parameters)
-                    if p.name.startswith("Macro")
-                ]
-                self._server.broadcast({"track": track.name, "rack": device.name, "macros": macros})
-        self.schedule_message(1, self._tick)
-```
-
-Notes:
-
-- Remote Scripts get no pip environment. Dependencies must be vendored in the
-  script folder. A hand-rolled minimal WebSocket server (handshake plus text
-  frames, no compression, no fragmentation) is realistically less work than
-  vendoring a library correctly.
-- Live's script host has no real threading. `schedule_message` is the only
-  periodic mechanism.
-- Poll visible racks rather than attaching listeners to everything, same scale
-  reason as 4.5.
-
-**Bonus: empirical mapping discovery.** For a rack with no saved file (built
-live, never exported), nudge a macro and watch which parameter's value moves in
-correlation. This discovers a binding without any file. It is invasive (the
-value audibly changes) and ambiguous when one macro drives several parameters,
-so use it as a cross-check or last resort, never as the primary path.
-
-### 4.8 The loopback bridge (probably unnecessary)
-
-Bundling removes the reason this existed. It is only worth building for one
-narrow case: someone who has the device installed but prefers editing in a real
-browser tab, wanting live values there. That is a small audience and a large
-amount of machinery. Documented here so the tradeoff is on record rather than
-rediscovered.
-
-**The problem.** The site is served from `https://` on GitHub Pages. The
-companion runs on the user's own machine. Browsers block mixed content, so an
-HTTPS page normally cannot open an insecure connection.
-
-**Why it may still work.** Browsers treat loopback (`127.0.0.1`, and
-`localhost` where it resolves to loopback) as a potentially trustworthy origin,
-which is what makes local-companion architectures viable at all. Support has
-historically differed between engines, and the rules around local network
-access have been tightening, so this needs verifying per browser rather than
-assuming.
-
-**Spike this before building anything else here.** Half a day: serve a trivial
-page over HTTPS, run a local WebSocket server on `127.0.0.1`, try to connect
-from the page in Chrome, Firefox and Safari on macOS and Windows, and record
-the result including whether any permission prompt appears.
-
-**If loopback WebSocket works**, that is the design:
-
-```typescript
-// packages/bridge-protocol/src/index.ts
-export const BRIDGE_PORT = 9770;
-export const PROTOCOL_VERSION = 1;
-
-export type FromCompanion =
-  | { t: "hello"; protocol: number; companion: string }
-  | { t: "selected-device"; name: string; path: string } | { t: "selected-device"; name: null }
-  | { t: "device-tree"; path: string; tree: LiveDeviceNode }
-  | { t: "live-values"; path: string; values: Record<number, number> }
-  | { t: "saved"; path: string };
-
-export type ToCompanion =
-  | { t: "subscribe-values"; path: string; parameterIndices: number[] }
-  | { t: "request-tree"; path: string }
-  | { t: "save"; path: string; bytesBase64: string };
-```
-
-The site-side hook must attempt the connection once on mount, then only on
-explicit user retry. Never poll: a background reconnect loop against a port
-nothing is listening on produces console noise on every page load for the
-majority of users who will never install the companion. It must also return a
-valid disconnected stub when nothing is running, with no thrown errors and no
-retry spinner blocking the UI. The overwhelmingly common case is no companion
-at all, and that path has to feel like the intended one rather than a degraded
-one.
-
-Version negotiation matters here in a way it usually does not: the site
-auto-updates on every push, the device updates only when a user chooses to
-download a new one, so an old device will meet a new site routinely. On a
-`hello` with a mismatched `protocol`, the site should keep working in Tier 0
-mode and show a quiet "companion needs updating" note, never an error.
-
-**If loopback WebSocket is blocked**, fall back to a manual transfer, which
-needs no networking at all: the device's UI shows an **Export context** button
-producing a JSON blob of the selected device's tree, the user copies or saves
-it and drops it into the site, and the site gets the same tree and the same
-filename suggestion. It loses only live value streaming, which is the least
-essential feature. This fallback is worth building regardless, since it also
-covers users on locked-down corporate browsers.
-
-**Do not** try to solve this with a local HTTPS server and a self-signed
-certificate. Certificate warnings on `localhost` are a worse experience than
-the manual export, and shipping a private key inside a downloadable device is
-not acceptable.
-
 ---
 
 ## Build order and risk
 
-Steps 1 to 4 are done; see DONE. What remains, in order:
-
-| Order | Work | Blocks | Risk if skipped |
-|---|---|---|---|
-| 5 | 4.1 colour index confirmation | 4.3 sticky colours | Wrong colours written to files |
-| 6 | 4.2 remaining editor items | nothing | Feature gaps only |
-| 7 | 4.4 offline + save-in-place | nothing | Current flow already works |
-| 8 | 4.5 companion device (bundled) | nothing | Convenience only |
-| 9 | 4.6 reload | nothing | Manual drag always works |
-| 10 | 4.8 loopback bridge | nothing | Probably never needed |
-| 11 | 4.7 control surface | nothing | Optional entirely |
-
-The product already ships. Everything above is an enhancement for users who opt
-in, and each must be removable without touching the site.
+| Order | Work | Risk if skipped |
+|---|---|---|
+| 1 | 4.1 VST dependency view | None, but it is the cheapest useful thing left |
+| 2 | 4.2 colour index confirmation | Wrong colours written to files |
+| 3 | 4.3 contract, Utility Gain only, plus the slot-shift mutation | The whole direction stays unproven |
+| 4 | 4.5 offline | No authoring on a flight |
+| 5 | 4.3 remaining devices | Contract covers one case only |
+| 6 | 4.4 editor open items | Feature gaps only |
+| 7 | 4.6 save in place | Current download flow works |
+| 8 | 4.7 device bundle | Site already delivers everything |
 
 ### Open risks
 
-1. **Colour index order (4.1).** Unverified, and everything colour-related
-   rests on it.
-2. **Range inversion semantics (SCHEMA.md Q4).** The editor now writes
-   inverted ranges, and the only direct evidence that Live honours `Min > Max`
-   is patchbay's Live 12.4.3 note. Confirm with our own diff.
-3. **Asset paths in the bundled build (4.5.4).** The most likely device-side
+1. **Insertion produces a rack that loads and behaves wrong** (4.3.4). The
+   worst failure mode available. Mitigated only by the hygiene checklist and by
+   loading every new device type in Live by hand.
+2. **Colour index order (4.2).** Unverified, and the contract assigns colours.
+3. **Range inversion semantics (SCHEMA.md Q4).** The editor writes inverted
+   ranges and the only direct evidence that Live honours `Min > Max` is
+   patchbay's Live 12.4.3 note. Confirm with our own diff.
+4. **The macro shift can have nowhere to go** (4.3.1). A rack using all 16
+   slots cannot take the contract's macros without being wrapped. `PD.adg` is
+   exactly that case, so it will be hit immediately.
+5. **Live closes the gap.** The whole value proposition of Job 1 is that Live
+   cannot move a macro mapping. Its Macro Mappings panel is recent and sits
+   directly adjacent. Worth rechecking on each Live release.
+6. **Asset paths in the bundled build (4.7).** The most likely device-side
    failure is a blank window from absolute paths resolving against the
-   filesystem root. Build with `base: "./"` and test the installed `.amxd`, not
-   just `pnpm dev`.
-4. **Macro index to LOM parameter index (Constraint 3).** Resolve by name
-   matching, verify against a drum rack specifically, where the layout is most
-   likely to differ.
-5. **`PadScrollPosition` geometry (SCHEMA.md Q10).** Unconfirmed, so the drum
-   pad view does not match Live's.
-6. **Hotswap scriptability (4.6).** Undocumented even by Ableton. Ship the
-   fallback.
+   filesystem root.
 
 ### Do not
 
 - Do not model anything in `adg-codec` that is not traceable to a diff recorded
   in `SCHEMA.md`. Guessing an element name or a colour index produces files
   that load in Live without complaint and silently corrupt.
+- Do not generate device XML. Copy a donor. Constraint 7.
+- Do not hand the user a file that has not passed the loadable check.
 - Do not compare `.adg` files byte for byte in tests. Gzip headers embed a
   timestamp. Compare normalized XML.
-- Do not let live LOM values influence what is written to the file. Bindings
-  come from the file, values come from the LOM, and the boundary belongs in the
-  code, not just in someone's head.
 - Do not attach live listeners to a whole nested rack at once.
 - Do not auto-load a guessed file path.
-- Do not let the site import from the device package, or assume a companion is
-  present anywhere in the editing path.
-- Do not claim the companion device works on the site while it is a scaffold.
+- Do not let the site import from the device package, or let any editor
+  component branch on whether the device is present.
 - Do not add a backend. The moment file bytes leave the browser, the privacy
   claim on the landing page stops being true.
-- Do not point the device at the deployed URL. Bundle the build, as m4l-strudel
-  does.
+- Do not point the device at the deployed URL. Bundle the build, as
+  m4l-gugelhupf does.
 - Do not ship the service worker in the device build.
-- Do not build the loopback bridge before someone actually asks for it.
 - Do not use HTML5 drag-and-drop for editor gestures. See DONE, D3.
+- Do not let the contract grow into session scaffolding. See Parked.
+
+---
+
+## Parked
+
+Considered, and not being built. Each entry says what killed it, so the same
+ground is not covered twice.
+
+**Session and project scaffolding.** Generating tracks, routing, returns, or an
+`.als` from a template. It is a coherent product and it is a different one:
+the moment the tool reasons about tracks it stops being a rack tool. The
+boundary that keeps this honest: anything inside one `.adg` is in scope,
+anything naming a track is not. The external sidechain source (4.3.6) sits
+exactly on that line, which is why it needs a diff before it gets an option.
+
+**A DSL front end.** patchbay already is one, and the point of this tool is to
+deliver the same consistency without asking anyone to write a spec. Deriving a
+contract from a rack the user already likes covers the same ground with no
+language to learn.
+
+**Batch operations across a rack library.** Scanning a folder, conforming forty
+racks at once, library-wide audits. Real for someone with a large library; the
+target user has eight racks, one per track, sized to a Push layout with no
+scrolling. A per-rack button is the whole feature at that scale.
+
+**Live values on the macro knobs, and click-to-pick a parameter in Live.**
+Both need LOM and both were interesting while the device was a product. With
+the device reduced to a bundle, neither earns the machinery. Click-to-pick also
+had an unsolved half: matching a LOM parameter back to its element path in the
+file.
+
+**Scripted hotswap reload.** Live's Browser API has `is_loadable`,
+`relation_to_hotswap_target` and `load_item`, and `browser.hotswap_target`
+appears read-only, so a script probably cannot point hotswap at a device the
+user has not already put into hotswap. Dragging the file back always works and
+needs nothing undocumented.
+
+**The loopback WebSocket bridge.** Existed to let a browser tab talk to the
+device for live values. Bundling removed the reason, and live values are parked
+anyway.
+
+**A Python control surface.** Only ever needed for live values outside the
+current track. Parked with them.
+
+**Macro Variation authoring.** Variations must stay correct under a move -
+Constraint 4, already tested - but creating, recalling and deleting them is a
+different tool.
+
+**Drum pad scroll window, knob redraw, chain selector strip, zone editors,
+Rand/Map.** Fidelity to Live's UI for its own sake. `PadScrollPosition`
+geometry is unconfirmed (SCHEMA.md Q10) and would need a diff nobody needs yet.
+
+**Automatic and sticky macro colours by name.** Superseded by 4.3: the contract
+assigns colours explicitly, which is the same benefit without inference.
 
 ---
 
 ## Prior art, all by the same author
 
 - `alienmind/patchbay` - Python DSL for authoring racks. Its `doc/SCHEMA.md` is
-  the head start behind most of ours.
+  the head start behind most of ours, its `donors/` is where 4.3's device
+  instances come from, and its `clone.py` is 4.3.4's checklist.
 - `alienmind/m4l-jweb` - the framework the device is built on.
-- `alienmind/m4l-strudel` - proves a full web app bundles offline into an
-  `.amxd`.
+- `alienmind/m4l-gugelhupf` - an `.amxd` with a `-site` folder beside it holding
+  the web app, opened in a window. The bundling pattern 4.7 copies.
 - `alienmind/trackster` - the CI/CD, PWA, and File System Access patterns
-  copied here, plus the SVG knob components 4.2 starts from.
+  copied here.
 
 ---
 
@@ -941,7 +866,7 @@ CI.
   `.amxd` is executable content and installing one is a real trust decision, so
   the source and the build workflow get linked at that point.
 
-### D5. Shipping the companion from the site - DONE
+### D5. Shipping the device from the site - DONE
 
 `release-device.yml` runs on every push to `main` rather than on a manual
 `device-vX` tag, since there is no versioning scheme yet, and always overwrites
@@ -954,16 +879,18 @@ file in the repo, so the site is not rebuilt to ship a device update.
 `apps/site/src/companion/download.ts` returns null on any failure and the UI
 always has a hardcoded fallback. GitHub's unauthenticated API is rate-limited
 per IP and will occasionally fail for reasons having nothing to do with the
-user. The download itself stays hidden until the device does something (D4).
+user. The download itself stays hidden until the device does something (D4),
+which under 4.7 means until it opens the bundled editor.
 
 Once the codec's versioning matures enough for real `device-vX` releases to
 make sense, revisit: either the site should prefer a real tagged release over
 the rolling one, or the rolling-build concept should retire entirely.
 
-This matches how m4l-strudel distributes: a zip of devices on GitHub Releases,
-with a maxforlive.com listing pointing at it. Worth listing there too once
-stable. Note that maxforlive lists a single device file, so if this ever grows
-to multiple devices, ship a zip bundle rather than fighting the form.
+This matches how m4l-gugelhupf distributes: a zip of devices on GitHub
+Releases, with a maxforlive.com listing pointing at it. Worth listing there too
+once the device is more than a scaffold. Note that maxforlive lists a single
+device file, so a multi-device release ships a zip rather than fighting the
+form.
 
 ### D6. CI/CD - DONE
 

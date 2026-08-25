@@ -9,7 +9,7 @@ Everything needed to continue is in the repo.
 
 | File | What it is |
 |---|---|
-| [`doc/PLAN.md`](PLAN.md) | Full implementation plan, phase by phase, with code. Opens with current state, next steps, and the constraints that rule out obvious designs. |
+| [`doc/PLAN.md`](PLAN.md) | The plan. Opens with what the tool is for, then current state, open work, and the constraints that rule out obvious designs. Finished work is in DONE at the end, dropped ideas in Parked. |
 | [`packages/adg-codec/SCHEMA.md`](../packages/adg-codec/SCHEMA.md) | Schema findings, confirmed against real racks. The codec's spec. |
 | [`CLAUDE.md`](../CLAUDE.md) | House rules: commit style, comment style, where scratch work goes. |
 
@@ -18,7 +18,7 @@ Everything needed to continue is in the repo.
 ```
 packages/adg-codec/   parse, mutate, serialize .adg. No UI deps.
 packages/editor-ui/   shared React components. No Ableton deps.
-apps/m4l-device/      optional companion .amxd, built with m4l-jweb.
+apps/m4l-device/      the same site, bundled into an .amxd. Adds no features.
 apps/site/            the product. Static, deployed to GitHub Pages.
 tools/adg-tool/       CLI: unpack/diff a rack, or exercise the codec directly.
 ```
@@ -28,7 +28,8 @@ Rules that keep the pieces honest:
 - `adg-codec` must not import React, and must run identically in Node and the
   browser.
 - `editor-ui` must not import anything `m4l-jweb`-specific. It takes live data
-  as plain props, so it renders the same with or without the companion device.
+  as plain props. The device adds no capability, so nothing may branch on
+  whether it is present.
 - `apps/site` must never import from `apps/m4l-device`. The site has to build
   and deploy with the device removed entirely.
 - The build stays a pure static build. No SSR, no API routes, nothing that
@@ -167,7 +168,7 @@ Nothing in `adg-codec` may model macros or mappings that are not traceable to
 a diff recorded in `SCHEMA.md`. Guessing element names produces files that
 load in Live without complaint and silently corrupt.
 
-## The companion device
+## The Max for Live device
 
 ```bash
 pnpm dev:device       # the device in a browser, with Live mocked beside it
@@ -177,7 +178,9 @@ pnpm install:device   # copies it into Ableton's User Library
 
 No Max install needed for the first two. It is a scaffold: the device confirms
 the bridge is alive and nothing else, which is why the site lists it as "Soon!"
-rather than offering a download. See `apps/m4l-device/README.md`.
+rather than offering a download. Its intended job is bundling only - the same
+editor, offline, inside Live - see `PLAN.md` 4.7 and
+`apps/m4l-device/README.md`.
 
 ## Pipeline
 
@@ -188,9 +191,8 @@ rather than offering a download. See `apps/m4l-device/README.md`.
 | `release-device.yml` | push to main | build `rack-editor.amxd`, publish to the `latest-device` release (overwritten each push, no versioning yet) |
 
 Codec tests gate the deploy. A broken codec corrupts racks silently, which is
-worse than the site being down. The site's "download companion device" button
-reads `release-device.yml`'s output live via the GitHub API - see `PLAN.md`
-Phase 4.5.
+worse than the site being down. The site's device download reads
+`release-device.yml`'s output live via the GitHub API - see `PLAN.md` D5.
 
 ## Prior art
 
@@ -200,9 +202,9 @@ Earlier projects by the same author, heavily reused here.
   authoring racks. Its `doc/SCHEMA.md` is the head start behind most of
   `SCHEMA.md`.
 - [`m4l-jweb`](https://github.com/alienmind/m4l-jweb) - the framework the
-  companion device is built on.
+  device is built on.
 - [`m4l-strudel`](https://github.com/alienmind/m4l-strudel) - proves a full web
   app bundles offline into an `.amxd`.
 - [`trackster`](https://github.com/alienmind/trackster) - the CI/CD, PWA, and
   File System Access patterns copied here, plus the SVG knob components
-  `doc/PLAN.md` Part 5 starts from.
+  `doc/PLAN.md` D3 drew on.
