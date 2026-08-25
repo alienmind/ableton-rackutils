@@ -483,3 +483,61 @@ describe('a macro driving a plugin parameter (SCHEMA.md Q20)', () => {
   });
 });
 
+
+describe('KD.adg - a rack of racks (SCHEMA.md Q22)', () => {
+  const kd = () => Rack.parse(load('KD.adg'));
+  const subRack = (rack: Rack, name: string) => {
+    for (const chain of rack.chains) {
+      const device = chain.devices.find((d) => d.isRack && d.name === name);
+      if (device) return rack.subRack(device.path)!;
+    }
+    throw new Error(`no nested rack called "${name}"`);
+  };
+
+  test('a parent macro driving a child rack macro belongs to the PARENT', () => {
+    const rack = kd();
+    // Live draws all ten of this rack's macros as mapped. Six of them drive a
+    // macro of the rack on a pad, and every one of those was credited to the
+    // child before Q22.
+    expect(rack.macros.slice(0, 10).every((m) => m.bindings.length > 0)).toBe(true);
+    expect(bindingNames(rack, 3)).toEqual(['KICK SEL']);
+  });
+
+  test('the child does not also claim it', () => {
+    const selector = subRack(kd(), 'AlienMind KD Kick Selector');
+    // Its own two macros, and nothing standing in for the parent's mappings.
+    expect(selector.macros.filter((m) => m.bindings.length > 0).map((m) => m.index)).toEqual([0, 1]);
+  });
+
+  test('a child macro on the child own ChainSelector stays the child (SCHEMA.md Q15)', () => {
+    const selector = subRack(kd(), 'AlienMind KD Kick Selector');
+    expect(bindingNames(selector, 1)).toEqual(['ChainSelector']);
+  });
+
+  test('a binding on a rack macro is named after that macro, not MacroControls.N', () => {
+    // What Live shows on the knob at the other end. The raw tag says nothing.
+    expect(bindingNames(kd(), 4)).toEqual(['Rumble Length']);
+  });
+
+  test('moving a macro carries its child-rack bindings with it', () => {
+    const rack = kd();
+    expect(moveMapping(rack, 3, 11).ok).toBe(true);
+
+    const after = Rack.parse(rack.serialize());
+    expect(after.macros[3].bindings).toHaveLength(0);
+    expect(bindingNames(after, 11)).toEqual(['KICK SEL']);
+    // The child is untouched by the parent's move: its own macro still drives
+    // its own chain selector.
+    expect(bindingNames(subRack(after, 'AlienMind KD Kick Selector'), 1)).toEqual(['ChainSelector']);
+  });
+
+  test('reordering leaves nothing stranded on the vacated slot', () => {
+    const rack = kd();
+    const before = rack.macros.slice(0, 10).map((m) => m.bindings.map((b) => b.targetName).sort());
+    expect(reorderMacro(rack, 0, 9).ok).toBe(true);
+
+    const after = Rack.parse(rack.serialize()).macros.map((m) => m.bindings.map((b) => b.targetName).sort());
+    expect(after[9]).toEqual(before[0]);
+    for (let i = 0; i < 9; i++) expect(after[i]).toEqual(before[i + 1]);
+  });
+});

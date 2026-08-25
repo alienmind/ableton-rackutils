@@ -123,3 +123,21 @@ macro index, the range nests a `MidiControllerRange` inside another one, and
 It is the only donor exercising the plugin binding path, so it is what the
 slot-changing mutations are tested against.
 
+
+## `KD.adg`
+
+A drum rack (`DrumGroupDevice`), four pads, each holding an instrument rack,
+one of them holding another. The first donor that is a rack of racks, and the
+evidence for SCHEMA.md Q22 and Q23:
+
+- **A parent macro drives a child rack's macro by a `KeyMidi` on the child's
+  own `MacroControls.N`.** Six of this rack's ten macros are that shape, and
+  the codec credited every one of them to the child until Q22.
+- **The same device element also carries the child's own `ChainSelector`
+  binding**, which belongs to the child (Q15). So depth does not decide the
+  owner; the parameter does.
+- **Five of its macros have no name** and Live labels them after what they
+  drive - `Rumble Length`, `Atmo Gain` - which is Q23.
+
+Nothing is harvested from it. It is a fixture, not a device source: its job is
+to keep the ownership rules honest on the shape a drum rack always has.

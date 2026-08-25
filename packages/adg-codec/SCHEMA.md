@@ -882,3 +882,69 @@ a range in a unit a human recognises.
 This was the last contract option with no donor and no known tag. `pnpm
 adg-harvest` now lifts it, so all five options in `doc/PLAN.md` 4.3.2 have one.
 
+
+---
+
+## Q22. Who owns a `KeyMidi` on a nested rack's `MacroControls.N`?
+
+Found on `donors/KD.adg`, a drum rack whose four pads each hold a rack. Live
+draws its macro 4 as `KICK SEL`, mapped; the editor drew it as an empty slot
+with a default label, while the mapping table listed the mapping under the
+nested rack. Both were reading the same file.
+
+**Answer: the rack ABOVE the one the element sits in.** A parent macro drives a
+child rack's macro by a `KeyMidi` on the child's own `MacroControls.N`:
+
+```
+root macro 4  <- MacroControls.1 < InstrumentGroupDevice "AlienMind KD Kick Selector"
+                                 < Device < GroupDevicePreset < DevicePresets
+                                 < DrumBranchPreset "Kick" < BranchPresets
+```
+
+`owningRackDevice()` walks up to the nearest `GroupDevicePreset`, which here is
+the CHILD's, so every one of these was credited to the child. On this rack that
+is six of the root's ten macros.
+
+**`ChainSelector` on the same device element goes the other way**, and the same
+file proves it: the child's own macro 2 (`KICK SEL`, colour 13) drives the
+child's `ChainSelector`, exactly the shape Q15 recorded on `BS.adg`. So the
+disambiguator is the PARAMETER, not the depth:
+
+| Parameter of a rack device | Owner |
+|---|---|
+| `MacroControls.N` | the rack above it |
+| everything else (`ChainSelector`, ...) | the rack itself |
+
+The rule behind it: a macro cannot drive its own rack's macro. There is nothing
+for such a mapping to mean, so a `KeyMidi` on `MacroControls.N` can only have
+come from the level above.
+
+**Consequence.** The same family of silent corruption as Q15: every
+slot-changing mutation routes through `collectMacroBindings()`, so on a rack
+of racks - the shape a drum rack always has - `moveMapping` moved nothing while
+permuting variation values as if it had, and `reorderMacro` left the parent's
+bindings on the vacated index.
+
+---
+
+## Q23. What does Live show on a macro that has no name?
+
+Same rack, same screenshot. `donors/KD.adg`'s root carries
+`MacroDisplayNames.4` through `.8` at their defaults (`Macro 5` ... `Macro 9`)
+and Live labels those knobs `Rumble Length`, `Rumble Reverb`, `Rumble Drive`,
+`Rumble Freq` and `Atmo Gain`.
+
+**Answer: an unnamed macro is labelled with the name of what it drives.** Each
+of those five is the name of the child rack macro at the other end of the Q22
+binding. Macro 4 is the same case with a colour of its own: default name,
+`MacroColor.3 = 13`, drawn white and labelled `KICK SEL` after the child macro
+it drives.
+
+The default is recognisable rather than empty: `Macro ${index + 1}`, exactly
+what `MacroDisplayNames.N` holds when nobody has renamed the slot, which is
+also what the empty slots of `BS.adg` carry.
+
+A macro driving several parameters is normal (Q1), and what Live labels one of
+those has not been checked against a rack that has one. The editor shows the
+first target's name; every macro in this rack drives exactly one thing, so the
+screenshot does not settle the multi-target case.
