@@ -3,7 +3,7 @@ import { Rack, isGzip } from '@rackutils/adg-codec';
 import { RackEditor } from '@rackutils/editor-ui';
 import '@rackutils/editor-ui/src/editor.css';
 import { RackTree } from './RackTree';
-import { CompanionDownload } from './companion/CompanionDownload';
+import { GettingStarted } from './GettingStarted';
 import logoUrl from './assets/logo.jpg';
 
 interface Loaded {
@@ -67,12 +67,10 @@ export default function App() {
         <h1>
           ableton-rackutils <span className="badge">v0.0.1 pre-alpha</span>
         </h1>
-        <p className="tagline">
-          Drag in a rack (.adg) to edit its macros. Nothing leaves this tab: the file is
-          parsed, edited, and rebuilt entirely in the browser.
-        </p>
-        <CompanionDownload />
+        <p className="tagline">Rearrange the macro knobs on an Ableton rack, in your browser.</p>
       </header>
+
+      <GettingStarted compact={loaded !== null} />
 
       <div
         className={`dropzone${dragOver ? ' dropzone-active' : ''}`}
@@ -109,9 +107,10 @@ export default function App() {
             </label>
           </div>
           <p className="note">
-            Drag a parameter onto a macro knob to bind it. Drag a knob onto another to move
-            the whole macro, or hold Shift while dropping to swap two. Double-click a name
-            to rename it. Saving downloads a copy - your original file is never overwritten.
+            Drag a parameter onto a macro knob to bind it. Drag a knob onto another to move the whole
+            macro, or hold Shift while dropping to swap two. Double-click a name to rename it. Saving
+            downloads a copy - your original file is never touched; drag that copy back onto the rack in
+            Live to load it.
           </p>
 
           <RackEditor rack={loaded.rack} onChange={(rack) => setLoaded({ ...loaded, rack })} />

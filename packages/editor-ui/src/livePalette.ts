@@ -1,0 +1,87 @@
+
+
+/**
+ * Live's colour palette, sampled from a screenshot of its own colour picker by
+ * `pnpm adg-palette` (tools/adg-tool/src/palette.ts). 14 columns x 5 rows.
+ *
+ * These are the exact pixels Live drew, NOT eyeballed approximations.
+ *
+ * ORDER IS GRID ORDER, left to right then top to bottom - which is NOT
+ * confirmed to be the index Live stores in `MacroColor.N` or
+ * `DocumentColorIndex`. Grid position and stored index are two different
+ * numbers until a diff proves otherwise (SCHEMA.md Q13, doc/PLAN.md Part 5):
+ * colour three or four macros distinctly by hand, save, and check which index
+ * lands where before trusting this as a lookup.
+ */
+export const LIVE_PALETTE: readonly string[] = [
+  '#ff94a6',
+  '#ffa529',
+  '#cc9927',
+  '#f7f47c',
+  '#bffb00',
+  '#1aff2f',
+  '#25ffa8',
+  '#5cffe8',
+  '#8bc5ff',
+  '#5480e4',
+  '#92a7ff',
+  '#d86ce4',
+  '#e553a0',
+  '#ffffff', // row 0
+  '#ff3636',
+  '#f66c03',
+  '#99724b',
+  '#fff034',
+  '#87ff67',
+  '#3dc300',
+  '#00bfaf',
+  '#19e9ff',
+  '#10a4ee',
+  '#007dc0',
+  '#886ce4',
+  '#b677c6',
+  '#ff39d4',
+  '#d0d0d0', // row 1
+  '#e2675a',
+  '#ffa374',
+  '#d3ad71',
+  '#edffae',
+  '#d2e498',
+  '#bad074',
+  '#9bc48d',
+  '#d4fde1',
+  '#cdf1f8',
+  '#b9c1e3',
+  '#cdbbe4',
+  '#ae98e5',
+  '#e5dce1',
+  '#a9a9a9', // row 2
+  '#c6928b',
+  '#b78256',
+  '#99836a',
+  '#bfba69',
+  '#a6be00',
+  '#7db04d',
+  '#88c2ba',
+  '#9bb3c4',
+  '#85a5c2',
+  '#8393cc',
+  '#a595b5',
+  '#bf9fbe',
+  '#bc7196',
+  '#7b7b7b', // row 3
+  '#af3333',
+  '#a95131',
+  '#724f41',
+  '#dbc300',
+  '#85961f',
+  '#539f31',
+  '#0a9c8e',
+  '#236384',
+  '#1a2f96',
+  '#2f52a2',
+  '#624bad',
+  '#a34bad',
+  '#cc2e6e',
+  '#3c3c3c', // row 4
+];

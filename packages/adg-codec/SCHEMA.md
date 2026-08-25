@@ -361,7 +361,7 @@ containment model (which doesn't care about depth at all) covers it.
 ## Q13. Where is a chain's colour stored?
 
 Live colours each chain row in a rack's chain list, and the UI reproduces that
-(`doc/UI-PLAN.md` Part 5).
+(`doc/PLAN.md` Part 5).
 
 **Answer, confirmed present in all four fixtures:** `DocumentColorIndex` on the
 branch preset, alongside `AutoColored`.
@@ -376,8 +376,7 @@ branch preset, alongside `AutoColored`.
 ```
 
 Like `MacroColor.N` (Q7), it is a **palette index, not a colour**, and this
-project still has no confirmed index -> hex table - that is `UI-PLAN.md` Part
-1.3, on hold. The UI renders it through the same placeholder palette and is
+project still has no confirmed index -> hex table - that is `doc/PLAN.md` Part 5, on hold. The UI renders it through the same placeholder palette and is
 labelled as such.
 
 **Weaker evidence than the other answers here, and worth saying so.** Every
@@ -439,7 +438,7 @@ behaviour differs between jsdom and a browser, only a browser settles it.
 ## Q11. What identifies a bindable parameter?
 
 Asked because the codec got this wrong and only a real fixture showed it. The
-UI's arm-a-parameter-then-click-a-macro loop (`doc/UI-PLAN.md` Part 2.5) needs
+UI's arm-a-parameter-then-click-a-macro loop (`doc/PLAN.md` Part 5) needs
 to enumerate what a device exposes; the first implementation keyed on Q1's
 `Timeable` wrapper and therefore found **zero parameters on every native
 Ableton device** - `Eq8`, `Reverb`, `Delay`, `Compressor2`, `StereoGain`,
@@ -486,7 +485,7 @@ that mapping gets authored.
 ## Q10. How is a drum rack's pad grid represented?
 
 Asked because the UI renders drum racks as their pad grid rather than as a
-generic chain list (`doc/UI-PLAN.md` Part 2.6) - a drum rack used as a bundle
+generic chain list (`doc/PLAN.md` Part 5) - a drum rack used as a bundle
 of functions routed per pad is a normal organising pattern, and a flat chain
 list throws away the layout the user built.
 

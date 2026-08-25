@@ -1,5 +1,5 @@
 /**
- * Render tests for the recursive rack rendering (UI-PLAN Part 2.6). These use
+ * Render tests for the recursive rack rendering (doc/PLAN.md Part 5). These use
  * the REAL fixtures where they exist, for the same reason the codec's tests
  * do: three bugs so far were invisible to synthetic data, and the recursion is
  * exactly the kind of thing that looks right on a hand-built two-level rack
@@ -11,6 +11,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
 import { Rack } from '@rackutils/adg-codec';
 import { RackEditor } from '../src/RackEditor';
+import { MACRO_PALETTE, macroColor } from '../src/macroColors';
 import { buildDrumFixtureBytes, buildFixtureBytes } from '../../adg-codec/tests/fixture';
 
 const FIXTURES = join(__dirname, '..', '..', 'adg-codec', 'tests', 'fixtures');
@@ -134,5 +135,21 @@ describe('macro numbering and the rack side buttons', () => {
     ]) {
       expect(html).toContain(title);
     }
+  });
+});
+
+describe('Live palette', () => {
+  test('offers Live\'s own 70 colours, not the old invented 16', () => {
+    expect(MACRO_PALETTE).toHaveLength(70);
+    // Sampled straight out of Live's picker: the first row's first swatch and
+    // the last row's last. If these drift, the palette was regenerated from a
+    // different screenshot and the index mapping needs rechecking.
+    expect(MACRO_PALETTE[0]).toBe('#ff94a6');
+    expect(MACRO_PALETTE[69]).toBe('#3c3c3c');
+    expect(MACRO_PALETTE.every((c) => /^#[0-9a-f]{6}$/.test(c))).toBe(true);
+  });
+
+  test('an index beyond the palette falls back rather than pretending it is colour 0', () => {
+    expect(macroColor(999)).not.toBe(MACRO_PALETTE[0]);
   });
 });

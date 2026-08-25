@@ -17,7 +17,7 @@
  *
  * What this canNOT tell you is which INDEX Live stores for each swatch.
  * Grid position and `MacroColor.N` are two different numbers until a diff says
- * otherwise (SCHEMA.md Q13, UI-PLAN Part 1.3). The output is ordered
+ * otherwise (SCHEMA.md Q13, doc/PLAN.md Part 5). The output is ordered
  * left-to-right, top-to-bottom and says so.
  */
 import { readFileSync } from 'node:fs';
@@ -153,7 +153,7 @@ process.stdout.write(`/**
  * ORDER IS GRID ORDER, left to right then top to bottom - which is NOT
  * confirmed to be the index Live stores in \`MacroColor.N\` or
  * \`DocumentColorIndex\`. Grid position and stored index are two different
- * numbers until a diff proves otherwise (SCHEMA.md Q13, UI-PLAN Part 1.3):
+ * numbers until a diff proves otherwise (SCHEMA.md Q13, doc/PLAN.md Part 5):
  * colour three or four macros distinctly by hand, save, and check which index
  * lands where before trusting this as a lookup.
  */

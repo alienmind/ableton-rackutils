@@ -1,41 +1,31 @@
-/**
- * PLACEHOLDER PALETTE - not Ableton's.
- *
- * `Macro.color` is `MacroColor.N`, an integer index into Live's own colour
- * palette (SCHEMA.md Q7). The real index -> hex table does not exist in this
- * project yet: extracting it is `doc/UI-PLAN.md` Part 1.3, which is on hold at
- * the project owner's explicit instruction, and it needs its own confirmation
- * pass anyway (grid position in Live's picker and the stored index are not
- * guaranteed to be the same number).
- *
- * So these 16 colours are a stand-in that lets the UI be built and read: they
- * are distinguishable from each other and nothing more. A knob showing one of
- * them is NOT showing the colour Live would show. Replacing this file with the
- * confirmed table should be the only change needed on the UI side.
- */
-const PLACEHOLDER_PALETTE: readonly string[] = [
-  '#ff6b6b',
-  '#ff9f45',
-  '#ffd166',
-  '#c9e265',
-  '#6bd47e',
-  '#4ecdc4',
-  '#45b7ff',
-  '#6ea8ff',
-  '#8f7dff',
-  '#c07dff',
-  '#ff7de3',
-  '#ff6ba6',
-  '#b98a6b',
-  '#9aa0aa',
-  '#d6d8de',
-  '#5f6470',
-];
+import { LIVE_PALETTE } from './livePalette';
 
-/** The colour to draw a macro in. Falls back to a neutral for an index this placeholder table does not cover, rather than pretending index 0 was meant. */
+/**
+ * Live's own 70-colour palette, sampled pixel-by-pixel from a screenshot of
+ * its colour picker (`pnpm adg-palette`, see `livePalette.ts`). This replaces
+ * the 16 invented stand-ins that stood here while the reference image was on
+ * hold - a knob now shows a colour Live actually offers.
+ *
+ * ONE THING IS STILL UNCONFIRMED, and it is the important one: whether a
+ * swatch's position in that grid is the number Live stores in `MacroColor.N`
+ * and `DocumentColorIndex`. Grid order and stored index are two different
+ * things until a diff says otherwise (SCHEMA.md Q13, doc/PLAN.md Part 5). So
+ * these are certainly Live's colours; whether index 7 here is the same colour
+ * Live calls 7 needs a rack coloured by hand and diffed.
+ *
+ * To settle it: colour three or four macros distinctly in Live, save, run
+ * `pnpm adg-tool mappings` or read `MacroColor.N` straight out of the XML, and
+ * check which index landed where.
+ */
+export const MACRO_PALETTE = LIVE_PALETTE;
+
+/** The colour to draw a macro in. Falls back to a neutral rather than pretending an unknown index meant colour 0. */
 export function macroColor(colorIndex: number): string {
-  return PLACEHOLDER_PALETTE[colorIndex] ?? 'var(--knob-fill-default, #6ea8ff)';
+  return MACRO_PALETTE[colorIndex] ?? 'var(--knob-fill-default, #6ea8ff)';
 }
 
-/** Indices this placeholder offers in the picker. The real palette is larger (roughly 60-70 swatches in recent Live versions). */
-export const PLACEHOLDER_COLOR_INDICES: readonly number[] = PLACEHOLDER_PALETTE.map((_, i) => i);
+/** Every index the picker offers, in Live's own grid order. */
+export const PALETTE_INDICES: readonly number[] = MACRO_PALETTE.map((_, i) => i);
+
+/** Live lays the picker out 14 wide; matching that keeps the swatches where a user expects them. */
+export const PALETTE_COLUMNS = 14;

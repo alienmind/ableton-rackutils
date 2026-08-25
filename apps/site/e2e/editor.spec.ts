@@ -90,6 +90,7 @@ test('picking a colour recolours the knob', async ({ page }) => {
   await loadRack(page);
   const knob = rootKnobs(page).first();
   const before = await knob.evaluate((el) => getComputedStyle(el).getPropertyValue('--macro-color'));
+  await rootKnobs(page).locator('.macro-knob-swatch').first().scrollIntoViewIfNeeded();
   await rootKnobs(page).locator('.macro-knob-swatch').first().click();
   await page.locator('.color-picker .color-swatch').nth(6).click();
   await expect
@@ -254,9 +255,16 @@ test('a patch cable hangs from the parameter while dragging, and lands on the kn
   // ends), and it reads as a valid target.
   const cable = page.locator('.patch-cable');
   await expect(cable).toHaveCount(1);
-  const d = (await cable.getAttribute('d'))!;
-  const [, y0, cy1] = d.match(/M [\d.-]+ ([\d.-]+) C [\d.-]+ ([\d.-]+)/)!.map(Number);
-  expect(cy1).toBeGreaterThan(y0); // hanging, not a straight line
+  // The sag is a damped spring starting at rest, so it needs a few frames
+  // before the curve differs from a straight line. Poll rather than sample
+  // once and hope.
+  await expect
+    .poll(async () => {
+      const d = (await cable.getAttribute('d')) ?? '';
+      const m = d.match(/M [\d.-]+ ([\d.-]+) C [\d.-]+ ([\d.-]+)/);
+      return m ? Number(m[2]) - Number(m[1]) : 0;
+    }, { timeout: 3000 })
+    .toBeGreaterThan(1); // hanging, not a straight line
   await expect(cable).toHaveClass(/will-connect/);
   // Over a knob, the cable takes that macro's colour rather than a generic one.
   // Both read through getComputedStyle: the browser normalises an inline hex
@@ -298,6 +306,7 @@ test('a mapped parameter wears the colour of the macro driving it', async ({ pag
   // Recolour macro 1, then check the parameter it drives followed it. A fixed
   // green says "mapped" and nothing more; a rack has up to 16 macros.
   const knob = rootKnobs(page).first();
+  await knob.locator('.macro-knob-swatch').scrollIntoViewIfNeeded();
   await knob.locator('.macro-knob-swatch').click();
   await page.locator('.color-picker .color-swatch').nth(9).click();
 

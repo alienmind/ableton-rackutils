@@ -97,7 +97,9 @@ describe('clicking things', () => {
 
   test('picking a colour recolours the macro', () => {
     click(container.querySelector('.macro-knob-swatch')!);
-    const swatches = container.querySelectorAll('.color-picker .color-swatch');
+    // The picker is portalled to the body: every panel clips its overflow, so
+    // a popover rendered inline came out sliced in half.
+    const swatches = document.body.querySelectorAll('.color-picker .color-swatch');
     expect(swatches.length).toBeGreaterThan(4);
     click(swatches[5]);
     expect(rack.macros[0].color).toBe(5);

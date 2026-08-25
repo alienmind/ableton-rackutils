@@ -24,20 +24,18 @@ export interface MacroKnobProps {
 }
 
 /**
- * PLACEHOLDER SHAPE. The real geometry comes from `doc/UI-PLAN.md` Part 1,
- * which is on hold - this is an arc-sweep knob built to that plan's sketch so
- * the interactions can be finished without it.
+ * PLACEHOLDER SHAPE: an arc-sweep dial, not a redrawn Live knob. The colours
+ * are Live's own now (`macroColors.ts`); the geometry is not.
  *
- * The macro's colour tints the ring at every value, not only the filled part.
- * The first cut coloured the fill alone and only when the macro was mapped,
- * which meant a macro sitting at value 0 - most of them, in a real rack -
- * showed no colour at all and picking a colour looked like it did nothing.
+ * Colour goes on the LABEL, not the dial - Live draws every knob's arc the
+ * same blue whatever colour the macro is, and tinting the arc as well made a
+ * rack look like a paint chart.
  */
 export function MacroKnob(props: MacroKnobProps) {
   const { macro, liveValue, armed, hidden, dragging, dropTarget, dropSwaps, bindTarget } = props;
   const { onDragStart, onClick, onRename, onRecolor, onUnbindOne } = props;
   const [editing, setEditing] = useState(false);
-  const [picking, setPicking] = useState(false);
+  const [picking, setPicking] = useState<DOMRect | null>(null);
 
   const mapped = macro.bindings.length > 0;
   const first = macro.bindings[0];
@@ -91,17 +89,29 @@ export function MacroKnob(props: MacroKnobProps) {
         </span>
       )}
 
-      <button type="button" className="macro-knob-swatch" onClick={() => setPicking((p) => !p)} title="Colour">
+      <button
+        type="button"
+        className="macro-knob-swatch"
+        onClick={(e) => {
+          // Read the box BEFORE the state updater runs: React has cleared
+          // `currentTarget` by the time a functional update is applied, so
+          // reading it in there throws and the popover never opens.
+          const anchor = e.currentTarget.getBoundingClientRect();
+          setPicking((p) => (p ? null : anchor));
+        }}
+        title="Colour"
+      >
         <span className="sr-only">Change colour</span>
       </button>
       {picking && (
         <ColorPicker
           current={macro.color}
+          anchor={picking}
           onPick={(i) => {
             onRecolor(i);
-            setPicking(false);
+            setPicking(null);
           }}
-          onClose={() => setPicking(false)}
+          onClose={() => setPicking(null)}
         />
       )}
 

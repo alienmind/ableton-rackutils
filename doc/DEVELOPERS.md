@@ -11,7 +11,6 @@ Everything needed to continue is in the repo.
 |---|---|
 | [`doc/PLAN.md`](PLAN.md) | Full implementation plan, phase by phase, with code. Opens with current state, next steps, and the constraints that rule out obvious designs. |
 | [`packages/adg-codec/SCHEMA.md`](../packages/adg-codec/SCHEMA.md) | Schema findings, confirmed against real racks. The codec's spec. |
-| [`doc/UI-PLAN.md`](UI-PLAN.md) | Web UI plan. Part 5 (match Live's visual language) is the governing principle; Parts 2-4 built, Part 1 on hold. |
 | [`CLAUDE.md`](../CLAUDE.md) | House rules: commit style, comment style, where scratch work goes. |
 
 ## Repo layout
@@ -83,10 +82,10 @@ Run all four of `lint`, `typecheck`, `test`, `build` clean before committing.
 ## Testing the codec
 
 ```bash
-pnpm test                                  # everything headless, 100 tests
-pnpm --filter @rackutils/adg-codec test    # 81 codec tests
-pnpm --filter @rackutils/editor-ui test    # 19 UI tests
-pnpm test:e2e                              # 9 browser specs, needs Chromium
+pnpm test                                  # everything headless, 109 tests
+pnpm --filter @rackutils/adg-codec test    # 84 codec tests
+pnpm --filter @rackutils/editor-ui test    # 25 UI tests
+pnpm test:e2e                              # 20 browser specs, needs Chromium
 ```
 
 The first time, install the browser: `pnpm --filter @rackutils/site exec
@@ -130,7 +129,7 @@ Playwright - and it would have failed for anyone who flicks a knob quickly.
 Add a spec here whenever a change touches DOM serialization, pointer handling,
 or layout that must not overflow.
 
-Of the codec's 78, 60 are synthetic and always run; 18 run against real
+Of the codec's 84, 66 are synthetic and always run; 18 run against real
 Ableton-saved racks in
 `packages/adg-codec/tests/fixtures/*.adg`, which are gitignored - they skip
 cleanly when absent (so, in CI) and run locally once you drop the four files
@@ -205,4 +204,4 @@ Earlier projects by the same author, heavily reused here.
   app bundles offline into an `.amxd`.
 - [`trackster`](https://github.com/alienmind/trackster) - the CI/CD, PWA, and
   File System Access patterns copied here, plus the SVG knob components
-  `UI-PLAN.md` Part 1 starts from.
+  `doc/PLAN.md` Part 5 starts from.

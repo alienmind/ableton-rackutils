@@ -154,3 +154,73 @@ header h1 {
   font-size: 0.8rem;
   color: #9a9aa5;
 }
+
+/* --- getting started: how to get a rack out of Live and onto this page --- */
+
+.getting-started {
+  margin: 1.5rem 0;
+  text-align: left;
+}
+
+.getting-started h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+}
+
+.getting-started .lead {
+  margin: 0 0 1rem;
+  color: #9a9aa5;
+}
+
+.guide-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.guide-steps li {
+  background: #1a1c22;
+  border: 1px solid #2e313a;
+  border-radius: 6px;
+  padding: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.guide-text {
+  font-size: 0.85rem;
+  color: #c9c9d1;
+}
+
+.guide-text strong { color: #e8e8ea; }
+
+.guide-steps img {
+  max-width: 100%;
+  border-radius: 4px;
+  border: 1px solid #2e313a;
+}
+
+.companion-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1rem;
+  padding: 0.4rem 0.7rem;
+  background: #1a1c22;
+  border: 1px solid #2e313a;
+  border-radius: 6px;
+  color: #6ea8ff;
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+
+.companion-card:hover { border-color: #6ea8ff; }
+
+.companion-card img {
+  height: 28px;
+  width: auto;
+}

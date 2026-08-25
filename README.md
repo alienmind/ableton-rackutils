@@ -8,10 +8,9 @@ page, or from the command line.
 
 **Live site:** https://alienmind.github.io/ableton-rackutils/
 
-> **v0.0.1, pre-alpha.** The macro editor now works in the browser, but nobody
-> has round-tripped an edited file back into Live from it yet. Treat it as
-> something to try on copies, not something to trust. See
-> [What works today](#what-works-today).
+> **v0.0.1, pre-alpha.** The macro editor works, and an edited rack has been
+> saved out and loaded back into Live - once, by hand. Treat it as something to
+> try on copies. See [What works today](#what-works-today).
 
 > **Keep backups.** This tool rewrites rack files, and a bug here can produce a
 > rack that loads fine and misbehaves quietly - a broken Macro Variation, say.
@@ -43,7 +42,8 @@ What that means in practice:
 | | Status |
 |---|---|
 | Open a rack in the browser and see its macros, chains and drum pads | works |
-| Rearrange, rename, recolour and rebind macros in the browser | works, untested in Live |
+| Rearrange, rename, recolour and rebind macros in the browser | works |
+| Save the result and load it back into Live | works, lightly tested |
 | Inspect and rearrange macros from the command line | works |
 | Companion Max for Live device | downloadable, but a scaffold - it confirms it is talking to Live and nothing more |
 
@@ -94,14 +94,18 @@ behind, `move-mapping` takes the same arguments and does that instead.
 Open https://alienmind.github.io/ableton-rackutils/ and drag a `.adg` onto the
 page. It works offline once loaded, and on a machine with no Ableton installed.
 
-You get the rack's macro knobs and, under them, its chains - with nested racks
-drawn as racks with their own knobs, and drum racks drawn as their pads. Drag a
-knob onto another to move that macro; hold Shift while dropping to swap two.
-Double-click a name to rename it. Click a parameter, then click a knob in the
-same rack, to bind it.
+The page walks you through getting a rack out of Live in four steps, then
+lays the rack out the way Live does: macro knobs, chains, and devices running
+left to right, with nested racks and drum pad grids drawn in place.
 
-The knobs are placeholder shapes and the colours are not Live's real palette
-yet.
+- **Drag a parameter onto a macro knob** to bind it - a patch cable follows
+  your pointer.
+- **Drag a knob onto another** to move that macro, or hold Shift to swap two.
+- **Double-click** a name to rename it, click a swatch to recolour it.
+- Under the rack, every mapping is listed in full: rack, macro, device,
+  parameter.
+
+The knob is still a placeholder shape, though the colours are Live's own.
 
 Saving downloads a copy with `-edited` on the end. Your original file is never
 touched.

@@ -21,7 +21,7 @@ export interface ChainListProps {
  * is what made a drum rack overflow the page.
  */
 export function ChainList({ chains, selected, onSelect, drum, onRecolor }: ChainListProps) {
-  const [picking, setPicking] = useState<string | null>(null);
+  const [picking, setPicking] = useState<{ path: string; anchor: DOMRect } | null>(null);
   // Pads are laid out by note, ascending. A real rack stores them in the
   // opposite order (92, 91, 90 in `drum-pads.adg`), so document order would
   // put the grid backwards. The ORIGINAL index travels with each entry -
@@ -77,13 +77,19 @@ export function ChainList({ chains, selected, onSelect, drum, onRecolor }: Chain
               title="Colour"
               onClick={(e) => {
                 e.stopPropagation();
-                setPicking((p) => (p === chain.path ? null : chain.path));
+                const anchor = e.currentTarget.getBoundingClientRect();
+                setPicking((p) => (p?.path === chain.path ? null : { path: chain.path, anchor }));
               }}
-              onKeyDown={(e) => e.key === 'Enter' && setPicking((p) => (p === chain.path ? null : chain.path))}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter') return;
+                const anchor = e.currentTarget.getBoundingClientRect();
+                setPicking((p) => (p?.path === chain.path ? null : { path: chain.path, anchor }));
+              }}
             />
-            {picking === chain.path && (
+            {picking?.path === chain.path && (
               <ColorPicker
                 current={chain.colorIndex ?? -1}
+                anchor={picking.anchor}
                 onPick={(i) => {
                   onRecolor(chain.path, i);
                   setPicking(null);

@@ -173,7 +173,7 @@ describe('drum racks (SCHEMA.md Q10)', () => {
   });
 
   test('the rack device type identifies it as a drum rack', () => {
-    // What the UI selects the pad-grid renderer on (UI-PLAN.md Part 2.6).
+    // What the UI selects the pad-grid renderer on (`doc/PLAN.md` Part 5).
     const rack = Rack.parse(buildDrumFixtureBytes());
     expect(rack.deviceEl.tagName).toBe('DrumGroupDevice');
   });

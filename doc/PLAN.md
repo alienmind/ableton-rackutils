@@ -1,6 +1,8 @@
 # ableton-rackutils: Implementation Plan (v4)
 
-**Product status: v0.0.1, pre-alpha, does not work yet.**
+**Product status: v0.0.1, pre-alpha.** The editor works in a browser and has
+been round-tripped through Live once by hand. Treat it as something to try on
+copies.
 
 Canonical plan for `ableton-rackutils`, a Swiss-army toolkit for Ableton rack
 preset (`.adg`) files. Lives in the repo so the project is self-contained:
@@ -21,10 +23,6 @@ Companion docs:
   is for people using the tool, not building it.)
 - `packages/adg-codec/SCHEMA.md` - the schema findings log, confirmed against
   real fixtures, that all codec code must trace to.
-- `doc/UI-PLAN.md` - the web UI overhaul plan (Ableton-matching macro panel,
-  SVG extraction, drag-and-drop, the mapped/"more" parameter split). Part 5 (match
-  Live's visual language) is the governing principle; Parts 2, 3 and 4 are
-  built and Part 1 is on hold - see its own status line.
 - `.github/workflows/` - the pipeline described in Phase 4.2.
 
 Handoff document. Written so another agent can pick this up cold. Read the Constraints section before writing any code, several intuitive designs are ruled out by facts about Ableton's API that are not obvious.
@@ -33,77 +31,45 @@ Handoff document. Written so another agent can pick this up cold. Read the Const
 
 ## Current state and next steps
 
-Scaffolded, two working previews, SCHEMA.md confirmed, and the codec itself
-(`model.ts`/`mutate.ts`) is now built and tested. Wiring it into the site's UI
-is the next real work.
+The codec is built and tested, the editor UI is built and works in a browser,
+and one edited file has been round-tripped through Live by hand.
 
-- `.github/workflows/` - CI, Pages deploy, device release. All three green.
-- `packages/adg-codec/src/gzip.ts` - done, works.
-- `packages/adg-codec/src/normalize.ts` - done, works.
-- `packages/adg-codec/SCHEMA.md` - Q1, Q2, Q4, Q5, Q7, Q8 independently
-  confirmed against 3 real fixtures. Q3 holds by structural inference. Q6
-  (variations during a mapping move) is exercised by `moveMapping`'s own
-  permutation logic and tested against a real rack with variations
-  (`withvariations.adg`), but the true confirmation - loading the result back
-  in Live and checking by eye - is still on you, see "How to test" below.
-- **`packages/adg-codec/src/model.ts` and `mutate.ts` - built.** `Rack.parse`/
-  `.clone`/`.serialize`, `macros`/`variations`/`chains` (full device tree,
-  including nested racks), and ten mutations: `moveMapping`/`swapMacros`/
-  `bindParameter`/`unbindMacro`/`renameMacro`, plus `UI-PLAN.md` Part 4's
-  `reorderMacro`/`setMacroCount`/`renameRack`/`setMacroColor`/`unbindOne`.
-  `Rack.subRack(devicePath)` exposes any nested rack as a `Rack` of its own
-  over the same document, so every mutation reaches nested macros unmodified,
-  and drum pads carry their `ReceivingNote` (SCHEMA.md Q10).
-  78 tests (`packages/adg-codec/tests/`): 60 synthetic (always run), 18
-  against the real fixtures (skip cleanly in CI, run locally). All confirmed
-  against `simplerack.adg`, `withvariations.adg`, `drum-nested.adg` and
-  `drum-pads.adg` - not just the synthetic fixture.
-- `tools/adg-tool/` - `unpack`/`diff` as before, plus three commands that
-  exercise the codec directly against a real file without needing the site
-  UI: `adg-tool mappings <file.adg>` (list what's bound), `adg-tool move
-  <file.adg> <from> <to> <out.adg>` (run `reorderMacro`), and `move-mapping`
-  (same arguments, the narrower `moveMapping`). See "How to test" below.
-- **`packages/editor-ui/` - built** (`doc/UI-PLAN.md` Parts 3 and 5).
-  Recursive `RackPanel` (a nested rack renders as a rack, a drum rack as its
-  pads, an unknown device as a mapped/"more" parameter list), laid out the way
-  Live lays a rack out: horizontal device chain at a fixed 169px height,
-  collapse-to-vertical-strip, macros in two rows. Pointer-based drag to
-  reorder or swap, inline rename, colour swatches, arm-and-bind, undo. 17
-  tests, split between render and real-DOM interaction, 4 against the real
-  `drum-pads.adg`. The knob SVG and the colour palette are placeholders
-  pending UI-PLAN Part 1.
-- `apps/site/` - runs (`pnpm dev`), deployed to GitHub Pages, confirmed
-  working on a real 4000+ element rack. **Now renders the editor**, with the
-  raw XML tree behind a checkbox. Saving downloads a copy, never overwriting
-  the original.
-- `apps/m4l-device/` - scaffolded with `m4l-jweb init`, builds a real
-  `rack-editor.amxd` (`pnpm build:device` / `install:device`), confirmed
-  installed and running in real Live: bridge alive, transport ticking. Audio
-  effect, passthrough chain, no params, no editor UI wired in - Phase 5 work.
-  Now also built and published automatically on every push to `main`
-  (`release-device.yml`, Phase 4.5), and the site has a working
-  "download companion device" link reading that release live.
-- Everything else - not started.
+- `.github/workflows/` - CI (lint, typecheck, codec + UI tests, and a separate
+  Chromium job running the browser specs), Pages deploy, device release. Green.
+- **`packages/adg-codec` - built.** `Rack.parse`/`.clone`/`.serialize`/
+  `.subRack`, `macros`/`variations`/`chains`, and eleven mutations:
+  `moveMapping`, `reorderMacro`, `swapMacros`, `bindParameter`, `unbindMacro`,
+  `unbindOne`, `renameMacro`, `renameRack`, `setMacroCount`, `setMacroColor`,
+  `setChainColor`. 84 tests, 18 of them against four real racks.
+- **`packages/editor-ui` - built** (Part 5 below). Flat one-row layout at Live's
+  169px device height, recursive racks, drum pads, pointer drag to reorder or
+  swap, drag-a-parameter-to-bind drawn as a patch cable, inline rename, Live's
+  real 70-colour palette for macros and chains, global undo/redo, and a mapping
+  table listing every rack -> macro -> device -> parameter. 25 tests.
+- **`apps/site` - the editor, plus a getting-started guide** walking through
+  saving a rack out of Live and dragging it in. 20 Playwright specs against a
+  real Chromium, run in CI.
+- `tools/adg-tool` - `unpack`/`diff`/`mappings`/`move`/`move-mapping`, plus
+  `adg-palette`, which samples Live's colour picker screenshot into an exact
+  palette table.
+- `apps/m4l-device` - scaffold. Builds and installs a real `.amxd`, bridge
+  alive, no editor UI wired in. Phase 5 work.
 
 Do this next, in order:
 
-1. **UI-PLAN Part 5**, matching Ableton's visual language, is the priority
-   item for the UI. The horizontal skeleton is in; the Macro Variations panel,
-   chain colours and the real knob are not.
-2. **Use it on real racks and fix what that finds.** Every bug this project
-   has hit came from that step, not from tests - including a first UI cut
-   whose every interaction was broken while its whole test suite passed.
-3. **UI-PLAN Part 1** (the reference screenshot, the SVG knob, the real colour
-   palette) - still explicitly on hold pending the project owner's go-ahead.
-   Until then the knob and palette are placeholders and look it.
-4. **Device editor UI** (Phase 5.3-5.4) - `apps/m4l-device` should render the
-   same `@rackutils/editor-ui` `RackEditor`. Lower priority: the site is the
-   product, the device is a convenience layered on the same codec later.
+1. **Use it on real racks.** Every bug this project has hit came from that,
+   not from tests - including a UI whose every interaction was broken while its
+   whole suite passed (SCHEMA.md Q12).
+2. **Confirm the colour index mapping** (SCHEMA.md Q13): colour a few macros
+   and chains by hand in Live, save, and check which stored index landed on
+   which swatch. Until then the palette is Live's colours in an unconfirmed
+   order.
+3. **Finish the UI's open items** - Part 5.5 below.
+4. **Device editor UI** (Phase 5.3-5.4): `apps/m4l-device` should render the
+   same `RackEditor`. The site is the product; the device is a convenience.
 
-Default to a read-only or simulated mode in the UI until real-world use has
-exercised `mutate.ts` on a range of racks beyond the 3 current fixtures,
-following `trackster`'s precedent for a tool that rewrites user files in
-place.
+Default to a read-only or simulated mode for anything that writes over a user's
+file. The site downloads a copy and never touches the original.
 
 ### How to test the codec right now
 
@@ -157,7 +123,7 @@ primitives:
 - **Macro colour.** `MacroColor.N` is modeled (`Macro.color`), `swapMacros`
   exchanges it, and `setMacroColor` authors it directly - all done. Still
   open: the palette table that turns a stored index into a hex colour for the
-  UI (`UI-PLAN.md` Part 1.3, on hold), and picking a colour automatically -
+  UI (`doc/PLAN.md` Part 5, on hold), and picking a colour automatically -
   from a
   palette, by name, or "sticky" colours for a given name/function that stay
   consistent across nested racks (e.g. every "Filter" macro anywhere in a
@@ -819,6 +785,97 @@ function MacroSlot({ macro, liveValue, onMove, onSwap }: MacroSlotProps) {
 ```
 
 Render the live indicator as visually distinct from the stored value. They are different things (Constraint 1: the file has bindings and stored values, the LOM has current positions) and conflating them in the UI invites conflating them in the code.
+
+---
+
+## Part 5: The editor UI
+
+`doc/PLAN.md` planned this and has been folded in here now that it is built.
+What follows is the part worth keeping: the decisions, and why.
+
+### 5.1 Reproduce Live's layout, do not invent one
+
+The governing rule, set by the project owner after rejecting a first cut that
+laid racks out as a vertical stack of cards. Users already know where things
+are in a rack; a tool that rearranges that knowledge costs them more than it
+gains.
+
+Concretely:
+
+- **Everything is ONE flat row.** A rack's controls, its devices, and any
+  nested rack's controls and devices are all siblings at the same top edge.
+  Nesting is shown by boundary brackets between panels, not by containment. A
+  nested rack rendered INSIDE its parent made racks cascade downward, capped
+  depth at however many title bars fit vertically, and produced scrollbars
+  inside scrollbars. Depth costs width only.
+- **A rack is exactly one device row tall: 169px, plus its title bar.** That is
+  the height a Max for Live device view gets, and it does not scroll, so
+  anything taller is unreachable there. Enforced with `height`, not
+  `min-height` - it regressed twice when panels were allowed to size to
+  content.
+- **A collapsed device or rack becomes a vertical title strip**, not a hidden
+  thing.
+- **Macros sit in two rows numbered across then down** (`1 2 3 4 / 5 6 7 8`),
+  the grid being `ceil(count / 2)` wide, and the +/- buttons step by TWO.
+- **Only the selected chain's devices are drawn.** Live shows one chain at a
+  time, and doing the same is what keeps the row a row: rendering every chain's
+  devices turned a four-pad drum rack into a page-height wall.
+- **The rack's left edge carries Live's button column**: show/hide macros, add
+  two, remove two, Macro Variations, collapse devices, show/hide chains.
+- **Colour goes on the label**, not the dial. Live's knob arc is the same blue
+  whatever colour the macro is.
+
+### 5.2 Interactions
+
+- **Pointer events, never HTML5 drag-and-drop.** DnD did nothing in a real
+  browser and swallowed clicks on buttons inside a `draggable` element. It is
+  also not something to rely on inside the Max `jweb` webview. Listeners attach
+  in the pointerdown handler, not from an effect, so a fast gesture cannot
+  finish before they exist.
+- **Drag a knob onto another to move the whole macro; Shift to swap.**
+- **Drag a parameter onto a knob to bind it**, drawn as a hanging patch cable
+  that takes the target macro's colour, wobbles on connect and retracts on a
+  miss. Click-to-arm still works and is the keyboard-reachable path.
+- **A macro can only drive a parameter in its OWN rack** (SCHEMA.md Q2's
+  owning-rack walk), so a drop onto another rack's knob is refused rather than
+  writing a mapping the file cannot express.
+- **Undo/redo is global**, on the root rack's title bar: one history across
+  every rack level, because a mutation on a nested rack edits the same document.
+
+### 5.3 Derive, never mirror
+
+Mapped vs unmapped, macro colours, chain lists - all computed from the `Rack`
+on every render. Nothing is copied into React state and kept in sync by hand.
+That is what makes a parameter jump out of "more" the instant it is bound, and
+it is why `apply()` clones the rack: a new reference so React re-renders, with
+the DOM as the single source of truth.
+
+Rack identity travels as a **path** (the chain of device paths from the root),
+never as a `Rack` handle - every mutation replaces the handle, so a stored one
+is stale immediately.
+
+### 5.4 Colours
+
+`MacroColor.N` and `DocumentColorIndex` are palette indices (SCHEMA.md Q7,
+Q13). Live's own 70 colours are sampled pixel-by-pixel from a screenshot of its
+picker by `pnpm adg-palette` (`tools/adg-tool/src/palette.ts`) into
+`packages/editor-ui/src/livePalette.ts`.
+
+**Still unconfirmed:** whether a swatch's position in that grid is the number
+Live stores. Grid order and stored index are two different things until a diff
+proves otherwise - colour three or four macros distinctly by hand, save, and
+check which index landed where.
+
+### 5.5 What is still open
+
+- The knob is still a placeholder arc rather than a redrawn Live knob.
+- Macro Variations render read-only; creating, recalling and deleting one need
+  codec mutations that do not exist.
+- Drum pads are laid out 4 wide, bottom-up, showing every pad. Live's 16-pad
+  scroll window is not reproduced because `PadScrollPosition`'s geometry is
+  unconfirmed (SCHEMA.md Q10).
+- The chain selector strip, the Key/Vel/Chain zone editors and the Rand/Map
+  buttons are absent.
 
 ---
 
