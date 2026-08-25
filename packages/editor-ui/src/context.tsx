@@ -58,8 +58,13 @@ export interface EditorContextValue {
   paramDrag: ParamDragState;
   startParamDrag: (param: ParamRef, rackPath: RackPath, e: React.PointerEvent) => void;
   arm: (armed: ArmedParam | null) => void;
-  /** Run a mutation against the rack at `rackPath`, recording undo and surfacing warnings. */
-  apply: (rackPath: RackPath, fn: (rack: Rack) => MutationResult) => void;
+  /**
+   * Run a mutation against the rack at `rackPath`, recording undo and
+   * surfacing warnings. Returns whether it actually applied, so a caller
+   * holding state of its own - the features strip - can put it back when the
+   * codec refuses.
+   */
+  apply: (rackPath: RackPath, fn: (rack: Rack) => MutationResult) => boolean;
   /** Live macro values from the M4L device, keyed by macro index. Root rack only, display only. */
   liveValues?: Record<number, number>;
   /**

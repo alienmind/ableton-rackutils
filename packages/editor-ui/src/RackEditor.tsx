@@ -42,12 +42,12 @@ export function RackEditor({ rack, onChange, onSave, liveValues }: RackEditorPro
   }, []);
 
   const apply = useCallback(
-    (rackPath: RackPath, fn: (target: Rack) => MutationResult) => {
-      if (!rack) return;
+    (rackPath: RackPath, fn: (target: Rack) => MutationResult): boolean => {
+      if (!rack) return false;
       const target = resolveRackPath(rack, rackPath);
       if (!target) {
         setWarnings([`that rack is no longer where it was - reload the file`]);
-        return;
+        return false;
       }
       const previous = rack.clone();
       let result: MutationResult;
@@ -58,10 +58,10 @@ export function RackEditor({ rack, onChange, onSave, liveValues }: RackEditorPro
         // must not take the editor down with it or leave a half-applied edit
         // presented as success.
         setWarnings([err instanceof Error ? err.message : String(err)]);
-        return;
+        return false;
       }
       setWarnings(result.warnings);
-      if (!result.ok) return;
+      if (!result.ok) return false;
       setUndo((u) => [...u.slice(-49), previous]);
       // A new edit invalidates anything that was undone: the branch it would
       // redo onto no longer exists.
@@ -69,6 +69,7 @@ export function RackEditor({ rack, onChange, onSave, liveValues }: RackEditorPro
       // `target` mutated the document `rack` owns; clone so React sees a new
       // reference and every derived read recomputes.
       onChange(rack.clone());
+      return true;
     },
     [rack, onChange],
   );

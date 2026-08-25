@@ -75,8 +75,13 @@ export function ContractStrip({ rack, onSave }: ContractStripProps) {
    */
   const materialise = useCallback(
     (next: Convention, removedId?: string) => {
+      const previous = convention;
       setConvention(next);
-      apply([], (r) => {
+      // Put the list back when the codec refuses - a rack with no room for
+      // another macro, or one with no chain selector of its own. A feature
+      // listed as being in the rack when it is not is the one thing this strip
+      // must never show.
+      const applied = apply([], (r) => {
         if (removedId) {
           const device = deviceFor(removedId, next);
           if (device) {
@@ -88,8 +93,9 @@ export function ContractStrip({ rack, onSave }: ContractStripProps) {
         if (devices.length === 0 && !removedId) return { ok: true, warnings: [] };
         return applyContract(r, devices, { name: next.name || undefined });
       });
+      if (!applied) setConvention(previous);
     },
-    [apply],
+    [apply, convention],
   );
 
   const add = (id: string) => {
