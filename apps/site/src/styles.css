@@ -23,10 +23,19 @@ body {
  * user scrolling a row that had room to be shown. This is the full-bleed
  * trick - pull the section out to the viewport edges from inside a centred
  * parent - so only the rack breaks out.
+ *
+ * The panels UNDER the rack do not want that width: `editor-panels` caps
+ * itself, so a feature list and a mapping table stay readable while the row
+ * above them uses the whole monitor.
  */
 .rack-view {
   width: auto;
   margin-inline: calc(50% - 50vw + 1rem);
+}
+
+.rack-view .editor-panels {
+  max-width: 1500px;
+  margin-inline: auto;
 }
 
 header {

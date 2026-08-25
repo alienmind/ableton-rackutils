@@ -610,9 +610,12 @@ codec and through a browser; "loads in Live" is a different claim (Open risk
 - **Cables are clipped to the rack row - BUILT.** The layer covers the
   viewport, so a cable to a control scrolled out of the row used to be drawn
   across the page beside it.
-- **The rack row is as wide as the window - BUILT.** Prose reads badly past
-  900px and a rack of racks runs to thousands, so the rack breaks out of the
-  text column rather than sharing its width.
+- **The rack row is as wide as the window, and it comes first - BUILT.** Prose
+  reads badly past 900px and a rack of racks runs to thousands, so the rack
+  breaks out of the text column rather than sharing its width. The two panels
+  that READ the rack - the features strip and the mapping table - sit under it
+  as two columns and stack when there is not room for both, because neither is
+  better for being stretched across a monitor.
 - **A macro resets from its own knob - BUILT.** The `x` unbinds it and puts its
   name and colour back to an untouched slot's, leaving the slot where it is.
 - **Cables while Map is on - BUILT.** Every mapping in the rack is drawn as a

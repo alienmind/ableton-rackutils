@@ -609,3 +609,25 @@ test('the cables stay inside the rack row', async ({ page }) => {
   const clip = await page.locator('.mapping-cable-layer').evaluate((el) => getComputedStyle(el).clipPath);
   expect(clip).toContain('inset');
 });
+
+test('the rack sits above the two panels, which stack when there is no room', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await loadRack(page);
+
+  const box = async (selector: string) => (await page.locator(selector).boundingBox())!;
+  const row = await box('.rack-editor-scroll');
+  const features = await box('.contract-strip');
+  const mappings = await box('.mapping-table');
+
+  // The rack first, and it gets the width; the panels read it from underneath.
+  expect(features.y).toBeGreaterThan(row.y + row.height - 1);
+  expect(Math.abs(features.y - mappings.y)).toBeLessThan(2); // side by side
+  expect(mappings.x).toBeGreaterThan(features.x + features.width - 1);
+
+  await page.setViewportSize({ width: 700, height: 1000 });
+  const narrowFeatures = await box('.contract-strip');
+  const narrowMappings = await box('.mapping-table');
+  // No room for both, so one goes under the other rather than shrinking to
+  // nothing.
+  expect(narrowMappings.y).toBeGreaterThan(narrowFeatures.y + narrowFeatures.height - 1);
+});

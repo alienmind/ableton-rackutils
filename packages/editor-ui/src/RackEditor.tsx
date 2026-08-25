@@ -137,14 +137,21 @@ export function RackEditor({ rack, onChange, onSave, liveValues }: RackEditorPro
           </ul>
         )}
 
-        <ContractStrip rack={rack} onSave={onSave} />
-
+        {/* The rack first and as wide as the window allows, then the two
+            panels that read it, side by side under it - and stacked instead
+            when there is not enough width for both. Only the rack needs the
+            whole monitor; a feature list and a table of mappings are worse
+            for being stretched across one. */}
         <div className="rack-editor-scroll">
           <div className="rack-row">
             <RackPanel rack={rack} rackPath={[]} depth={0} />
           </div>
         </div>
-        <MappingTable rack={rack} />
+
+        <div className="editor-panels">
+          <ContractStrip rack={rack} onSave={onSave} />
+          <MappingTable rack={rack} />
+        </div>
 
         <MappingCables rack={rack} active={mapping} />
         <PatchCable drag={paramDrag} echo={cableEcho} onEchoDone={clearCableEcho} />
