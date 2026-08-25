@@ -1,8 +1,7 @@
 # ableton-rackutils: Implementation Plan (v4)
 
-**Product status: v0.0.1, pre-alpha.** The editor works in a browser and has
-been round-tripped through Live once by hand. Treat it as something to try on
-copies.
+**Product status: v0.1.0, beta.** The editor works end to end and the round
+trip through Live has been done on real racks. Still young: keep backups.
 
 Canonical plan for `ableton-rackutils`, a Swiss-army toolkit for Ableton rack
 preset (`.adg`) files. Lives in the repo so the project is self-contained:

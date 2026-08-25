@@ -28,6 +28,23 @@ Do not write code or comments with detectable LLM tells. Concretely:
 
 This applies to everything committed: source, comments, docs, commit messages.
 
+## Branching
+
+**No trunk-based development. Never commit directly to `main`.**
+
+Work happens on a branch and reaches `main` through a pull request:
+
+- `feat/<short-name>` for a feature, `fix/<short-name>` for a fix,
+  `docs/<short-name>` for documentation.
+- `release/<version>` for a version bump and its release notes.
+
+Start by branching from an up-to-date `main`. Push the branch, open a PR with
+`gh pr create`, and let CI run on it - both jobs, `check` and `browser`. Merge
+only when they are green.
+
+If you find yourself on `main` with uncommitted work, branch first and commit
+there; do not "just this once" push to `main`.
+
 ## Commit messages
 
 One line per commit. `type: what changed`, stated plainly, no body.
