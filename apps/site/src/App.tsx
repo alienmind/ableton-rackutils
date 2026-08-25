@@ -3,8 +3,15 @@ import { Rack, isGzip } from '@rackutils/adg-codec';
 import { RackEditor } from '@rackutils/editor-ui';
 import '@rackutils/editor-ui/src/editor.css';
 import { RackTree } from './RackTree';
-import { GettingStarted } from './GettingStarted';
-import logoUrl from './assets/logo.jpg';
+import { Landing } from './Landing';
+
+/**
+ * The Max for Live bundle goes straight to the work: load a rack, author it.
+ * The device window is small and its user installed the thing on purpose, so
+ * the landing chrome is dropped at BUILD time - see `Landing.tsx` - rather
+ * than merely hidden (doc/PLAN.md 4.7).
+ */
+const EMBEDDED = import.meta.env.VITE_EMBED === '1';
 
 interface Loaded {
   fileName: string;
@@ -61,16 +68,8 @@ export default function App() {
   }, [loaded]);
 
   return (
-    <div className="app">
-      <header>
-        <img src={logoUrl} alt="ableton-rackutils" className="logo" />
-        <h1>
-          ableton-rackutils <span className="badge">v0.1.0 beta</span>
-        </h1>
-        <p className="tagline">Rearrange the macro knobs on an Ableton rack, in your browser.</p>
-      </header>
-
-      <GettingStarted compact={loaded !== null} />
+    <div className={`app${EMBEDDED ? ' app-embedded' : ''}`}>
+      <Landing compact={loaded !== null} />
 
       <div
         className={`dropzone${dragOver ? ' dropzone-active' : ''}`}
@@ -86,7 +85,7 @@ export default function App() {
             <strong>{loaded.fileName}</strong> loaded. Drop another file to replace it.
           </p>
         ) : (
-          <p>Drop a .adg file here, or</p>
+          <p>{EMBEDDED ? 'Save the rack from Live, then drop the .adg here, or' : 'Drop a .adg file here, or'}</p>
         )}
         <label className="file-input-label">
           choose a file

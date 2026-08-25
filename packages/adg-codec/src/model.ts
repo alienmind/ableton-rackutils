@@ -53,7 +53,7 @@ export interface Binding {
 }
 
 export interface ParamRef {
-  /** Path relative to the owning Rack's BranchPresets root (see `dom.ts` pathOf/resolvePath). */
+  /** Path relative to the owning Rack's `GroupDevicePreset` (see `dom.ts` pathOf/resolvePath). */
   path: string;
   name: string;
   boundToMacro: number | null;
@@ -231,15 +231,19 @@ export class Rack {
 
   /** @internal Resolve a ParamRef/path against this rack's current DOM. */
   resolveTarget(path: string): Element | null {
-    const bp = this.branchPresetsEl;
-    return bp ? resolvePath(bp, path) : null;
+    return resolvePath(this.root, path);
   }
 
-  /** @internal Path of an element relative to this rack's BranchPresets root. */
+  /**
+   * @internal Path of an element relative to this rack's `GroupDevicePreset`.
+   *
+   * Rooted at the preset, not at `BranchPresets`, because a macro can drive a
+   * parameter of the rack device ITSELF - `ChainSelector` is one, SCHEMA.md
+   * Q15 - and `Device` is a sibling of `BranchPresets`, so a BranchPresets-
+   * rooted path cannot address it at all.
+   */
   pathOf(target: Element): string {
-    const bp = this.branchPresetsEl;
-    if (!bp) throw new Error('rack has no BranchPresets');
-    return pathOf(bp, target);
+    return pathOf(this.root, target);
   }
 
   /**
@@ -251,10 +255,10 @@ export class Rack {
    * reuse the same index space - see the class doc comment.
    */
   collectMacroBindings(): Map<number, Element[]> {
-    const bp = this.branchPresetsEl;
     const result = new Map<number, Element[]>();
-    if (!bp) return result;
-    for (const keyMidi of Array.from(bp.getElementsByTagName('KeyMidi'))) {
+    // Scans the whole preset, not just BranchPresets: a macro can drive the
+    // rack device's own parameters (SCHEMA.md Q15).
+    for (const keyMidi of Array.from(this.root.getElementsByTagName('KeyMidi'))) {
       if (childValue(keyMidi, 'Channel') !== '16') continue; // not a macro mapping (SCHEMA.md Q1)
       if (this.owningRackDevice(keyMidi) !== this.deviceEl) continue; // belongs to a nested rack's own macro
       const index = Number(childValue(keyMidi, 'NoteOrController'));
@@ -265,12 +269,50 @@ export class Rack {
     return result;
   }
 
-  /** @internal SCHEMA.md Q2 / patchbay ARCHITECTURE.md §5: walk up to the nearest BranchPresets, then that element's parent's Device child. */
+  /**
+   * @internal Macro bindings that are NOT `KeyMidi`, keyed by macro index.
+   *
+   * A plugin parameter is driven by an integer `MacroControlIndex` on its
+   * `PluginParameterSettings`, and a plugin's own on/off by
+   * `PowerMacroControlIndex` on the preset (SCHEMA.md Q20). Neither is a
+   * `KeyMidi`, so `collectMacroBindings` cannot see them, and every
+   * slot-changing mutation has to move these too or leave them pointing at a
+   * vacated slot.
+   *
+   * `-1` means unmapped and is skipped.
+   */
+  collectPluginMacroRefs(): Map<number, Element[]> {
+    const result = new Map<number, Element[]>();
+    for (const tag of ['MacroControlIndex', 'PowerMacroControlIndex']) {
+      for (const el of Array.from(this.root.getElementsByTagName(tag))) {
+        if (this.owningRackDevice(el) !== this.deviceEl) continue;
+        const index = Number(el.getAttribute('Value'));
+        if (!Number.isInteger(index) || index < 0) continue;
+        const list = result.get(index);
+        if (list) list.push(el);
+        else result.set(index, [el]);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * @internal Which rack's macros a KeyMidi belongs to: walk up to the nearest
+   * `GroupDevicePreset`, then take its `Device` child (SCHEMA.md Q2).
+   *
+   * The walk stops at the PRESET rather than at the rack device, because the
+   * rack device is a SIBLING of `BranchPresets`, not an ancestor of it - a
+   * binding on a device inside a chain never passes through it. Stopping at
+   * the preset is the one point both shapes share: a chain device's binding
+   * reaches it going up through `BranchPresets`, and a binding on the rack's
+   * own parameter (`ChainSelector`, SCHEMA.md Q15) reaches it going up through
+   * `Device`. An earlier version stopped at `BranchPresets`, which the second
+   * shape has none of, so it ran past and returned null.
+   */
   private owningRackDevice(el: Element): Element | null {
     let node: Element | null = el.parentElement;
-    while (node && node.tagName !== 'BranchPresets') node = node.parentElement;
-    const groupDevicePreset = node?.parentElement ?? null;
-    const device = child(groupDevicePreset, 'Device');
+    while (node && node.tagName !== 'GroupDevicePreset') node = node.parentElement;
+    const device = child(node, 'Device');
     return device?.firstElementChild ?? null;
   }
 

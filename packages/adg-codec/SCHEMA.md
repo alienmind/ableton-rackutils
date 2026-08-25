@@ -358,42 +358,31 @@ containment model (which doesn't care about depth at all) covers it.
 
 ---
 
-## Q13. Where is a chain's colour stored?
+## Q13. Where is a chain's colour stored, and is grid position the stored index?
 
-Live colours each chain row in a rack's chain list, and the UI reproduces that
-(`doc/PLAN.md` Part 5).
+**Answered. A swatch's position in Live's picker IS the number Live stores.**
 
-**Answer, confirmed present in all four fixtures:** `DocumentColorIndex` on the
-branch preset, alongside `AutoColored`.
+`MacroColor.N` on the rack device, and `DocumentColorIndex` on a chain, are
+indices into Live's 70-colour picker, counted in reading order from 0.
 
-```xml
-<DrumBranchPreset>
-  <Name Value="Riser Faze" />
-  <DocumentColorIndex Value="3" />
-  <AutoColored Value="true" />
-  ...
-</DrumBranchPreset>
-```
+Confirmed against `donors/BS.adg`, whose macro colours were picked by hand and
+reported by their author:
 
-Like `MacroColor.N` (Q7), it is a **palette index, not a colour**, and this
-project still has no confirmed index -> hex table - that is `doc/PLAN.md` Part 5, on hold. The UI renders it through the same placeholder palette and is
-labelled as such.
+| Macro | `MacroColor.N` | Author picked | `livePalette.ts` at that index |
+|---|---|---|---|
+| 1 (BS SELECT) | 13 | white | `#ffffff` |
+| 5 (BS GAIN) | 69 | grey, the LAST swatch in the picker | `#3c3c3c` |
 
-**Weaker evidence than the other answers here, and worth saying so.** Every
-chain in every fixture is `AutoColored="true"` and every chain within a file
-carries the SAME index (9, 9, 9 in `drum-nested.adg`; 3, 3, 3, 3 in
-`drum-pads.adg`). So:
+Two points settle it. The last swatch storing 69 in a 70-colour palette rules
+out any offset and any reversal; an interior point landing on white at 13 rules
+out a row permutation that happened to fix the ends.
 
-- That the field holds a colour is inference from its name plus Live's UI, not
-  from a diff where a colour was changed and the value moved.
-- Whether it varies per chain in a rack where the user coloured chains by hand
-  has never been observed here.
+So `pnpm adg-palette`'s pixel-sampled grid can be indexed directly, which is
+what `macroColor()` already assumed.
 
-To settle it: take a rack, colour two chains differently by hand in Live, save,
-and diff. Until then the codec reads the field and the UI shows it, and neither
-should be trusted to be showing Live's actual colour.
-
----
+**`-1` means no colour set**, not an index. Macro 9 in the same rack stores -1
+and reads grey in Live, so the default rendering is grey. `macroColor()` falls
+through to a neutral for any index it does not hold, which covers it.
 
 ## Q12. Does `XMLSerializer` emit the XML declaration?
 
@@ -543,3 +532,353 @@ rack type, especially drum racks, and resolve by NAME rather than assuming a
 fixed offset.
 
 **Answer:**
+
+---
+
+## Q14. Does a saved preset carry an external sidechain source?
+
+Asked because the contract (`doc/PLAN.md` 4.3) wants a Gate and a Compressor
+option, and the maintainer's own convention routes both to a separate track.
+
+**Answer: no. Live keeps the sidechain switch and drops the routing.**
+
+Confirmed against `donors/PD.adg`, whose Gate and Compressor were BOTH routed
+to a separate track in Live when the rack was saved. What the file holds:
+
+```xml
+<SideChain>
+  <OnOff>
+    <Manual Value="true" />          <!-- the switch survives -->
+  </OnOff>
+  <RoutedInput>
+    <Routable>
+      <Target Value="AudioIn/None" />
+      <UpperDisplayString Value="No Output" />
+      <LowerDisplayString Value="" />
+    </Routable>
+  </RoutedInput>
+</SideChain>
+```
+
+The whole document contains only `AudioIn/None` and `AudioOut/None` as routing
+values, and `No Output` as the only display string. Nothing anywhere else in
+the file names a track.
+
+This is what the format should do: a source names a track, and a preset has no
+tracks. It is recorded because the opposite is easy to assume from
+`UpperDisplayString` being a human-readable name, and because patchbay's notes
+on `RoutedInput/Routable` describe the mechanism without saying what survives a
+preset save.
+
+**Consequence.** A contract option may insert a Gate or a Compressor, switch
+its sidechain on, and bind a macro to it. It may NOT set the source, and the UI
+must not imply the routing came across. That stays one manual step per Set.
+
+---
+
+## Q15. A macro can drive the rack's OWN parameters, not only its chains'
+
+Found by running `pnpm adg-tool mappings` on `donors/BS.adg` and noticing that
+macro 1, which the author says drives the chain selector, was missing from the
+output while macros 2 to 9 were listed.
+
+**Answer: the rack device carries bindable parameters of its own, and
+`ChainSelector` is one.** Macro 1's `KeyMidi` sits directly on it:
+
+```
+macro 1  <- ChainSelector < InstrumentGroupDevice < Device < GroupDevicePreset
+macro 5  <- Gain < StereoGain < Device < AbletonDevicePreset < DevicePresets
+```
+
+The second line is the shape every previously recorded binding has: down inside
+`BranchPresets`, on a device in a chain. The first is a sibling of
+`BranchPresets`, one level up.
+
+**This breaks two assumptions the codec was built on.**
+
+1. `collectMacroBindings()` scans `branchPresetsEl.getElementsByTagName(
+   'KeyMidi')`, so a binding on the rack's own parameter is never seen. In
+   `BS.adg` the file holds 19 `KeyMidi` elements with `NoteOrController` 0
+   through 8, and the codec reports bindings for 1 through 8 only.
+2. `owningRackDevice()` establishes ownership by walking up to the nearest
+   `BranchPresets` and taking that element's parent's `Device` child. A KeyMidi
+   on the rack's own parameter has no `BranchPresets` ancestor within its rack,
+   so the walk runs past it and returns null.
+
+Ownership is better established by walking up to the nearest ancestor whose tag
+is a group device (`InstrumentGroupDevice`, `AudioEffectGroupDevice`,
+`DrumGroupDevice`, `MidiEffectGroupDevice`). That answer is correct for both
+shapes and still excludes a nested rack's own macros, which is what the
+BranchPresets walk was for.
+
+**Consequence, which is a silent corruption bug.** Every slot-changing mutation
+routes through `collectMacroBindings()`. On a rack whose macro drives the chain
+selector, `moveMapping` moves nothing while permuting variation values as if it
+had, and `reorderMacro`/`swapMacros` leave the `ChainSelector` KeyMidi pointing
+at the vacated index, so the chain selector ends up driven by whichever macro
+lands there. `unbindMacro` clears nothing and resets the variation value.
+
+A path fix is needed alongside: `pathOf`/`resolveTarget` are rooted at
+`BranchPresets`, which cannot address the rack's own parameters at all.
+
+Third time this pattern has held. Q11 was the same lesson: the synthetic
+fixture modelled only the shape the codec already assumed.
+
+---
+
+## Q16. What does an `Id` attribute mean?
+
+Asked while inserting a harvested device: what `Id` should the new element get?
+
+**Answer: `Id` is the element's index within its own sibling list, not a
+document-wide handle.** Confirmed against `donors/BS.adg`:
+
+```
+BranchPresets children          Id = 0, 1
+DevicePresets children (chain 0) Id = 0, 1, 2, 3, 4, 5, 6
+DevicePresets children (chain 1) Id = 0, 1, 2, 3, 4, 5, 6
+everything inside a device       Id = 0
+```
+
+The file holds 1318 `Id` attributes and 57 distinct values. 1255 of them are
+`0`. The same value repeats freely across different lists, so uniqueness is
+per-parent and nothing else.
+
+**This corrects a pre-SCHEMA guess.** `doc/PLAN.md`'s original Phase 2.4 said
+to "allocate above the current maximum" and never reuse an id, which was
+written before any of this was measured and is the opposite of what Live does.
+Following it would have numbered an inserted device somewhere in the hundreds
+while its siblings ran 0 to 6.
+
+**Consequence for insertion.** Append the device, then set its `Id` from where
+it landed - `siblingCount - 1` - and leave its interior at 0. `maxId()` in
+`normalize.ts` survives from the same guess and is not used for insertion.
+
+The elements Ableton regenerates on every save (`Id`, `PointeeId`, `LomId`,
+`LomIdView`) are filtered from diffs for readability, which is a separate point
+recorded in `doc/PLAN.md` D1. Filtering them does not mean they can be written
+carelessly.
+
+---
+
+## Q17. How is a VST3 plugin represented, and are its parameters bindable?
+
+Asked for the plugin dependency view (`doc/PLAN.md` 4.1) and for whether a
+macro can drive a plugin parameter. Evidence: `donors/BS-VST3.adg`, a copy of
+`BS.adg` with a third chain whose instrument is an Arturia VST3.
+
+**A plugin is NOT an `AbletonDevicePreset`.** It is a sibling wrapper with a
+different tag and no `Device` child at all:
+
+```
+DevicePresets
+  AbletonDevicePreset -> Device -> MidiArpeggiator
+  Vst3Preset                              <- no Device child
+  AbletonDevicePreset -> Device -> Roar
+  ...
+```
+
+`Vst3Preset` holds:
+
+| Element | Value in this file | What it is |
+|---|---|---|
+| `Uid/Fields.0-3` | 1098019957, 1096173907, 1296192084, 1349676899 | the VST3 class UID, four 32-bit ints |
+| `DeviceType` | 1 | |
+| `ProcessorState` | 77 KB of hex | plugin-internal, opaque |
+| `ControllerState` | hex | plugin-internal, opaque |
+| `ParameterSettings` | EMPTY | see below |
+| `StoredAllParameters` | true | |
+| `Name` | `""` | empty |
+| `PowerMacroControlIndex` | -1 | |
+
+**There is no plugin name in the file.** `Vst3Preset/Name` is empty and no
+other element carries one. The only human-readable string near it is the CHAIN
+name, `MiniBrute`, which its author typed. Live resolves the `Uid` against
+installed plugins at load time.
+
+The four `Uid` fields concatenate to `41727475415649534D42525450726F63`, which
+decodes as ASCII to `ArtuAVISMBRTProc`. Some vendors build readable UIDs like
+that; it is a coincidence to exploit for display, never a fact to rely on.
+
+**The codec sees it, and finds nothing to bind.** `rack.chains` reports the
+device as type `Vst3Preset` with **0 parameters**, because parameter discovery
+keys on `MidiControllerRange` (Q11) and a plugin exposes none of that.
+
+**Whether a macro can drive a plugin parameter is OPEN.** `ParameterSettings`
+is empty here and `StoredAllParameters` is true, which together suggest the
+element populates only when parameters are explicitly exposed - Live's
+"Configure" mode on a plugin device. Nothing in this file shows what an exposed
+parameter looks like, so it cannot be modelled yet.
+
+**To answer it:** in Live, configure two or three parameters on that VST3 so
+they appear on the device, map ONE of them to a macro, save, and diff against
+this file. That should show both what an exposed parameter looks like and
+whether the mapping is the usual `KeyMidi` or something plugin-specific. Until
+then the codec must not offer plugin parameters as bindable targets.
+
+---
+
+## Q18. Can a VST3 `Uid` be resolved to a plugin name, client side?
+
+Q17 established that a `Vst3Preset` carries no plugin name, only `Uid/Fields.0-3`.
+This is how to turn that back into a name without leaving the browser.
+
+**The `Uid` fields are the VST3 class id, big-endian, concatenated.**
+`donors/BS-VST3.adg` stores 1098019957, 1096173907, 1296192084, 1349676899,
+which is `41727475415649534D42525450726F63`.
+
+**The class id is embedded in the plugin binary, in COM byte order.** Confirmed
+by byte search:
+
+```
+Arturia/MiniBrute V.vst3   25,942,368 bytes   COM-ordered id at offset 23,623,120
+Arturia/MiniFreak V.vst3   30,341,016 bytes   absent
+```
+
+COM order is the usual GUID reshuffle: reverse the first four bytes, then the
+next two, then the next two, and keep the last eight as they are. The plain
+order did NOT match on Windows. The VST3 SDK is not COM-ordered on every
+platform, so an implementation has to search for BOTH forms.
+
+**What does not work here.** The documented portable route is
+`moduleinfo.json`, which the VST3 SDK can ship inside a plugin bundle's
+`Resources` folder listing every class id and its name. On this Windows machine
+there are zero of them: every `.vst3` under `Program Files/Common Files/VST3` is
+a single DLL, not a bundle. It is opt-in for vendors and none of these took it.
+Do not build on it as the primary path.
+
+**Consequence: resolution is a byte search over the user's own plugin folder.**
+`showDirectoryPicker()` gets read access once, each `.vst3` is streamed and
+searched for the 16 bytes in either order, and the FILENAME is the answer -
+`MiniBrute V.vst3`. Pure client side, no native code, no registry, no network.
+
+Two things make it cheap enough. The result is a `uid -> name` table worth
+caching, so the scan happens once rather than per rack. And a MISS is a useful
+answer in its own right: a rack naming a class id no local plugin contains is a
+rack this machine cannot fully load, which is the question the dependency view
+exists to answer.
+
+Limits worth stating in the UI: it only sees plugins installed on the machine
+doing the looking, `showDirectoryPicker` is Chromium-only today, and a plugin
+that ships several classes resolves them all to one filename.
+
+---
+
+## Q19. What visible macro counts does Live accept, and what makes a rack render tall?
+
+Found by loading a rack this codec wrote into Live: it worked, and it drew
+noticeably taller than any hand-built rack beside it.
+
+**Two causes, both ours.**
+
+**1. `NumVisibleMacroControls` should be EVEN.** The generated rack carried 11.
+Every rack Live wrote carries an even number - `BS.adg` and `BS-VST3.adg` 10,
+`PD.adg` 16 - and Live's own +/- buttons step by two, which is already recorded
+in `doc/PLAN.md` D3 as a UI rule without anyone noticing it was also a file
+rule. An odd count loads without complaint and draws the macro grid wrong.
+
+`insertMacroSlots` now rounds the new count up to even.
+
+**2. A long macro name wraps onto a second line**, and the taller cell takes
+the whole rack with it. The generated names were 21 characters
+(`AlienMind Bass FILTER`) because the contract expanded `{name}` from the
+rack's own name. Hand-built racks here top out at 12 (`Pluck / Long`,
+`GATE ON/OFF`) and sit on one line.
+
+The exact wrap threshold is not established - it is a rendered text width, not
+a character count, and no diff can measure it. What is established is that 12
+fits and 21 does not. `applyContract` takes the label name explicitly now, so
+the short track code the convention is built on (`BS GAIN`) is the path of
+least resistance rather than an override.
+
+Neither is a corruption: the file is valid and the mappings work. It is a
+reminder that "loads in Live" is not the same as "looks like a rack", and only
+opening it answers the second one.
+
+---
+
+## Q20. How is a plugin parameter exposed, and how does a macro drive it?
+
+Evidence: `donors/BS-EQ3.adg`, where one parameter of the Arturia VST3 was
+exposed through Live's Configure mode.
+
+**Exposing a parameter fills `ParameterSettings`**, which Q17 found empty:
+
+```xml
+<ParameterSettings>
+  <PluginParameterSettings>
+    <Index Value="0" />
+    <VisualIndex Value="0" />
+    <ParameterId Value="70" />              <!-- the plugin's own id -->
+    <Type Value="PluginFloatParameter" />
+    <MacroControlIndex Value="-1" />        <!-- the macro, -1 when unmapped -->
+    <MidiControllerRange />
+    <LomId Value="0" />
+  </PluginParameterSettings>
+</ParameterSettings>
+```
+
+**A plugin parameter is NOT driven by a `KeyMidi`.** Everything recorded in Q1
+through Q15 - `KeyMidi` with `Channel` 16 and `NoteOrController` carrying the
+macro index - applies to Ableton devices. A plugin carries an integer
+`MacroControlIndex` on the exposed parameter instead. `Vst3Preset` also carries
+`PowerMacroControlIndex` for its own on/off, the same shape, and no Ableton
+device in any donor has that element.
+
+**Confirmed against `donors/BS-VST3-mapped.adg`**, the same rack with that
+parameter mapped to macro 13:
+
+```xml
+<PluginParameterSettings>
+  <ParameterId Value="70" />
+  <Type Value="PluginFloatParameter" />
+  <MacroControlIndex Value="12" />     <!-- 0-based: macro 13 -->
+  <MidiControllerRange>
+    <MidiControllerRange>             <!-- nested twice, and only once mapped -->
+      <Min Value="0" />
+      <Max Value="1" />
+    </MidiControllerRange>
+  </MidiControllerRange>
+  <LomId Value="1232" />              <!-- non-zero once mapped -->
+</PluginParameterSettings>
+```
+
+Three things the mapped state adds: `MacroControlIndex` holds the 0-based macro
+index, the range appears as a `MidiControllerRange` nested inside another
+`MidiControllerRange` rather than the flat one an Ableton parameter uses (Q4),
+and `LomId` becomes non-zero.
+
+**Consequence, which was a real bug and is now fixed.**
+`collectMacroBindings()` finds `KeyMidi` elements and cannot see a plugin
+mapping, so every slot-changing mutation left the index pointing at the vacated
+slot. `Rack.collectPluginMacroRefs()` collects these separately and
+`moveMapping`, `swapMacros`, `insertMacroSlots` and `unbindMacro` all carry
+them now. Two details:
+
+- `moveMapping` used to refuse outright on a macro with no `KeyMidi`, which is
+  exactly what a macro driving only a plugin parameter looks like.
+- Unbinding writes -1 rather than removing the element. The parameter stays
+  exposed on the device, it just stops being driven.
+
+**Still open: the editor cannot SHOW these.** `Macro.bindings` is built from
+`KeyMidi` and a plugin binding has no `targetPath`, so the mapping table lists
+nothing for a macro that drives a plugin parameter. Correctness first; display
+is a separate change to the `Binding` model.
+
+## Q21. What is EQ Three, and what are its band gains?
+
+`FilterEQ3`, confirmed in `donors/BS-EQ3.adg` where its three band gains are
+mapped to macros 10, 11 and 12:
+
+| Parameter | Range |
+|---|---|
+| `GainLo` | 0.0003162277571 .. 1.99526238 |
+| `GainMid` | same |
+| `GainHi` | same |
+
+Linear amplitude, not decibels, which is the usual trap when a contract wants
+a range in a unit a human recognises.
+
+This was the last contract option with no donor and no known tag. `pnpm
+adg-harvest` now lifts it, so all five options in `doc/PLAN.md` 4.3.2 have one.
+

@@ -11,10 +11,15 @@ export {
   unbindOne,
   setBindingRange,
   invertBindingRange,
+  insertDeviceInEveryChain,
   renameMacro,
   renameRack,
   setMacroCount,
+  insertMacroSlots,
   setMacroColor,
   setChainColor,
 } from './mutate';
-export type { MutationResult } from './mutate';
+export type { MutationResult, InsertDeviceResult, InsertedDevice } from './mutate';
+export { applyContract, macroNameFor } from './contract';
+export type { ContractDevice, ContractOptions, ContractResult } from './contract';
+export { DONOR_DEVICES } from './donorLibrary.generated';

@@ -10,5 +10,9 @@ tmp/
 # Real racks stay local. They are personal project data and can be large.
 # Covers stray output from `pnpm adg-inspect move ...` too, wherever it lands.
 *.adg
+
+# Donors are the exception: device instances the contract copies from, which
+# have to ship with the code (PLAN.md Constraint 7).
+!packages/adg-codec/donors/*.adg
 playwright-report/
 test-results/

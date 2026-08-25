@@ -31,13 +31,16 @@ jobs:
 
       - run: pnpm --filter @rackutils/adg-codec test
 
-      # NOT YET: bundling apps/site's UI into the device (doc/PLAN.md Phase
-      # 5.5) is unimplemented. apps/m4l-device builds its OWN placeholder
-      # UI (src/app/rack-editor/App.tsx) via its own vite config, entirely
-      # separate from apps/site right now. When 5.5 lands, this step gains a
-      # "build site with VITE_BASE=./" step feeding the device build, plus the
-      # absolute-asset-path guard the plan describes - the single most likely
-      # device-side failure once embedding exists.
+      # NOT YET: bundling apps/site's UI into the device (doc/PLAN.md 4.7) is
+      # unimplemented. apps/m4l-device builds its OWN placeholder UI
+      # (src/app/rack-editor/App.tsx) via its own vite config, entirely
+      # separate from apps/site right now. When 4.7 lands, this step gains a
+      # site build with VITE_BASE=./ and VITE_EMBED=1 feeding the device
+      # build, plus two guards:
+      #   - no absolute asset paths in the bundle, the single most likely
+      #     device-side failure
+      #   - no sw.js in the bundle. VITE_EMBED already skips the PWA plugin
+      #     (apps/site/vite.config.ts); the guard is what keeps it skipped.
       - name: Build device
         run: pnpm --filter @rackutils/m4l-device build
 
@@ -48,7 +51,7 @@ jobs:
           body: |
             Auto-built from `main` at ${{ github.sha }}. Not a versioned
             release - this tag is overwritten on every push. Scaffold status:
-            see doc/PLAN.md Phase 5. Install via the site's download button,
-            or drag `rack-editor.amxd` onto a track in Live 12.
+            see doc/PLAN.md 4.7. Install via the site's download button, or
+            drag `rack-editor.amxd` onto a track in Live 12.
           prerelease: true
           files: apps/m4l-device/dist/@rackutils/m4l-device/*.amxd

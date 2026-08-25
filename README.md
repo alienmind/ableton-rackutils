@@ -8,12 +8,13 @@ page, or from the command line.
 
 **Live site:** https://alienmind.github.io/ableton-rackutils/
 
-> **v0.1.0, beta.** The editor works end to end: open a rack, rearrange and
-> rebind its macros, save, and load the result back into Live. That round trip
-> has been done on real racks. See [What works today](#what-works-today).
+> **v0.2.0, beta.** The editor works end to end: open a rack, rearrange and
+> rebind its macros, save, and load the result back into Live. Racks the
+> contract authored have made that round trip too. See
+> [What works today](#what-works-today).
 
 > **Keep backups anyway.** This tool rewrites rack files. The codec is covered
-> by 84 tests against four real racks, and the editor by 45 more including a
+> by 137 tests, many against real racks, and the editor by 46 more including a
 > real browser, but a preset that loads without complaint and behaves subtly
 > differently is the failure mode that testing catches last. Racks with Macro
 > Variations deserve a listen before you trust the result.

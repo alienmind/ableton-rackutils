@@ -11,7 +11,8 @@
  * stops writing a `KeyMidi` change with stale `MacroSnapshot` values sitting
  * right next to it.
  */
-import { child, childValue, createValueEl, elementChildren, insertAfterLomId, setChildValue } from './dom';
+import { child, childValue, createValueEl, elementChildren, insertAfterLomId, parseXmlDoc, setChildValue } from './dom';
+import { DONOR_DEVICES } from './donorLibrary.generated';
 import { MACRO_SLOTS, Rack, UNSET_MACRO_VALUE, type ParamRef } from './model';
 
 export interface MutationResult {
@@ -35,16 +36,27 @@ export function moveMapping(rack: Rack, from: number, to: number): MutationResul
   assertSlot(from);
   assertSlot(to);
   const bindings = rack.collectMacroBindings();
+  // Plugin parameters bind by an index rather than a KeyMidi (SCHEMA.md Q20),
+  // so a macro can be driving something while having no KeyMidi at all.
+  const pluginRefs = rack.collectPluginMacroRefs();
   const fromKeyMidis = bindings.get(from) ?? [];
-  if (fromKeyMidis.length === 0) return fail(`macro ${from + 1} has no mapping to move`);
+  const fromPlugin = pluginRefs.get(from) ?? [];
+  if (fromKeyMidis.length === 0 && fromPlugin.length === 0) {
+    return fail(`macro ${from + 1} has no mapping to move`);
+  }
 
   const warnings: string[] = [];
   const toKeyMidis = bindings.get(to) ?? [];
-  if (toKeyMidis.length > 0) {
-    warnings.push(`cleared ${toKeyMidis.length} existing binding${toKeyMidis.length > 1 ? 's' : ''} on macro ${to + 1}`);
+  const toPlugin = pluginRefs.get(to) ?? [];
+  const cleared = toKeyMidis.length + toPlugin.length;
+  if (cleared > 0) {
+    warnings.push(`cleared ${cleared} existing binding${cleared > 1 ? 's' : ''} on macro ${to + 1}`);
     for (const km of toKeyMidis) removeKeyMidi(km);
+    // Cleared by writing -1: the parameter stays exposed, it stops being driven.
+    for (const el of toPlugin) el.setAttribute('Value', '-1');
   }
   for (const km of fromKeyMidis) setChildValue(km, 'NoteOrController', to);
+  for (const el of fromPlugin) el.setAttribute('Value', String(to));
 
   permuteVariations(rack, (values) => {
     values[to] = values[from];
@@ -71,6 +83,13 @@ export function swapMacros(rack: Rack, a: number, b: number): MutationResult {
   for (const km of aKeyMidis) setChildValue(km, 'NoteOrController', b);
   for (const km of bKeyMidis) setChildValue(km, 'NoteOrController', a);
 
+  // Same for plugin parameters, which bind by index (SCHEMA.md Q20).
+  const pluginRefs = rack.collectPluginMacroRefs();
+  const aPlugin = pluginRefs.get(a) ?? [];
+  const bPlugin = pluginRefs.get(b) ?? [];
+  for (const el of aPlugin) el.setAttribute('Value', String(b));
+  for (const el of bPlugin) el.setAttribute('Value', String(a));
+
   const device = rack.deviceEl;
   for (const field of PER_SLOT_FIELDS) swapChildValue(device, `${field}.${a}`, device, `${field}.${b}`);
   swapChildValue(child(device, `MacroControls.${a}`), 'Manual', child(device, `MacroControls.${b}`), 'Manual');
@@ -94,6 +113,51 @@ export function reorderMacro(rack: Rack, from: number, to: number): MutationResu
   assertSlot(to);
   const step = from < to ? 1 : -1;
   for (let i = from; i !== to; i += step) swapMacros(rack, i, i + step);
+  return ok();
+}
+
+/**
+ * Make room at the FRONT of the macro bank by shifting every macro right by
+ * `count`, leaving slots 0..count-1 empty.
+ *
+ * The contract puts its own macros in the leading slots so they are in the
+ * same place on every rack (doc/PLAN.md 4.3.1), which means the rack's
+ * existing macros have to move out of the way first.
+ *
+ * Implemented as repeated `reorderMacro(15, 0)`, which rotates the whole bank
+ * right by one and brings the top slot round to the front. That keeps the
+ * variation handling on the single already-tested path (Constraint 4) instead
+ * of adding a second bulk permutation, and it is lossless precisely because
+ * the slots being rotated out are checked to be empty first.
+ *
+ * Fails rather than silently dropping anything when the top `count` slots
+ * carry bindings, which is what a full rack looks like.
+ */
+export function insertMacroSlots(rack: Rack, count: number): MutationResult {
+  if (!Number.isInteger(count) || count < 1 || count >= MACRO_SLOTS) {
+    throw new RangeError(`slot count ${count} out of range 1..${MACRO_SLOTS - 1}`);
+  }
+
+  const bindings = rack.collectMacroBindings();
+  const occupied: number[] = [];
+  for (let i = MACRO_SLOTS - count; i < MACRO_SLOTS; i++) {
+    if ((bindings.get(i) ?? []).length > 0) occupied.push(i + 1);
+  }
+  if (occupied.length > 0) {
+    return fail(
+      `no room to shift: macro${occupied.length > 1 ? 's' : ''} ${occupied.join(', ')} would be pushed off the end`,
+    );
+  }
+
+  for (let i = 0; i < count; i++) reorderMacro(rack, MACRO_SLOTS - 1, 0);
+
+  // Widen the visible bank so the new slots are reachable, rounded UP to an
+  // even number. Live's own +/- steps by two and every rack it wrote in
+  // donors/ has an even count (10, 10, 16); an odd one renders the macro grid
+  // wrong - a rack taller than a rack is allowed to be - while still loading.
+  const wanted = rack.macroCount + count;
+  const visible = Math.min(MACRO_SLOTS, wanted + (wanted % 2));
+  setMacroCount(rack, visible);
   return ok();
 }
 
@@ -289,8 +353,12 @@ function findBinding(rack: Rack, macroIndex: number, targetPath: string): Elemen
 export function unbindMacro(rack: Rack, macroIndex: number): MutationResult {
   assertSlot(macroIndex);
   const keyMidis = rack.collectMacroBindings().get(macroIndex) ?? [];
-  if (keyMidis.length === 0) return ok();
+  const pluginRefs = rack.collectPluginMacroRefs().get(macroIndex) ?? [];
+  if (keyMidis.length === 0 && pluginRefs.length === 0) return ok();
   for (const km of keyMidis) removeKeyMidi(km);
+  // A plugin binding is cleared by writing -1, not by removing the element:
+  // the parameter stays exposed, it just stops being driven (SCHEMA.md Q20).
+  for (const el of pluginRefs) el.setAttribute('Value', '-1');
   permuteVariations(rack, (values) => {
     values[macroIndex] = UNSET_MACRO_VALUE;
   });
@@ -376,3 +444,76 @@ function createKeyMidi(doc: Document, macroIndex: number): Element {
   el.appendChild(createValueEl(doc, 'ControllerMapMode', 0));
   return el;
 }
+
+/** Where one inserted (or reused) device landed. */
+export interface InsertedDevice {
+  /** Path of the device's `AbletonDevicePreset`, relative to the rack (see `Rack.pathOf`). */
+  path: string;
+  /** True when an existing device at the end of the chain was reused rather than a new one added. */
+  reused: boolean;
+}
+
+export interface InsertDeviceResult extends MutationResult {
+  devices: InsertedDevice[];
+}
+
+/**
+ * Put `deviceTag` at the end of EVERY chain, reusing one already there.
+ *
+ * The contract applies in parallel across a rack's chains rather than by
+ * wrapping the rack in a parent (doc/PLAN.md 4.3.3): `donors/BS.adg` has a
+ * Utility at the end of each of its two chains with one macro driving both.
+ * Wrapping is the cheap answer anyone can do by hand in Live, and it costs a
+ * menu dive on Push to reach the knobs it hides.
+ *
+ * A chain that already ends in the device keeps it, so running this twice
+ * inserts nothing the second time and the result is the same either way.
+ *
+ * Device XML is copied from a harvested donor, never generated (Constraint 7).
+ * The copy's `Id` is set from its position in the chain, which is what an `Id`
+ * means (SCHEMA.md Q16); its interior ids stay at 0, as Live writes them.
+ */
+export function insertDeviceInEveryChain(rack: Rack, deviceTag: string): InsertDeviceResult {
+  const donorXml = DONOR_DEVICES[deviceTag];
+  if (!donorXml) {
+    return { ok: false, warnings: [`no donor for "${deviceTag}" - save one into packages/adg-codec/donors and run pnpm adg-harvest`], devices: [] };
+  }
+
+  const bp = rack.branchPresetsEl;
+  const chains = bp ? elementChildren(bp) : [];
+  if (chains.length === 0) return { ok: false, warnings: ['rack has no chains'], devices: [] };
+
+  const devices: InsertedDevice[] = [];
+  const warnings: string[] = [];
+
+  for (const chain of chains) {
+    const presets = child(chain, 'DevicePresets');
+    if (!presets) {
+      warnings.push(`chain "${childValue(chain, 'Name') ?? ''}" has no DevicePresets and was skipped`);
+      continue;
+    }
+
+    const existing = elementChildren(presets);
+    const last = existing[existing.length - 1];
+    if (last && deviceTagOfPreset(last) === deviceTag) {
+      devices.push({ path: rack.pathOf(last), reused: true });
+      continue;
+    }
+
+    const parsed = parseXmlDoc(donorXml).documentElement;
+    const copy = rack.document.importNode(parsed, true) as Element;
+    presets.appendChild(copy);
+    // Id is a position in the sibling list, not a handle (SCHEMA.md Q16), so
+    // it is set AFTER appending, from where the element actually landed.
+    copy.setAttribute('Id', String(elementChildren(presets).length - 1));
+    devices.push({ path: rack.pathOf(copy), reused: false });
+  }
+
+  return { ok: true, warnings, devices };
+}
+
+/** The device tag an `AbletonDevicePreset` wraps. */
+function deviceTagOfPreset(preset: Element): string | null {
+  return child(preset, 'Device')?.firstElementChild?.tagName ?? null;
+}
+
