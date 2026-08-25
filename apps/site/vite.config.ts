@@ -4,9 +4,10 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 const base = process.env.VITE_BASE || '/';
 
-// The device bundle ships the same dist/ from disk, where a service worker
-// solves nothing bundling has not already solved and can serve a stale UI
-// after a device update (doc/PLAN.md 4.5).
+// The device bundle ships the same dist/ from disk. Two things follow: a
+// service worker there solves nothing bundling has not already solved and can
+// serve a stale UI after a device update (doc/PLAN.md 4.5), and the UI drops
+// its landing chrome for the small device window (4.7).
 const embedded = process.env.VITE_EMBED === '1';
 
 // base comes from an env var, not from GITHUB_ACTIONS sniffing or a hardcoded
@@ -14,6 +15,14 @@ const embedded = process.env.VITE_EMBED === '1';
 // ('/ableton-rackutils/'), and the device bundle ('./').
 export default defineConfig({
   base,
+  resolve: {
+    // Swaps the landing chrome for a stub, so the logo and the guide images
+    // are never in the device bundle's module graph at all.
+    alias: embedded ? { './Landing': './Landing.embedded' } : {},
+  },
+  define: {
+    'import.meta.env.VITE_EMBED': JSON.stringify(process.env.VITE_EMBED ?? ''),
+  },
   plugins: [
     react(),
     ...(embedded

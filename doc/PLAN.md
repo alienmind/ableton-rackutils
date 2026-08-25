@@ -607,8 +607,15 @@ designed backend-free:
   `/ableton-rackutils/` path resolves against the filesystem root inside `jweb`
   and 404s into a blank window.
 - No absolute-root fetches, no CDN imports at runtime. Everything vendored.
-- Hide the landing copy and anything Pages-specific when embedded. A build-time
-  flag, since the bundle already differs.
+- **The device UI drops the landing chrome, at build time.** No logo, no guide,
+  no images: load a rack, tick the contract options, see the rack and its
+  connections. The device window is small and its user installed the thing on
+  purpose, so nothing there has to explain what the tool is. `Landing.tsx`
+  holds all of it and `vite.config.ts` aliases that module to
+  `Landing.embedded.tsx` under `VITE_EMBED=1`, which keeps the assets out of
+  the module graph rather than merely unrendered - hiding the markup still
+  bundled the 2.4MB logo. Embedded build: 282 KB of JS and 16 KB of CSS, no
+  images, no service worker.
 - No service worker (4.5).
 - The device reports the bundled site version, so a bug report from inside Live
   is traceable to a commit.
