@@ -161,6 +161,11 @@
   align-items: stretch;
   gap: 2px;
   height: calc(var(--device-height) + var(--header-height));
+  /* Sized by its contents, not by the scroll box. Without this the row is as
+     wide as the viewport, panels overhang it, and the scroll container decides
+     it has nothing to scroll - so a rack wider than the window had no
+     scrollbar at all until some panel toggled and forced a re-layout. */
+  min-width: max-content;
 }
 
 .panel {
