@@ -659,3 +659,60 @@ The elements Ableton regenerates on every save (`Id`, `PointeeId`, `LomId`,
 recorded in `doc/PLAN.md` D1. Filtering them does not mean they can be written
 carelessly.
 
+---
+
+## Q17. How is a VST3 plugin represented, and are its parameters bindable?
+
+Asked for the plugin dependency view (`doc/PLAN.md` 4.1) and for whether a
+macro can drive a plugin parameter. Evidence: `donors/BS-VST3.adg`, a copy of
+`BS.adg` with a third chain whose instrument is an Arturia VST3.
+
+**A plugin is NOT an `AbletonDevicePreset`.** It is a sibling wrapper with a
+different tag and no `Device` child at all:
+
+```
+DevicePresets
+  AbletonDevicePreset -> Device -> MidiArpeggiator
+  Vst3Preset                              <- no Device child
+  AbletonDevicePreset -> Device -> Roar
+  ...
+```
+
+`Vst3Preset` holds:
+
+| Element | Value in this file | What it is |
+|---|---|---|
+| `Uid/Fields.0-3` | 1098019957, 1096173907, 1296192084, 1349676899 | the VST3 class UID, four 32-bit ints |
+| `DeviceType` | 1 | |
+| `ProcessorState` | 77 KB of hex | plugin-internal, opaque |
+| `ControllerState` | hex | plugin-internal, opaque |
+| `ParameterSettings` | EMPTY | see below |
+| `StoredAllParameters` | true | |
+| `Name` | `""` | empty |
+| `PowerMacroControlIndex` | -1 | |
+
+**There is no plugin name in the file.** `Vst3Preset/Name` is empty and no
+other element carries one. The only human-readable string near it is the CHAIN
+name, `MiniBrute`, which its author typed. Live resolves the `Uid` against
+installed plugins at load time.
+
+The four `Uid` fields concatenate to `41727475415649534D42525450726F63`, which
+decodes as ASCII to `ArtuAVISMBRTProc`. Some vendors build readable UIDs like
+that; it is a coincidence to exploit for display, never a fact to rely on.
+
+**The codec sees it, and finds nothing to bind.** `rack.chains` reports the
+device as type `Vst3Preset` with **0 parameters**, because parameter discovery
+keys on `MidiControllerRange` (Q11) and a plugin exposes none of that.
+
+**Whether a macro can drive a plugin parameter is OPEN.** `ParameterSettings`
+is empty here and `StoredAllParameters` is true, which together suggest the
+element populates only when parameters are explicitly exposed - Live's
+"Configure" mode on a plugin device. Nothing in this file shows what an exposed
+parameter looks like, so it cannot be modelled yet.
+
+**To answer it:** in Live, configure two or three parameters on that VST3 so
+they appear on the device, map ONE of them to a macro, save, and diff against
+this file. That should show both what an exposed parameter looks like and
+whether the mapping is the usual `KeyMidi` or something plugin-specific. Until
+then the codec must not offer plugin parameters as bindable targets.
+

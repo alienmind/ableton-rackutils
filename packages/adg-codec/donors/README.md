@@ -79,3 +79,21 @@ Its hand-picked macro colours closed SCHEMA.md Q13: index 13 is white and index
 69, the last swatch in Live's picker, is grey, so grid position is the stored
 index.
 
+## `BS-VST3.adg`
+
+`BS.adg` with a third chain whose instrument is an Arturia VST3 instead of
+`InstrumentMeld`. The only donor holding a plugin, and the evidence for
+SCHEMA.md Q17:
+
+- A plugin is a `Vst3Preset`, a sibling wrapper of `AbletonDevicePreset` with
+  no `Device` child.
+- It carries a `Uid` of four 32-bit ints and **no plugin name**. The chain is
+  called `MiniBrute` because its author named it that, not because the file
+  says so.
+- The codec reads it as a device of type `Vst3Preset` with 0 parameters:
+  parameter discovery keys on `MidiControllerRange` (Q11) and a plugin exposes
+  none.
+
+Also the only donor with three chains, which makes it the better fixture for
+anything that has to hold across more than a pair.
+
