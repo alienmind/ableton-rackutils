@@ -4,6 +4,7 @@ import {
   renameMacro,
   renameRack,
   reorderMacro,
+  resetMacro,
   setChainColor,
   setMacroColor,
   setMacroCount,
@@ -185,6 +186,7 @@ export function RackPanel({ rack, rackPath, depth, collapsible, forceCollapsed }
           onBindArmed={bindHere}
           onRename={(i, name) => apply(rackPath, (r) => renameMacro(r, i, name))}
           onRecolor={(i, colorIndex) => apply(rackPath, (r) => setMacroColor(r, i, colorIndex))}
+          onReset={(i) => apply(rackPath, (r) => resetMacro(r, i))}
         />
         )}
 

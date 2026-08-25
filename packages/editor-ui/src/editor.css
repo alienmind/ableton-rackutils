@@ -1254,3 +1254,153 @@
 }
 
 .contract-note.warn { color: #d8c07a; }
+
+/* --- templates, arrows, reordering (doc/PLAN.md 4.3.7) --- */
+
+.contract-templates {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--edit-dim);
+}
+
+.contract-templates label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.contract-templates select,
+.contract-template-name {
+  font: inherit;
+  font-size: 11px;
+  text-transform: none;
+  letter-spacing: 0;
+  padding: 2px 4px;
+  color: var(--edit-text);
+  background: #101116;
+  border: 1px solid var(--edit-line);
+  border-radius: 3px;
+}
+
+.contract-template-name { width: 110px; }
+
+.contract-templates button {
+  font-size: 9px;
+  padding: 2px 6px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--edit-dim);
+  background: transparent;
+  border: 1px solid var(--edit-line);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.contract-templates button:hover { color: var(--edit-text); }
+
+.contract-columns {
+  grid-template-columns: 1fr auto 1fr 1.2fr;
+}
+
+/* The two arrows between the lists: in, and back out. */
+.contract-arrows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-self: center;
+}
+
+.contract-arrows button {
+  width: 28px;
+  padding: 3px 0;
+  font-size: 11px;
+  color: var(--edit-text);
+  background: #14151a;
+  border: 1px solid var(--edit-line);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.contract-arrows button:disabled { opacity: 0.35; cursor: default; }
+.contract-arrows button:not(:disabled):hover { border-color: var(--edit-accent); color: var(--edit-accent); }
+
+/* The order of this list is the order of the knobs, so it is draggable. */
+.contract-grip {
+  display: flex;
+  align-items: center;
+  padding: 0 2px;
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: -1px;
+  color: var(--edit-dim);
+  cursor: grab;
+  user-select: none;
+}
+
+.contract-list li.dragging { opacity: 0.55; }
+
+.contract-entry-slot {
+  flex: 0 0 auto;
+  min-width: 12px;
+  font-size: 9px;
+  opacity: 0.8;
+}
+
+/* --- per-knob reset --- */
+
+.macro-knob-reset {
+  position: absolute;
+  top: 1px;
+  right: 13px;
+  width: 11px;
+  height: 11px;
+  padding: 0;
+  font-size: 8px;
+  line-height: 1;
+  color: var(--edit-dim);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.macro-knob-reset:hover { color: #ff6b6b; }
+
+/* --- collapsed mapping groups --- */
+
+.mapping-expand-all {
+  margin-left: 6px;
+  font-size: 9px;
+  padding: 1px 5px;
+  color: var(--edit-dim);
+  background: transparent;
+  border: 1px solid var(--edit-line);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.mapping-expand-all:hover { color: var(--edit-text); }
+
+.mapping-summary { cursor: pointer; }
+
+.mapping-fanout {
+  margin-left: 5px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #2e313a;
+  color: var(--edit-dim);
+  font-size: 9px;
+}
+
+.mapping-open {
+  padding: 0 5px;
+  color: var(--edit-dim);
+  background: transparent;
+  border: 1px solid var(--edit-line);
+  border-radius: 3px;
+  cursor: pointer;
+}

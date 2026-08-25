@@ -25,6 +25,8 @@ export interface MacroKnobProps {
   onClick: () => void;
   onRename: (name: string) => void;
   onRecolor: (colorIndex: number) => void;
+  /** Unbind this macro and put its name and colour back to an untouched slot's. */
+  onReset: () => void;
 }
 
 /**
@@ -41,7 +43,7 @@ export interface MacroKnobProps {
  */
 export function MacroKnob(props: MacroKnobProps) {
   const { macro, liveValue, armed, hidden, dragging, dropTarget, dropSwaps, bindTarget, mapSource, mapKeys } = props;
-  const { onDragStart, onClick, onRename, onRecolor } = props;
+  const { onDragStart, onClick, onRename, onRecolor, onReset } = props;
   const [editing, setEditing] = useState(false);
   const [picking, setPicking] = useState<DOMRect | null>(null);
 
@@ -115,6 +117,14 @@ export function MacroKnob(props: MacroKnobProps) {
         >
           {label}
         </span>
+      )}
+
+      {/* Only on a macro there is something to undo: an untouched slot has
+          nothing to reset, and the control would be noise on all sixteen. */}
+      {(mapped || label !== `Macro ${macro.index + 1}` || macro.color >= 0) && (
+        <button type="button" className="macro-knob-reset" onClick={onReset} title="Unbind this macro and reset its name and colour">
+          x<span className="sr-only">{` reset macro ${macro.index + 1}`}</span>
+        </button>
       )}
 
       <button

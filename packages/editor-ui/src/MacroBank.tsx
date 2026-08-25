@@ -27,6 +27,7 @@ export interface MacroBankProps {
   onBindArmed: (macroIndex: number) => void;
   onRename: (index: number, name: string) => void;
   onRecolor: (index: number, colorIndex: number) => void;
+  onReset: (index: number) => void;
 }
 
 /**
@@ -42,7 +43,7 @@ export interface MacroBankProps {
  * is `ceil(count / 2)` columns wide and never ragged.
  */
 export function MacroBank(props: MacroBankProps) {
-  const { macros, macroCount, armed, rackPath, liveValues, mapping, onMapSource, parentKeys, onReorder, onSwap, onBindArmed, onRename, onRecolor } = props;
+  const { macros, macroCount, armed, rackPath, liveValues, mapping, onMapSource, parentKeys, onReorder, onSwap, onBindArmed, onRename, onRecolor, onReset } = props;
   const { drag, startDrag } = useMacroDrag({ onReorder, onSwap });
   const { paramDrag } = useEditor();
 
@@ -71,6 +72,7 @@ export function MacroBank(props: MacroBankProps) {
       onClick={() => onBindArmed(macro.index)}
       onRename={(name) => onRename(macro.index, name)}
       onRecolor={(colorIndex) => onRecolor(macro.index, colorIndex)}
+      onReset={() => onReset(macro.index)}
     />
   );
 

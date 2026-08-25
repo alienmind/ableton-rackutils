@@ -374,6 +374,8 @@ test('every rack sits in one flat row, nested racks included', async ({ page }) 
 
 test('the mapping table lists macro, path, name and range', async ({ page }) => {
   await loadRack(page);
+  // A macro driving several parameters is one collapsed row until opened.
+  await page.locator('.mapping-expand-all').click();
   // Scoped to the root rack: the nested rack has a Macro 1 of its own.
   const rows = page
     .locator('.mapping-grid tbody tr')
@@ -402,6 +404,7 @@ test('devices and nested racks start collapsed', async ({ page }) => {
 
 test('the unbind buttons line up on the right edge', async ({ page }) => {
   await loadRack(page);
+  await page.locator('.mapping-expand-all').click();
   const rights = await page.locator('.mapping-unbind').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().right)));
   expect(rights.length).toBeGreaterThan(1);
   expect(new Set(rights).size).toBe(1);
@@ -412,6 +415,8 @@ test('the mapping table edits a range and inverts it', async ({ page }) => {
   // table is the only place they can be authored. Browser-only because the
   // edit has to survive a real serialize/reparse cycle.
   await loadRack(page);
+  // Macro 1 drives two parameters, so its rows live behind the summary.
+  await page.locator('.mapping-expand-all').click();
   const row = page.locator('.mapping-grid tbody tr', { hasText: 'ParamA' }).first();
   const min = row.locator('.mapping-range').first();
   const max = row.locator('.mapping-range').nth(1);
@@ -459,6 +464,7 @@ test('a rack feature goes in from the left and comes back out from the right', a
   const available = page.locator('.contract-column').nth(0);
   const inRack = page.locator('.contract-column').nth(1);
   await available.locator('.contract-entry', { hasText: 'Auto Filter' }).click();
+  await page.locator('.contract-arrows button').first().click();
 
   // Leading slot, the rack name on the knob, and the feature now sits in the
   // right-hand list under its own label.
@@ -468,7 +474,8 @@ test('a rack feature goes in from the left and comes back out from the right', a
   // The settings column is the one that was just added.
   await expect(page.locator('.contract-settings h4')).toHaveText('Auto Filter');
 
-  await inRack.locator('li', { hasText: 'BS FILTER' }).locator('.contract-remove').click();
+  await inRack.locator('.contract-entry', { hasText: 'BS FILTER' }).click();
+  await page.locator('.contract-arrows button').nth(1).click();
   await expect(inRack.locator('.contract-entry-name')).toHaveCount(0);
   await expect(rootKnobs(page).first().locator('.macro-knob-name')).not.toHaveText('BS FILTER');
 });
@@ -480,6 +487,7 @@ test('a contract-authored rack saves as a file that reparses', async ({ page }) 
   await page.locator('.contract-code').fill('BS');
   await page.locator('.contract-code').press('Enter');
   await page.locator('.contract-column').nth(0).locator('.contract-entry', { hasText: 'Utility Gain' }).click();
+  await page.locator('.contract-arrows button').first().click();
 
   const file = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Save a copy' }).click()]).then(
     ([d]) => d,
@@ -495,4 +503,62 @@ test('a contract-authored rack saves as a file that reparses', async ({ page }) 
   // The Utility the contract inserted, named from the same code.
   expect(xml).toContain('<StereoGain');
   expect(xml).toContain('<UserName Value="BS GAIN"/>');
+});
+
+test('a macro driving several parameters is one row until it is opened', async ({ page }) => {
+  // What the contract writes is one knob across every chain, and four
+  // identical rows say nothing four times.
+  await loadRack(page);
+  const summary = page.locator('.mapping-summary').first();
+  await expect(summary).toBeVisible();
+  await expect(summary.locator('.mapping-fanout')).toHaveText('x2');
+
+  await summary.dblclick();
+  await expect(page.locator('.mapping-summary')).toHaveCount(0);
+  await expect(page.locator('.mapping-grid tbody tr', { hasText: 'ParamC' })).toHaveCount(1);
+});
+
+test('a macro can be reset from its own knob', async ({ page }) => {
+  await loadRack(page);
+  const knob = rootKnobs(page).first();
+  await expect(knob.locator('.macro-knob-name')).toHaveText('ParamA');
+  await knob.locator('.macro-knob-reset').click();
+
+  // Unbound, back to the default name, and no colour.
+  await expect(knob.locator('.macro-knob-name')).toHaveText('Macro 1');
+  await expect(knob).toHaveClass(/unmapped/);
+});
+
+test('a rack feature is added with the arrow and reordered by dragging', async ({ page }) => {
+  await loadRack(page);
+  await page.locator('.contract-code').fill('BS');
+  await page.locator('.contract-code').press('Enter');
+
+  const available = page.locator('.contract-column').nth(0);
+  const inRack = page.locator('.contract-column').nth(1);
+  const [addButton, removeButton] = [page.locator('.contract-arrows button').nth(0), page.locator('.contract-arrows button').nth(1)];
+
+  await available.locator('.contract-entry', { hasText: 'Auto Filter' }).click();
+  await addButton.click();
+  await available.locator('.contract-entry', { hasText: 'Utility Gain' }).click();
+  await addButton.click();
+  await expect(inRack.locator('.contract-entry-name')).toHaveText(['BS FILTER', 'BS GAIN']);
+  await expect(rootKnobs(page).nth(0).locator('.macro-knob-name')).toHaveText('BS FILTER');
+
+  // Drag the second one over the first: the list order IS the knob order.
+  const rows = inRack.locator('li[data-feature-index]');
+  const source = rows.nth(1).locator('.contract-grip');
+  const target = rows.nth(0);
+  await source.hover();
+  await page.mouse.down();
+  await target.hover();
+  await page.mouse.up();
+
+  await expect(inRack.locator('.contract-entry-name')).toHaveText(['BS GAIN', 'BS FILTER']);
+  await expect(rootKnobs(page).nth(0).locator('.macro-knob-name')).toHaveText('BS GAIN');
+
+  // And back out through the other arrow.
+  await inRack.locator('.contract-entry', { hasText: 'BS GAIN' }).click();
+  await removeButton.click();
+  await expect(inRack.locator('.contract-entry-name')).toHaveText(['BS FILTER']);
 });

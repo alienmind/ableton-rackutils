@@ -32,7 +32,6 @@ describe('RackEditor', () => {
     // Only the root's bank: a nested rack starts collapsed to a title strip.
     expect(html.match(/class="macro-knob /g) ?? []).toHaveLength(8);
     expect(html).toContain('ParamA');
-    expect(html).toContain('ParamC');
     expect(html).toContain('M1'); // the macro badge on a mapped parameter
   });
 
@@ -44,12 +43,14 @@ describe('RackEditor', () => {
     expect(html).toContain('TestSynth');
   });
 
-  test('lists every mapping below the row, with an unbind control', () => {
+  test('lists the mappings below the row, a multi-target macro as one row', () => {
     const html = render(Rack.parse(buildFixtureBytes()));
     expect(html).toContain('mapping-grid');
-    expect(html).toContain('mapping-unbind');
-    expect(html).toContain('ParamA');
-    expect(html).toContain('ParamC');
+    // The fixture's macro 1 drives two parameters, which is exactly what the
+    // contract writes across chains: one collapsed row, opened on demand.
+    expect(html).toContain('mapping-summary');
+    expect(html).toContain('2 parameters');
+    expect(html).toContain('Expand all');
   });
 
   test('renders a nested rack collapsed to a title strip, in the same row', () => {

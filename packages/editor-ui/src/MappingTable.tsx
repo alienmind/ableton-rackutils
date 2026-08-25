@@ -24,10 +24,24 @@ export interface MappingTableProps {
  * unit for them, so they are shown raw. An inverted range is stored as
  * Min > Max (SCHEMA.md Q4), which is why the invert control swaps the two
  * numbers rather than setting a flag.
+ *
+ * **A macro driving several parameters is ONE collapsed row**, because that is
+ * exactly what the contract writes: one knob across every chain. Four
+ * identical rows say nothing four times. Double-click the row to open it, or
+ * use Expand all.
  */
 export function MappingTable({ rack }: MappingTableProps) {
   const { apply } = useEditor();
   const rows = collectMappings(rack);
+  const [opened, setOpened] = useState<Set<string>>(new Set());
+
+  const groupKey = (row: (typeof rows)[number]) => `${row.rackPath.join('|')}:${row.macroIndex}`;
+  const toggle = (key: string) =>
+    setOpened((open) => {
+      const next = new Set(open);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
 
   if (rows.length === 0) {
     return (
@@ -42,6 +56,15 @@ export function MappingTable({ rack }: MappingTableProps) {
     <section className="mapping-table">
       <h4>
         Macro Mappings <span className="mapping-count">{rows.reduce((n, r) => n + r.targets.length, 0)}</span>
+        {rows.some((r) => r.targets.length > 1) && (
+          <button
+            type="button"
+            className="mapping-expand-all"
+            onClick={() => setOpened(opened.size === 0 ? new Set(rows.filter((r) => r.targets.length > 1).map(groupKey)) : new Set())}
+          >
+            {opened.size === 0 ? 'Expand all' : 'Collapse all'}
+          </button>
+        )}
       </h4>
       <table className="mapping-grid">
         <thead>
@@ -55,11 +78,50 @@ export function MappingTable({ rack }: MappingTableProps) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) =>
-            row.targets.map((t) => {
+          {rows.map((row) => {
+            const key = groupKey(row);
+            // One target is its own summary: collapsing it would hide the row
+            // and gain nothing.
+            if (row.targets.length > 1 && !opened.has(key)) {
+              const parameters = [...new Set(row.targets.map((t) => t.parameter))];
+              const devices = [...new Set(row.targets.map((t) => t.device))];
+              return (
+                <tr
+                  key={key}
+                  className="mapping-summary"
+                  style={{ '--mapped-color': row.color } as React.CSSProperties}
+                  onDoubleClick={() => toggle(key)}
+                  title="Double-click to open"
+                >
+                  <td className="col-macro">
+                    <span className="mapping-slot">{row.macroIndex + 1}</span>
+                    <span className="mapping-macro">{row.macroName}</span>
+                  </td>
+                  <td className="col-path">
+                    {row.rackName} | {devices.length === 1 ? devices[0] : `${devices.length} devices`}
+                  </td>
+                  <td className="col-name">
+                    {parameters.length === 1 ? parameters[0] : `${parameters.length} parameters`}
+                    <span className="mapping-fanout">x{row.targets.length}</span>
+                  </td>
+                  <td className="col-num" />
+                  <td className="col-num" />
+                  <td className="col-actions">
+                    <button type="button" className="mapping-open" onClick={() => toggle(key)} title="Show every target">
+                      ...
+                    </button>
+                  </td>
+                </tr>
+              );
+            }
+            return row.targets.map((t) => {
               const key = `${row.rackPath.join('|')}:${row.macroIndex}:${t.targetPath}`;
               return (
-                <tr key={key} style={{ '--mapped-color': row.color } as React.CSSProperties}>
+                <tr
+                  key={key}
+                  style={{ '--mapped-color': row.color } as React.CSSProperties}
+                  onDoubleClick={() => row.targets.length > 1 && toggle(groupKey(row))}
+                >
                   <td className="col-macro">
                     <span className="mapping-slot">{row.macroIndex + 1}</span>
                     <span className="mapping-macro">{row.macroName}</span>
@@ -115,8 +177,8 @@ export function MappingTable({ rack }: MappingTableProps) {
                   </td>
                 </tr>
               );
-            }),
-          )}
+            });
+          })}
         </tbody>
       </table>
     </section>

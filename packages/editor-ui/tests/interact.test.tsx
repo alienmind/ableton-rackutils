@@ -104,6 +104,8 @@ describe('clicking things', () => {
     // of parameters and naming them in a 58px knob pushed the grid apart. The
     // table carries the list and the unbind control with it.
     expect(container.querySelector('.macro-knob-targets')).toBeNull();
+    // Macro 1 drives two parameters, so its row is collapsed until opened.
+    click(container.querySelector('.mapping-expand-all')!);
     const unbind = container.querySelector('.mapping-unbind')!;
     expect(unbind).toBeTruthy();
     click(unbind);
@@ -250,22 +252,24 @@ describe('Map mode (doc/PLAN.md 4.4)', () => {
 });
 
 describe('rack features, the contract strip (doc/PLAN.md 4.3.1)', () => {
-  /** Left column: click a feature to put it in the rack. */
+  const columns = () => [...container.querySelectorAll('.contract-column')];
+  const arrow = (which: 'in' | 'out') => container.querySelectorAll('.contract-arrows button')[which === 'in' ? 0 : 1] as HTMLElement;
+
+  /** Pick it on the left, then press the arrow: the two-column gesture. */
   const addFeature = (label: string) => {
-    const entry = [...container.querySelectorAll('.contract-column')][0].querySelectorAll('.contract-entry');
-    const target = [...entry].find((el) => el.textContent?.includes(label))!;
-    act(() => (target as HTMLElement).click());
+    const entry = [...columns()[0].querySelectorAll('.contract-entry')].find((el) => el.textContent?.includes(label))!;
+    act(() => (entry as HTMLElement).click());
+    act(() => arrow('in').click());
   };
 
-  /** Right column: the x takes it back out. */
+  /** Pick it on the right, then press the other arrow. */
   const removeFeature = (label: string) => {
-    const rows = [...container.querySelectorAll('.contract-column')][1].querySelectorAll('li');
-    const row = [...rows].find((el) => el.textContent?.includes(label))!;
-    act(() => (row.querySelector('.contract-remove') as HTMLElement).click());
+    const entry = [...columns()[1].querySelectorAll('.contract-entry')].find((el) => el.textContent?.includes(label))!;
+    act(() => (entry as HTMLElement).click());
+    act(() => arrow('out').click());
   };
 
-  const addedLabels = () =>
-    [...[...container.querySelectorAll('.contract-column')][1].querySelectorAll('.contract-entry-name')].map((el) => el.textContent);
+  const addedLabels = () => [...columns()[1].querySelectorAll('.contract-entry-name')].map((el) => el.textContent);
 
   const setCode = (code: string) => {
     const input = container.querySelector('.contract-code') as HTMLInputElement;
@@ -299,27 +303,49 @@ describe('rack features, the contract strip (doc/PLAN.md 4.3.1)', () => {
     expect(rack.chains.some((c) => c.devices.some((d) => d.type === 'AutoFilter2'))).toBe(false);
   });
 
-  test('slot order is the strip order, not the order they were ticked', () => {
+  test('the knobs land in the order of the list', () => {
     setCode('BS');
     addFeature('Auto Filter');
     addFeature('Utility Gain');
 
-    // Utility sits above Auto Filter in the strip, so it leads however they
-    // were ticked. That is the whole familiarity claim.
+    // The list is the template's order, and the template's order is the
+    // convention: whatever the rack, these two knobs land this way round.
+    expect(addedLabels()).toEqual(['BS FILTER', 'BS GAIN']);
+    expect(rack.macros.slice(0, 2).map((m) => m.name)).toEqual(['BS FILTER', 'BS GAIN']);
+  });
+
+  test('dragging a feature up the list moves its knob left', () => {
+    setCode('BS');
+    addFeature('Auto Filter');
+    addFeature('Utility Gain');
+
+    const rows = [...columns()[1].querySelectorAll('li[data-feature-index]')];
+    const grip = rows[1].querySelector('.contract-grip')!;
+    // jsdom gives every element a zero box, so the drop target is resolved by
+    // the row under the pointer - stub the boxes the way the real ones sit.
+    rows.forEach((row, i) => {
+      row.getBoundingClientRect = () => ({ top: i * 20, bottom: i * 20 + 20 }) as DOMRect;
+    });
+
+    act(() => grip.dispatchEvent(Object.assign(new Event('pointerdown', { bubbles: true }), { button: 0, clientY: 20 })));
+    act(() => window.dispatchEvent(Object.assign(new Event('pointermove'), { clientY: 5 })));
+    act(() => window.dispatchEvent(Object.assign(new Event('pointerup'), { clientY: 5 })));
+
+    expect(addedLabels()).toEqual(['BS GAIN', 'BS FILTER']);
     expect(rack.macros.slice(0, 2).map((m) => m.name)).toEqual(['BS GAIN', 'BS FILTER']);
   });
 
-  test('the convention survives a remount', () => {
+  test('the template survives a remount, and the rack name does not travel with it', () => {
     setCode('BS');
     addFeature('Utility Gain');
 
     act(() => root.unmount());
     container.remove();
-    mount();
+    mount(); // a fresh rack, called Test Rack again
 
-    // Still in the right-hand list, still named the same way.
-    expect(addedLabels()).toEqual(['BS GAIN']);
-    expect((container.querySelector('.contract-code') as HTMLInputElement).value).toBe('BS');
+    // The feature is still in the template. Its label reads the NEW rack's
+    // name, because the name belongs to the rack and the template does not.
+    expect(addedLabels()).toEqual(['Test Rack GAIN']);
   });
 
   test('the settings column belongs to the feature just added', () => {
