@@ -289,3 +289,27 @@ test('a cable dropped on nothing retracts and binds nothing', async ({ page }) =
   await expect(page.locator('.patch-cable')).toHaveCount(0, { timeout: 4000 });
   expect(await rootKnobs(page).locator('.target-name').allTextContents()).toEqual(before);
 });
+
+test('a mapped parameter wears the colour of the macro driving it', async ({ page }) => {
+  await loadRack(page);
+  // Recolour macro 1, then check the parameter it drives followed it. A fixed
+  // green says "mapped" and nothing more; a rack has up to 16 macros.
+  const knob = rootKnobs(page).first();
+  await knob.locator('.macro-knob-swatch').click();
+  await page.locator('.color-picker .color-swatch').nth(9).click();
+
+  const knobColour = await knob.evaluate((el) => getComputedStyle(el).getPropertyValue('--macro-color').trim());
+  const chip = page.locator('.mapped-params .param').first();
+  const chipColour = await chip.evaluate((el) => getComputedStyle(el).backgroundColor);
+
+  const asRgb = await page.evaluate((hex) => {
+    const probe = document.createElement('span');
+    probe.style.color = hex;
+    document.body.appendChild(probe);
+    const rgb = getComputedStyle(probe).color;
+    probe.remove();
+    return rgb;
+  }, knobColour);
+
+  expect(chipColour).toBe(asRgb);
+});

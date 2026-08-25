@@ -181,6 +181,10 @@ nothing sensible: a `KeyMidi` belongs to the nearest enclosing rack
 **Chain rows carry their colour** from `DocumentColorIndex` (`SCHEMA.md` Q13),
 through the placeholder palette and with the same caveat as macro colours.
 
+**A mapped parameter wears the colour of the macro driving it**, badge
+included. It was a fixed green, which says "mapped" and nothing more - useless
+in a rack with sixteen macros, where the question is always WHICH one.
+
 Also: collapse-to-vertical-title-strip for devices and nested racks, a pad grid
 beside the chain rows for drum racks, Live's darker panel/line palette, text
 selection off throughout (dragging a knob was selecting its label, which reads

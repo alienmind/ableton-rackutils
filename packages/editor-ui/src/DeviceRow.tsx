@@ -5,6 +5,13 @@ import { samePath, useEditor, type RackPath } from './context';
 export interface DeviceRowProps {
   device: DeviceNode;
   rackPath: RackPath;
+  /**
+   * The colour of each macro in the owning rack, by index. A mapped parameter
+   * wears the colour of the macro driving it, which is the only cheap way to
+   * see WHICH knob a parameter belongs to - a uniform green says "mapped" and
+   * nothing more, and a rack has up to 16 of them.
+   */
+  macroColors: readonly string[];
   /** The rack's collapse-devices toggle. Sets this device's state without owning it, so it can still be opened on its own afterwards. */
   collapsed?: boolean;
 }
@@ -20,7 +27,7 @@ export interface DeviceRowProps {
  * what makes a parameter jump from "more" up into the mapped list the instant
  * it is bound, with no list surgery anywhere (Part 2.5).
  */
-export function DeviceRow({ device, rackPath, collapsed: collapsedFromRack }: DeviceRowProps) {
+export function DeviceRow({ device, rackPath, macroColors, collapsed: collapsedFromRack }: DeviceRowProps) {
   const [collapsed, setCollapsed] = useState(Boolean(collapsedFromRack));
   useEffect(() => setCollapsed(Boolean(collapsedFromRack)), [collapsedFromRack]);
   const [showMore, setShowMore] = useState(false);
@@ -40,6 +47,8 @@ export function DeviceRow({ device, rackPath, collapsed: collapsedFromRack }: De
 
   const isArmed = (p: ParamRef) => armed !== null && armed.param.path === p.path && samePath(armed.rackPath, rackPath);
   const toggleArm = (p: ParamRef) => arm(isArmed(p) ? null : { rackPath, param: p });
+  const mappedColor = (p: ParamRef) =>
+    p.boundToMacro === null ? undefined : ({ '--mapped-color': macroColors[p.boundToMacro] } as React.CSSProperties);
 
   if (collapsed) {
     return (
@@ -64,7 +73,7 @@ export function DeviceRow({ device, rackPath, collapsed: collapsedFromRack }: De
         {mapped.length > 0 && (
           <ul className="params mapped-params">
             {mapped.map((p) => (
-              <li key={p.path}>
+              <li key={p.path} style={mappedColor(p)}>
                 <button
                   type="button"
                   className={isArmed(p) ? 'param armed' : 'param'}

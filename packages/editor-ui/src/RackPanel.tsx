@@ -4,6 +4,7 @@ import type { DeviceNode, Rack } from '@rackutils/adg-codec';
 import { ChainList } from './ChainList';
 import { DeviceRow } from './DeviceRow';
 import { RackSideButtons } from './RackSideButtons';
+import { macroColor } from './macroColors';
 import { VariationsPanel } from './VariationsPanel';
 import { MacroBank } from './MacroBank';
 import { RackHeader } from './RackHeader';
@@ -44,6 +45,7 @@ export function RackPanel({ rack, rackPath, depth, collapsible, forceCollapsed }
   const [devicesCollapsed, setDevicesCollapsed] = useState(false);
   const { armed, arm, apply, liveValues, history } = useEditor();
 
+  const macroColors = rack.macros.map((m) => macroColor(m.color));
   const isDrumRack = rack.deviceEl.tagName === 'DrumGroupDevice';
   const chains = rack.chains;
   const chain = chains[Math.min(selectedChain, chains.length - 1)];
@@ -67,9 +69,17 @@ export function RackPanel({ rack, rackPath, depth, collapsible, forceCollapsed }
 
   const renderDevice = (device: DeviceNode) =>
     device.isRack ? (
-      <NestedRack key={device.path} parent={rack} device={device} rackPath={rackPath} depth={depth} collapsed={devicesCollapsed} />
+      <NestedRack
+        key={device.path}
+        parent={rack}
+        device={device}
+        rackPath={rackPath}
+        depth={depth}
+        collapsed={devicesCollapsed}
+        macroColors={macroColors}
+      />
     ) : (
-      <DeviceRow key={device.path} device={device} rackPath={rackPath} collapsed={devicesCollapsed} />
+      <DeviceRow key={device.path} device={device} rackPath={rackPath} macroColors={macroColors} collapsed={devicesCollapsed} />
     );
 
   if (collapsible && !open) {
@@ -145,14 +155,16 @@ function NestedRack({
   rackPath,
   depth,
   collapsed,
+  macroColors,
 }: {
   parent: Rack;
   device: DeviceNode;
   rackPath: RackPath;
   depth: number;
   collapsed: boolean;
+  macroColors: readonly string[];
 }) {
   const nested = parent.subRack(device.path);
-  if (!nested) return <DeviceRow device={device} rackPath={rackPath} collapsed={collapsed} />;
+  if (!nested) return <DeviceRow device={device} rackPath={rackPath} macroColors={macroColors} collapsed={collapsed} />;
   return <RackPanel rack={nested} rackPath={[...rackPath, device.path]} depth={depth + 1} collapsible forceCollapsed={collapsed} />;
 }

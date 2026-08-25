@@ -688,9 +688,27 @@
 }
 
 .mapped-params { margin-bottom: 2px; }
-.mapped-params .param { background: #2f4a2f; }
 
-.macro-badge { font-size: 9px; color: #9ad49a; }
+/* A mapped parameter wears the colour of the macro driving it, so which knob
+   owns it is readable at a glance. The fallback green only shows if a colour
+   somehow did not resolve. */
+.mapped-params .param {
+  background: var(--mapped-color, #2f4a2f);
+  color: #14151a;
+  font-weight: 600;
+  border-color: rgba(0, 0, 0, 0.45);
+}
+
+.mapped-params .param.armed {
+  background: #1d2a3d;
+  color: var(--edit-text);
+  border-color: var(--edit-accent);
+}
+
+.macro-badge {
+  font-size: 9px;
+  color: var(--mapped-color, #9ad49a);
+}
 
 .more-toggle { margin-top: 2px; }
 
