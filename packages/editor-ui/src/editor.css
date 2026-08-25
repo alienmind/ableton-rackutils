@@ -990,3 +990,267 @@
   stroke-width: 1;
   opacity: 0.8;
 }
+
+
+/* --- Rack features: the contract strip (doc/PLAN.md 4.3.1) --- */
+
+.contract-strip {
+  margin-bottom: 8px;
+  padding: 6px 8px 8px;
+  border: 1px solid var(--edit-line);
+  border-radius: 4px;
+  background: #1a1c22;
+}
+
+.contract-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.contract-head h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--edit-text);
+}
+
+.contract-rack-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--edit-dim);
+}
+
+.contract-code {
+  width: 170px;
+  padding: 2px 5px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--edit-text);
+  background: #101116;
+  border: 1px solid var(--edit-line);
+  border-radius: 3px;
+}
+
+/* Saving sits with the name, because they are the same thought: the rack is
+   called this, and this is the file it becomes. */
+.contract-save {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: var(--edit-text);
+  background: transparent;
+  border: 1px solid var(--edit-line);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.contract-save:hover { border-color: var(--edit-accent); color: var(--edit-accent); }
+
+.contract-save svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.contract-io {
+  display: flex;
+  gap: 3px;
+  margin-left: auto;
+}
+
+.contract-io button {
+  font-size: 9px;
+  padding: 2px 6px;
+  color: var(--edit-dim);
+  background: transparent;
+  border: 1px solid var(--edit-line);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.contract-io button:hover { color: var(--edit-text); }
+
+/* Left: what the rack could have. Middle: what it has. Right: the one that is
+   selected. Three columns rather than a row of tiles, so a feature's settings
+   have somewhere to live that does not grow the strip every time. */
+.contract-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.2fr;
+  gap: 8px;
+  align-items: start;
+}
+
+.contract-column h4 {
+  margin: 0 0 3px;
+  font-size: 9px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--edit-dim);
+}
+
+.contract-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 116px;
+  overflow-y: auto;
+}
+
+.contract-list li {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+}
+
+.contract-entry {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  color: var(--edit-text);
+  background: #14151a;
+  border: 1px solid var(--edit-line);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.contract-entry:hover { border-color: var(--edit-accent); }
+
+/* An added feature wears its own colour, with a foreground picked for contrast
+   against it - Live's palette runs from near black to white. */
+.contract-entry.filled { border-color: transparent; }
+.contract-entry.selected { outline: 1px solid var(--edit-text); outline-offset: 1px; }
+
+.contract-entry-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.contract-entry-state {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  opacity: 0.75;
+}
+
+/* The colour chip an editor puts beside a colour value, same idea here. */
+.contract-chip {
+  flex: 0 0 auto;
+  width: 11px;
+  height: 11px;
+  border: 1px solid rgba(0, 0, 0, 0.55);
+  border-radius: 2px;
+}
+
+.contract-remove {
+  flex: 0 0 auto;
+  width: 18px;
+  font-size: 10px;
+  color: var(--edit-dim);
+  background: transparent;
+  border: 1px solid var(--edit-line);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.contract-remove:hover { color: #ff6b6b; border-color: #ff6b6b; }
+
+.contract-empty {
+  padding: 3px 2px;
+  margin: 0;
+  font-size: 10px;
+  color: var(--edit-dim);
+  list-style: none;
+}
+
+.contract-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 8px;
+  border-left: 1px solid var(--edit-line);
+}
+
+.contract-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--edit-dim);
+}
+
+.contract-field-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.contract-pattern {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 4px;
+  font: inherit;
+  font-size: 11px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--edit-text);
+  background: #101116;
+  border: 1px solid var(--edit-line);
+  border-radius: 2px;
+}
+
+.contract-swatch {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border: 1px solid #101116;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.contract-setting {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--edit-text);
+  cursor: pointer;
+}
+
+.contract-setting span { display: flex; flex-direction: column; gap: 1px; }
+
+.contract-note {
+  margin: 0;
+  font-size: 9px;
+  font-style: normal;
+  line-height: 1.35;
+  color: var(--edit-dim);
+}
+
+.contract-note.warn { color: #d8c07a; }

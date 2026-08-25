@@ -5,12 +5,15 @@ import { EditorProvider, resolveRackPath, type ArmedParam, type RackPath } from 
 import { MappingTable } from './MappingTable';
 import { PatchCable } from './PatchCable';
 import { MappingCables } from './MappingCables';
+import { ContractStrip } from './ContractStrip';
 import { useParamDrag } from './useParamDrag';
 
 export interface RackEditorProps {
   /** The loaded rack, owned by the host so it can decide how a file is opened (picker, drop, M4L path). */
   rack: Rack | null;
   onChange: (rack: Rack) => void;
+  /** Save the rack to a file. The editor does not own the file, its host does - so the button is here and the doing is there. */
+  onSave?: () => void;
   /** Live macro values from the M4L device, root rack only, display only - never written to the file. */
   liveValues?: Record<number, number>;
 }
@@ -24,7 +27,7 @@ export interface RackEditorProps {
  * derived from the current handle on each render rather than mirrored into
  * React state (doc/PLAN.md Part 5).
  */
-export function RackEditor({ rack, onChange, liveValues }: RackEditorProps) {
+export function RackEditor({ rack, onChange, onSave, liveValues }: RackEditorProps) {
   const [undo, setUndo] = useState<Rack[]>([]);
   const [redo, setRedo] = useState<Rack[]>([]);
   const [armed, setArmed] = useState<ArmedParam | null>(null);
@@ -132,6 +135,8 @@ export function RackEditor({ rack, onChange, liveValues }: RackEditorProps) {
             ))}
           </ul>
         )}
+
+        <ContractStrip rack={rack} onSave={onSave} />
 
         <div className="rack-editor-scroll">
           <div className="rack-row">

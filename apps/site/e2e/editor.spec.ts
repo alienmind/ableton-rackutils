@@ -450,3 +450,49 @@ test('Map mode draws the existing cables, and leaving it takes them away', async
   await turnMapOn(page); // Unmap
   await expect(page.locator('.mapping-cable')).toHaveCount(0);
 });
+
+test('a rack feature goes in from the left and comes back out from the right', async ({ page }) => {
+  await loadRack(page);
+  await page.locator('.contract-code').fill('BS');
+  await page.locator('.contract-code').press('Enter');
+
+  const available = page.locator('.contract-column').nth(0);
+  const inRack = page.locator('.contract-column').nth(1);
+  await available.locator('.contract-entry', { hasText: 'Auto Filter' }).click();
+
+  // Leading slot, the rack name on the knob, and the feature now sits in the
+  // right-hand list under its own label.
+  await expect(rootKnobs(page).first().locator('.macro-knob-name')).toHaveText('BS FILTER');
+  await expect(inRack.locator('.contract-entry-name')).toHaveText(['BS FILTER']);
+  await expect(page.locator('.rack-name').first()).toHaveText('BS');
+  // The settings column is the one that was just added.
+  await expect(page.locator('.contract-settings h4')).toHaveText('Auto Filter');
+
+  await inRack.locator('li', { hasText: 'BS FILTER' }).locator('.contract-remove').click();
+  await expect(inRack.locator('.contract-entry-name')).toHaveCount(0);
+  await expect(rootKnobs(page).first().locator('.macro-knob-name')).not.toHaveText('BS FILTER');
+});
+
+test('a contract-authored rack saves as a file that reparses', async ({ page }) => {
+  // The whole point of the strip: what it writes has to survive a round trip,
+  // because the next thing that opens it is Live.
+  await loadRack(page);
+  await page.locator('.contract-code').fill('BS');
+  await page.locator('.contract-code').press('Enter');
+  await page.locator('.contract-column').nth(0).locator('.contract-entry', { hasText: 'Utility Gain' }).click();
+
+  const file = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Save a copy' }).click()]).then(
+    ([d]) => d,
+  );
+  // Named after the code, one file per rack, as the convention says.
+  expect(file.suggestedFilename()).toBe('BS.adg');
+
+  const xml = gunzipSync(readFileSync((await file.path())!)).toString('utf8');
+  expect(xml.split('<?xml')).toHaveLength(2);
+  // The macro label, the rack name and the inserted device all read the code.
+  expect(xml).toContain('<MacroDisplayNames.0 Value="BS GAIN"/>');
+  expect(xml).toContain('<UserName Value="BS"/>');
+  // The Utility the contract inserted, named from the same code.
+  expect(xml).toContain('<StereoGain');
+  expect(xml).toContain('<UserName Value="BS GAIN"/>');
+});

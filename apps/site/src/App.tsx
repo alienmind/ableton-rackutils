@@ -2,7 +2,6 @@ import { useCallback, useState } from 'react';
 import { Rack, isGzip } from '@rackutils/adg-codec';
 import { RackEditor } from '@rackutils/editor-ui';
 import '@rackutils/editor-ui/src/editor.css';
-import { RackTree } from './RackTree';
 import { Landing } from './Landing';
 
 /**
@@ -22,7 +21,6 @@ export default function App() {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
-  const [showRaw, setShowRaw] = useState(false);
 
   const loadFile = useCallback(async (file: File) => {
     setError(null);
@@ -62,7 +60,11 @@ export default function App() {
     const url = URL.createObjectURL(new Blob([loaded.rack.serialize() as BlobPart], { type: 'application/gzip' }));
     const a = document.createElement('a');
     a.href = url;
-    a.download = loaded.fileName.replace(/\.adg$/i, '') + '-edited.adg';
+    // Named after the rack, which the features strip's rack name field also
+    // sets: one name on the rack, on its macros, on the devices it added, and
+    // on the file (doc/PLAN.md 4.3.1). Falls back to the file it came from.
+    const code = loaded.rack.name.replace(/[\\/:*?"<>|]/g, '').trim();
+    a.download = code ? code + '.adg' : loaded.fileName.replace(/\.adg$/i, '') + '-edited.adg';
     a.click();
     URL.revokeObjectURL(url);
   }, [loaded]);
@@ -97,24 +99,7 @@ export default function App() {
 
       {loaded && (
         <section className="rack-view">
-          <div className="rack-actions">
-            <button type="button" className="save-button" onClick={save}>
-              Save a copy
-            </button>
-            <label className="raw-toggle">
-              <input type="checkbox" checked={showRaw} onChange={(e) => setShowRaw(e.target.checked)} /> raw XML
-            </label>
-          </div>
-          <p className="note">
-            Drag a parameter onto a macro knob to bind it. Drag a knob onto another to move the whole
-            macro, or hold Shift while dropping to swap two. Double-click a name to rename it. Saving
-            downloads a copy - your original file is never touched; drag that copy back onto the rack in
-            Live to load it.
-          </p>
-
-          <RackEditor rack={loaded.rack} onChange={(rack) => setLoaded({ ...loaded, rack })} />
-
-          {showRaw && <RackTree root={loaded.rack.document.documentElement} />}
+          <RackEditor rack={loaded.rack} onChange={(rack) => setLoaded({ ...loaded, rack })} onSave={save} />
         </section>
       )}
     </div>

@@ -18,9 +18,10 @@ import { collectMappings } from './mappings';
  *
  * Coordinates are viewport coordinates and the layer is `position: fixed`,
  * exactly as `PatchCable` does it, so nothing has to be converted out of the
- * scrolled row's space. Positions are re-measured on a frame loop while the
- * mode is on: panels expand, the row scrolls sideways, and there is no event
- * that covers all of it.
+ * scrolled row's space. Positions are re-measured when something moves them -
+ * a panel opening, the row scrolling, the window resizing - rather than on a
+ * frame loop, which would re-measure every control sixty times a second for a
+ * picture that changes when a user clicks something.
  */
 export interface MappingCablesProps {
   rack: Rack;
@@ -65,6 +66,7 @@ export function MappingCables({ rack, active }: MappingCablesProps) {
     let frame = 0;
     let previous = '';
     const measure = () => {
+      frame = 0;
       const next: Segment[] = [];
       for (const cable of wanted) {
         // `~=` because a nested rack's knob carries TWO keys: its own, and
@@ -82,11 +84,30 @@ export function MappingCables({ rack, active }: MappingCablesProps) {
         previous = stamp;
         setSegments(next);
       }
-      frame = requestAnimationFrame(measure);
     };
 
-    frame = requestAnimationFrame(measure);
-    return () => cancelAnimationFrame(frame);
+    // Measure once the panels are laid out, then again whenever anything that
+    // moves them happens. Event-driven rather than a frame loop: a loop
+    // re-measures every control on every frame for a picture that only changes
+    // when a panel opens or the row scrolls.
+    const schedule = () => {
+      if (frame === 0) frame = requestAnimationFrame(measure);
+    };
+
+    schedule();
+    window.addEventListener('resize', schedule);
+    // Capturing, because the row that scrolls is a div inside the page, and a
+    // scroll event on it does not bubble.
+    window.addEventListener('scroll', schedule, true);
+    const observer = new MutationObserver(schedule);
+    observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'style'] });
+
+    return () => {
+      if (frame !== 0) cancelAnimationFrame(frame);
+      window.removeEventListener('resize', schedule);
+      window.removeEventListener('scroll', schedule, true);
+      observer.disconnect();
+    };
   }, [rack, active]);
 
   if (!active || segments.length === 0) return null;

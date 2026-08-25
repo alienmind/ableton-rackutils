@@ -35,7 +35,12 @@ function mount() {
   render(rack);
 }
 
-beforeEach(mount);
+beforeEach(() => {
+  // The contract strip restores its convention from localStorage, so a test
+  // starts from a stored one unless it is cleared BEFORE the strip mounts.
+  window.localStorage.clear();
+  mount();
+});
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
@@ -241,5 +246,103 @@ describe('Map mode (doc/PLAN.md 4.4)', () => {
     expect(container.querySelector('.map-button')!.textContent).toBe('Unmap');
     turnMapOn();
     expect(container.querySelector('.map-button')!.textContent).toBe('Map');
+  });
+});
+
+describe('rack features, the contract strip (doc/PLAN.md 4.3.1)', () => {
+  /** Left column: click a feature to put it in the rack. */
+  const addFeature = (label: string) => {
+    const entry = [...container.querySelectorAll('.contract-column')][0].querySelectorAll('.contract-entry');
+    const target = [...entry].find((el) => el.textContent?.includes(label))!;
+    act(() => (target as HTMLElement).click());
+  };
+
+  /** Right column: the x takes it back out. */
+  const removeFeature = (label: string) => {
+    const rows = [...container.querySelectorAll('.contract-column')][1].querySelectorAll('li');
+    const row = [...rows].find((el) => el.textContent?.includes(label))!;
+    act(() => (row.querySelector('.contract-remove') as HTMLElement).click());
+  };
+
+  const addedLabels = () =>
+    [...[...container.querySelectorAll('.contract-column')][1].querySelectorAll('.contract-entry-name')].map((el) => el.textContent);
+
+  const setCode = (code: string) => {
+    const input = container.querySelector('.contract-code') as HTMLInputElement;
+    act(() => {
+      input.value = code;
+      // React delegates onBlur through focusout, which is the event that
+      // bubbles; a plain blur event never reaches it.
+      input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    });
+  };
+
+  test('ticking an option adds the device, the macro and the code', () => {
+    setCode('BS');
+    addFeature('Auto Filter');
+
+    // Leading slot, one binding per chain, and the code on the rack itself.
+    expect(rack.name).toBe('BS');
+    expect(rack.macros[0].name).toBe('BS FILTER');
+    expect(rack.macros[0].bindings).toHaveLength(rack.chains.length);
+    expect(rack.chains.every((c) => c.devices.some((d) => d.type === 'AutoFilter2'))).toBe(true);
+  });
+
+  test('unticking it takes the device and the slot back off', () => {
+    setCode('BS');
+    const before = { count: rack.macroCount, names: rack.macros.map((m) => m.name) };
+    addFeature('Auto Filter');
+    removeFeature('BS FILTER');
+
+    expect(rack.macroCount).toBe(before.count);
+    expect(rack.macros.map((m) => m.name)).toEqual(before.names);
+    expect(rack.chains.some((c) => c.devices.some((d) => d.type === 'AutoFilter2'))).toBe(false);
+  });
+
+  test('slot order is the strip order, not the order they were ticked', () => {
+    setCode('BS');
+    addFeature('Auto Filter');
+    addFeature('Utility Gain');
+
+    // Utility sits above Auto Filter in the strip, so it leads however they
+    // were ticked. That is the whole familiarity claim.
+    expect(rack.macros.slice(0, 2).map((m) => m.name)).toEqual(['BS GAIN', 'BS FILTER']);
+  });
+
+  test('the convention survives a remount', () => {
+    setCode('BS');
+    addFeature('Utility Gain');
+
+    act(() => root.unmount());
+    container.remove();
+    mount();
+
+    // Still in the right-hand list, still named the same way.
+    expect(addedLabels()).toEqual(['BS GAIN']);
+    expect((container.querySelector('.contract-code') as HTMLInputElement).value).toBe('BS');
+  });
+
+  test('the settings column belongs to the feature just added', () => {
+    setCode('BS');
+    addFeature('Utility Gain');
+
+    const settings = container.querySelector('.contract-settings')!;
+    expect(settings.querySelector('h4')!.textContent).toBe('Utility Gain');
+    expect((settings.querySelector('.contract-pattern') as HTMLInputElement).value).toBe('{name} GAIN');
+    // Bass mono is this feature's own setting, and it is two real parameters
+    // on StereoGain rather than a knob.
+    expect(settings.textContent).toContain('Bass mono');
+  });
+
+  test('a settings checkbox writes into the device it belongs to', () => {
+    setCode('BS');
+    addFeature('Utility Gain');
+    const box = container.querySelector('.contract-settings .contract-setting input') as HTMLInputElement;
+    act(() => box.click());
+
+    const utility = rack.chains[0].devices.find((d) => d.type === 'StereoGain')!;
+    const el = rack.resolveTarget(utility.path)!;
+    const bassMono = el.getElementsByTagName('BassMono')[0].getElementsByTagName('Manual')[0];
+    expect(bassMono.getAttribute('Value')).toBe('true');
   });
 });

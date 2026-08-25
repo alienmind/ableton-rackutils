@@ -18,7 +18,7 @@
  *   the chain selector, which `donors/KD.adg` carries by hand as `KICK SEL`.
  */
 import { child, childValue, setChildValue } from './dom';
-import { MACRO_SLOTS, Rack, type ParamRef } from './model';
+import { MACRO_SLOTS, Rack, type Macro, type ParamRef } from './model';
 import {
   bindParameter,
   renameRack,
@@ -144,9 +144,13 @@ export function macroNameFor(pattern: string, rackName: string): string {
  */
 export function inspectContract(rack: Rack, devices: readonly ContractDevice[]): ContractStatus[] {
   const chainCount = rack.chains.length;
+  // Read once. `rack.macros` recomputes every slot and rescans the document
+  // for KeyMidi elements, so reading it per slot per option turned the strip
+  // into seconds of work on every render.
+  const macros = rack.macros;
   return devices.map((device) => {
     const chainsCovered = device.deviceTag ? chainsEndingIn(rack, device.deviceTag).length : 0;
-    const satisfied = findSatisfiedSlot(rack, device);
+    const satisfied = findSatisfiedSlot(rack, device, macros);
     if (satisfied !== null) return { slot: satisfied, state: 'satisfied', chainsCovered, chainCount };
 
     // An option with no macro is satisfied by its device alone.
@@ -154,7 +158,7 @@ export function inspectContract(rack: Rack, devices: readonly ContractDevice[]):
       return { slot: null, state: 'satisfied', chainsCovered, chainCount };
     }
 
-    const partial = findPartialSlot(rack, device);
+    const partial = findPartialSlot(rack, device, macros);
     const state: ContractState = partial !== null || chainsCovered > 0 ? 'partial' : 'absent';
     return { slot: partial, state, chainsCovered, chainCount };
   });
@@ -192,8 +196,9 @@ export function applyContract(
   // Split into what is already on the rack and what has to be made room for,
   // before touching anything: the shift has to be sized once.
   const existing = new Map<number, number>(); // index into devices -> macro slot
+  const before = rack.macros; // read once: see inspectContract
   devices.forEach((device, i) => {
-    const slot = findSatisfiedSlot(rack, device);
+    const slot = findSatisfiedSlot(rack, device, before);
     if (slot !== null) existing.set(i, slot);
   });
 
@@ -376,13 +381,13 @@ function orderContractMacros(rack: Rack, slots: number[]): void {
  * An option on the rack's own parameter has exactly one target, so one binding
  * is the whole job.
  */
-function findSatisfiedSlot(rack: Rack, device: ContractDevice): number | null {
+function findSatisfiedSlot(rack: Rack, device: ContractDevice, macros: readonly Macro[] = rack.macros): number | null {
   if (device.parameter === undefined) return null;
   const wanted = device.deviceTag ? rack.chains.length : 1;
   if (wanted === 0) return null;
 
   for (let slot = 0; slot < MACRO_SLOTS; slot++) {
-    const bindings = rack.macros[slot].bindings;
+    const bindings = macros[slot].bindings;
     if (bindings.length !== wanted) continue;
     if (bindings.every((b) => drivesThisOption(rack, b.targetPath, device))) return slot;
   }
@@ -390,10 +395,10 @@ function findSatisfiedSlot(rack: Rack, device: ContractDevice): number | null {
 }
 
 /** The slot driving this option on SOME chains but not all - partial satisfaction (doc/PLAN.md 4.3.3). */
-function findPartialSlot(rack: Rack, device: ContractDevice): number | null {
+function findPartialSlot(rack: Rack, device: ContractDevice, macros: readonly Macro[] = rack.macros): number | null {
   if (device.parameter === undefined) return null;
   for (let slot = 0; slot < MACRO_SLOTS; slot++) {
-    const bindings = rack.macros[slot].bindings;
+    const bindings = macros[slot].bindings;
     if (bindings.length > 0 && bindings.some((b) => drivesThisOption(rack, b.targetPath, device))) return slot;
   }
   return null;
