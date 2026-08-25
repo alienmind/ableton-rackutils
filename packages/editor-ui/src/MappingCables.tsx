@@ -28,6 +28,14 @@ export interface MappingCablesProps {
   active: boolean;
 }
 
+/** The box the cables are allowed to be seen in: the rack's own scrolling row. */
+interface Clip {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
 interface Segment {
   key: string;
   from: { x: number; y: number };
@@ -47,10 +55,12 @@ export function macroKey(rackPath: readonly string[], index: number): string {
 
 export function MappingCables({ rack, active }: MappingCablesProps) {
   const [segments, setSegments] = useState<Segment[]>([]);
+  const [clip, setClip] = useState<Clip | null>(null);
 
   useEffect(() => {
     if (!active) {
       setSegments([]);
+      setClip(null);
       return;
     }
 
@@ -67,6 +77,13 @@ export function MappingCables({ rack, active }: MappingCablesProps) {
     let previous = '';
     const measure = () => {
       frame = 0;
+      // Cables belong to the rack row and are clipped to it. The layer is
+      // fixed over the whole viewport, so a cable to a control scrolled out of
+      // the row was drawn across the page beside it - a line coming out of
+      // nowhere, over the guide and the mapping table.
+      const box = document.querySelector('.rack-editor-scroll')?.getBoundingClientRect();
+      const clipped: Clip | null = box ? { top: box.top, right: box.right, bottom: box.bottom, left: box.left } : null;
+
       const next: Segment[] = [];
       for (const cable of wanted) {
         // `~=` because a nested rack's knob carries TWO keys: its own, and
@@ -75,7 +92,12 @@ export function MappingCables({ rack, active }: MappingCablesProps) {
         const knob = document.querySelector(`[data-map-key~="${cable.knob}"]`);
         const param = document.querySelector(`[data-map-key~="${cable.param}"]`);
         if (!knob || !param) continue;
-        next.push({ key: cable.key, from: centreOf(param), to: centreOf(knob), color: cable.color });
+        const from = centreOf(param);
+        const to = centreOf(knob);
+        // Both ends outside the row means the cable has nothing to say: it
+        // would be a curve across the page between two things nobody can see.
+        if (clipped && !inside(from, clipped) && !inside(to, clipped)) continue;
+        next.push({ key: cable.key, from, to, color: cable.color });
       }
       // Re-rendering only when something actually moved: this runs every frame
       // and most frames change nothing.
@@ -84,6 +106,7 @@ export function MappingCables({ rack, active }: MappingCablesProps) {
         previous = stamp;
         setSegments(next);
       }
+      setClip(clipped);
     };
 
     // Measure once the panels are laid out, then again whenever anything that
@@ -113,7 +136,17 @@ export function MappingCables({ rack, active }: MappingCablesProps) {
   if (!active || segments.length === 0) return null;
 
   return (
-    <svg className="mapping-cable-layer" aria-hidden="true">
+    <svg
+      className="mapping-cable-layer"
+      aria-hidden="true"
+      style={
+        clip
+          ? {
+              clipPath: `inset(${clip.top}px ${window.innerWidth - clip.right}px ${window.innerHeight - clip.bottom}px ${clip.left}px)`,
+            }
+          : undefined
+      }
+    >
       {segments.map((s) => (
         <g key={s.key}>
           <path className="mapping-cable" style={{ stroke: s.color }} d={cablePath(s.from, s.to)} />
@@ -124,6 +157,8 @@ export function MappingCables({ rack, active }: MappingCablesProps) {
     </svg>
   );
 }
+
+const inside = (p: { x: number; y: number }, clip: Clip) => p.x >= clip.left && p.x <= clip.right && p.y >= clip.top && p.y <= clip.bottom;
 
 function centreOf(el: Element): { x: number; y: number } {
   const box = el.getBoundingClientRect();

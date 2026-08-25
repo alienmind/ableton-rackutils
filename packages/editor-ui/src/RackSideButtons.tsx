@@ -1,7 +1,6 @@
 import {
   AddMacroKnobs,
   ICON_NEUTRAL,
-  ICON_OFF,
   ICON_ON,
   RemoveMacroKnobs,
   ToggleShowChains,
@@ -32,14 +31,16 @@ export interface RackSideButtonsProps {
  * Macros come in PAIRS because the panel is two rows: Live's +/- step by two,
  * so the grid never ends up with a ragged column.
  *
- * A toggle shows its state the way Live does, by filling the button orange
- * when on and near-black when off - not by changing the glyph.
+ * A toggle shows its state by filling the button orange when on and grey when
+ * off - not by changing the glyph. Grey rather than Live's near-black: these
+ * icons draw their glyph in near-black too, so an off button came out as a
+ * black shape on a black disc and read as an empty hole.
  */
 export function RackSideButtons(props: RackSideButtonsProps) {
   const { showMacros, showVariations, showChains, devicesCollapsed, macroCount } = props;
   const { onToggleMacros, onToggleVariations, onToggleChains, onToggleDevices, onSetMacroCount } = props;
 
-  const state = (on: boolean) => (on ? ICON_ON : ICON_OFF);
+  const state = (on: boolean) => (on ? ICON_ON : ICON_NEUTRAL);
 
   return (
     <div className="rack-side">
@@ -59,7 +60,7 @@ export function RackSideButtons(props: RackSideButtonsProps) {
         title="Show/hide Macro Variations"
         aria-pressed={showVariations}
       >
-        <ToggleShowMacroVariant backgroundColor={showVariations ? ICON_ON : ICON_NEUTRAL} />
+        <ToggleShowMacroVariant backgroundColor={state(showVariations)} />
       </button>
       <button
         type="button"
@@ -71,7 +72,7 @@ export function RackSideButtons(props: RackSideButtonsProps) {
         <ToggleShowRacks backgroundColor={state(!devicesCollapsed)} />
       </button>
       <button type="button" className="side-btn" onClick={onToggleChains} title="Show/hide chains" aria-pressed={showChains}>
-        <ToggleShowChains backgroundColor={showChains ? ICON_ON : ICON_NEUTRAL} />
+        <ToggleShowChains backgroundColor={state(showChains)} />
       </button>
     </div>
   );
