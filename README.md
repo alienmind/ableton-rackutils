@@ -8,13 +8,13 @@ page, or from the command line.
 
 **Live site:** https://alienmind.github.io/ableton-rackutils/
 
-> **v0.2.0, beta.** The editor works end to end: open a rack, rearrange and
-> rebind its macros, save, and load the result back into Live. Racks the
-> contract authored have made that round trip too. See
-> [What works today](#what-works-today).
+> **v0.3.0, beta.** The editor works end to end: open a rack, rearrange and
+> rebind its macros, add the features you want every rack of yours to have,
+> save, and load the result back into Live. Racks the contract authored have
+> made that round trip too. See [What works today](#what-works-today).
 
 > **Keep backups anyway.** This tool rewrites rack files. The codec is covered
-> by 137 tests, many against real racks, and the editor by 46 more including a
+> by 155 tests, many against real racks, and the editor by 59 more including a
 > real browser, but a preset that loads without complaint and behaves subtly
 > differently is the failure mode that testing catches last. Racks with Macro
 > Variations deserve a listen before you trust the result.
@@ -48,7 +48,8 @@ What that means in practice:
 | Rearrange, rename, recolour and rebind macros in the browser | works |
 | Save the result and load it back into Live | works, lightly tested |
 | Inspect and rearrange macros from the command line | works |
-| Companion Max for Live device | downloadable, but a scaffold - it confirms it is talking to Live and nothing more |
+| Add a gain, a gate, a compressor, a filter or an EQ to every chain at once, on one macro | works |
+| Companion Max for Live device | works - the same editor, offline, inside Live |
 
 ## The command line tools
 
@@ -101,8 +102,15 @@ The page walks you through getting a rack out of Live in four steps, then
 lays the rack out the way Live does: macro knobs, chains, and devices running
 left to right, with nested racks and drum pad grids drawn in place.
 
-- **Drag a parameter onto a macro knob** to bind it - a patch cable follows
-  your pointer.
+- **Rack features**, above the rack: pick one on the left and it lands in
+  every chain at once - a Utility, a Gate, a Compressor, an Auto Filter, EQ
+  Three, or a knob that selects the chain - on one macro, in the same slot, in
+  the colour and under the name you gave it. Pick it again on the right to take
+  it back out. Export those choices to a file and the next rack comes out the
+  same.
+- **Map** turns on binding, the way Live's own Map button does. While it is on,
+  drag a parameter - or a nested rack's knob - onto a macro knob, and every
+  mapping the rack already has is drawn as a cable.
 - **Drag a knob onto another** to move that macro, or hold Shift to swap two.
 - **Double-click** a name to rename it, click a swatch to recolour it.
 - Under the rack, every mapping is listed in full: rack, macro, device,
@@ -110,18 +118,20 @@ left to right, with nested racks and drum pad grids drawn in place.
 
 The knob is still a placeholder shape, though the colours are Live's own.
 
-Saving downloads a copy with `-edited` on the end. Your original file is never
+Saving downloads a copy named after the rack. Your original file is never
 touched.
 
 ## The companion device (optional)
 
 A Max for Live device, downloadable from the site, that carries the same editor
-inside Live and adds the two things only Live knows: which rack you have
-selected, and what its knobs are doing right now. Everything the tool does
-works without it.
+inside Live. It adds no editing capability - what it adds is reach: the editor
+with no browser and no network, which is what you want on a flight. Everything
+the tool does works without it.
 
-Currently a scaffold - it loads, confirms it is talking to Live, and nothing
-else yet.
+Drop it on any track (it is a passthrough audio effect, so it changes nothing
+you hear) and press **Open**. Unpack the download whole: the device reads the
+folder that ships next to it, and the installer scripts put both into your User
+Library. Needs Live 12 and Max for Live.
 
 ## Contributing
 

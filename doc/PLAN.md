@@ -1,7 +1,8 @@
 # ableton-rackutils: Implementation Plan (v6)
 
-**Product status: v0.2.0, beta.** The editor works end to end, and racks the
-contract authored have been loaded back into Live. Still young: keep backups.
+**Product status: v0.3.0, beta.** The editor works end to end, racks the
+contract authored have been loaded back into Live, and the device now carries
+the same editor offline. Still young: keep backups.
 
 Canonical plan for `ableton-rackutils`, a toolkit for Ableton rack preset
 (`.adg`) files. Lives in the repo so the project is self-contained: clone it
@@ -51,29 +52,30 @@ editing, batch library operations - is out. See Parked.
 
 ## Current state
 
-- **`packages/adg-codec`** - built. Thirteen mutations, 88 tests, 18 of them
-  against four real racks.
-- **`packages/editor-ui`** - built. Reproduces Live's layout, 24 tests.
+- **`packages/adg-codec`** - built. Sixteen mutations plus the contract, 155
+  tests, 30 of them against the committed donor racks.
+- **`packages/editor-ui`** - built. Reproduces Live's layout, plus the rack
+  features strip and Map mode. 33 tests.
 - **`apps/site`** - the editor plus a getting-started guide, deployed to Pages.
-  22 Playwright specs against real Chromium in CI.
+  26 Playwright specs against real Chromium in CI.
 - **`tools/adg-tool`** - `unpack`/`diff`/`mappings`/`move`/`move-mapping`, plus
-  `adg-palette`.
-- **`apps/m4l-device`** - scaffold. Builds and installs a real `.amxd`, bridge
-  alive, no editor UI wired in. The site presents it as "Soon!", never as a
-  working download.
-- **`.github/workflows/`** - CI (both jobs), Pages deploy, device release.
-  Green.
+  `adg-palette` and `adg-harvest`.
+- **`apps/m4l-device`** - the site, bundled. The `.amxd` opens a window holding
+  the same editor, offline, with the built site delivered as a folder beside
+  it. Shipped as a zip; the site's card links the newest versioned release.
+- **`.github/workflows/`** - CI (both jobs), Pages deploy, device release
+  (rolling and versioned). Green.
 
 ## Next steps, in order
 
-1. **The options strip UI** (4.3.1). The contract's codec side is built,
-   tested, and confirmed in Live. What is missing is the surface that drives
-   it: tick an option, see it land.
-2. **VST dependency view** (4.1). The resolution route is settled (SCHEMA.md
+1. **VST dependency view** (4.1). The resolution route is settled (SCHEMA.md
    Q18): pick the plugin folder once, byte-search each `.vst3` for the class
    id, cache the answer.
-3. **Editor open items** (4.4), cables on selection first.
-4. **Save in place** (4.6), then the device bundle (4.7).
+2. **Show a plugin binding in the editor** (Open risk 1). Moves are correct;
+   the mapping table still cannot draw one, because a plugin binding has no
+   `targetPath`.
+3. **Editor open items** (4.4), the mapping table's units and sorting.
+4. **Save in place** (4.6).
 
 Use it on real racks throughout. Every bug this project has hit came from that,
 not from tests - including a UI whose every interaction was broken while its
@@ -347,23 +349,33 @@ index.
 The new direction. A rack comes in; the user ticks the pieces of their
 convention; the rack comes out conforming.
 
-#### 4.3.1 The interaction
+#### 4.3.1 The interaction - BUILT
 
-A horizontal strip of options above the rendered rack. Each option is one
-device the contract can guarantee, with its own settings. Ticking one
-materializes it: the device is added if absent, a macro is bound to the
-relevant parameter, named from a pattern, coloured, and placed in the slot the
-contract assigns it.
+**Rack features**, a strip above the rendered rack: two lists and a settings
+column. Left is what the rack could have, right is what it has. Click on the
+left and the feature materializes - the device is added at the end of every
+chain if absent, a macro is bound to every instance, named from a pattern,
+coloured, and placed in the slot the contract assigns it. The `x` on a feature
+takes it back out, device included, if the contract is what put it there.
 
-Global settings sit alongside: the rack name (for example `BS`), written to
-the rack's name and used for the output filename.
+The third column belongs to the one feature selected: its label, its colour,
+and whatever else it carries (bass mono, a sidechain switch). Settings live
+there rather than on the tiles because a strip that grows every time an option
+gains a checkbox stops being a strip.
 
-**One code, everywhere.** That name reaches the rack, every macro the contract
-adds, and every device it inserts, so a rack is identifiable from any one of
-them. A device already in the chain keeps whatever its owner called it -
-renaming someone else's device is not this tool's job. Keep the code short:
-`BS GAIN` fits on a knob, a 21-character label wraps and grows the whole rack
-(SCHEMA.md Q19).
+The rack name sits in the header with the save button, because they are the
+same thought: the rack is called this, and this is the file it becomes.
+
+**One name, everywhere.** It reaches the rack, every macro the contract adds,
+every device it inserts, and the saved file, so a rack is identifiable from any
+one of them. A device already in the chain keeps whatever its owner called it -
+renaming someone else's device is not this tool's job.
+
+The name is the RACK's name, in full, and a feature's label is its own field:
+`{name} GAIN` on a rack called `AlienMind KD` produces a 17-character label,
+which wraps and grows the whole rack (SCHEMA.md Q19). The settings column says
+so when a label gets long, and the label can be typed in flat rather than
+patterned.
 
 **A piece already present is detected, not duplicated.** If the rack already
 ends in a Utility, the option shows as satisfied, coloured differently, and the
@@ -528,7 +540,7 @@ Two caveats it has to answer:
 - One export/import button, writing the convention as a JSON file, fixes both
   for about an hour of work. Build it with the storage, not after.
 
-#### 4.3.8 Status: the codec half is done and confirmed in Live
+#### 4.3.8 Status: built, and confirmed in Live
 
 `applyContract` is built and tested, and its output has been loaded in Live on
 a real rack. Utility Gain and AutoFilter both land: a new device at the end of
@@ -543,15 +555,30 @@ recorded as SCHEMA.md Q19:
 - A macro label of 21 characters wraps onto a second line and takes the whole
   rack's height with it. Hand-built racks here top out at 12.
 
-Still to do here: Gate and Compressor (both have donors; the sidechain source
-stays manual per 4.3.6), then EQ Three once a donor for it exists.
+All eight features are built: chain select, Utility gain, Gate, Compressor, Auto
+Filter and EQ Three's three bands. Three of them needed the codec to stop
+assuming every option is one device plus one macro:
+
+- **A feature can add a device and bind nothing.** The Compressor does.
+- **A feature can bind a parameter of the RACK ITSELF and add no device.** The
+  chain selector does, which is the shape `donors/KD.adg` carries by hand as
+  `KICK SEL` (SCHEMA.md Q15).
+- **A feature can write values that are not macros** - bass mono, the sidechain
+  switch - into every instance of its device, inserted or reused. The sidechain
+  SOURCE still does not travel (4.3.6) and the settings column says so.
+
+What has NOT been done is opening each of the new ones in Live. Gate,
+Compressor, EQ Three and the chain selector have round-tripped through the
+codec and through a browser; "loads in Live" is a different claim (Open risk
+2).
 
 ### 4.4 Editor open items
 
-- **Cables that persist on selection.** Clicking a macro or a parameter should
-  show its existing patch cables, fading in and out rather than blinking. The
-  machinery is in `PatchCable.tsx` and `useParamDrag.ts`; it currently draws
-  only during a drag. Requested, not built.
+- **Cables while Map is on - BUILT.** Every mapping in the rack is drawn as a
+  cable for as long as Map mode is on, and taken away when it is off. Endpoints
+  are found in the DOM by a `data-map-key` on both ends rather than computed,
+  so a cable to a control that is not on screen simply is not drawn. Positions
+  are re-measured on scroll, resize and DOM change rather than on a frame loop.
 - **Mapping table units.** Min and Max show as raw numbers. Live shows the
   target parameter's own units (`20.0 Hz`, `-inf dB`), which are not
   recoverable from the file for every parameter type. patchbay's donor index
@@ -601,74 +628,9 @@ await writable.close();
   Default to read-only, and require an explicit opt-in before any destructive
   write.
 
-### 4.7 The Max for Live device, as a bundle
+### 4.7 The Max for Live device, as a bundle - DONE
 
-**It adds no editing capability. It is the same app, reachable without a
-browser and without a network.** Anyone who has the site has everything the
-device does.
-
-The pattern is proven by `m4l-gugelhupf`, the author's own: an `.amxd` with a
-`-site` folder beside it holding the local copy of the web app, opened in a
-window.
-
-**The device view is minimal**, because it is 169px tall and does not scroll:
-
-- an **Open** button, which opens the editor in a pop-up window
-- optionally, **a list of the rack devices on this track**, so the user can see
-  which racks are candidates
-
-Everything else happens in the window.
-
-**What "import racks from this track" can and cannot be.** LOM can enumerate
-the devices on the track the device sits on, so it can list rack names. It
-cannot read their mappings (Constraint 1) and it cannot find their files
-(Constraint 2). So the honest feature is: list the racks by name, and for each
-one either offer a matching `.adg` from the User Library or tell the user to
-save it first. It is a shortcut to the file picker, not a way to read a live
-rack. Do not let it imply otherwise in the UI.
-
-**The download points at a versioned release, not the rolling build.** The site
-should resolve the newest `vX.Y.Z` tag carrying a device asset and link that,
-showing the version it is offering. Three reasons the rolling `latest-device`
-tag stops being right once real tags exist (D5):
-
-- A user who reports a bug can say which device they have.
-- A device and the site that documents it move together, instead of the device
-  silently changing under a fixed link.
-- `/releases/latest` becomes usable, since a real release is not a prerelease -
-  which is exactly the endpoint the rolling tag forced the site to avoid.
-
-`apps/site/src/companion/download.ts` fetches `/releases/tags/latest-device`
-today and falls back to a hardcoded link on any failure, which stays: GitHub's
-unauthenticated API is rate-limited per IP and fails for reasons unrelated to
-the user. Keep the rolling build if a nightly is wanted, but the card the
-public sees offers the tagged one.
-
-Bundling checklist, most of which the site already satisfies because it was
-designed backend-free:
-
-- Relative asset paths. `release-device.yml` passes `VITE_BASE: './'` and
-  asserts no absolute asset paths survived, because an absolute
-  `/ableton-rackutils/` path resolves against the filesystem root inside `jweb`
-  and 404s into a blank window.
-- No absolute-root fetches, no CDN imports at runtime. Everything vendored.
-- **The device UI drops the landing chrome, at build time.** No logo, no guide,
-  no images: load a rack, tick the contract options, see the rack and its
-  connections. The device window is small and its user installed the thing on
-  purpose, so nothing there has to explain what the tool is. `Landing.tsx`
-  holds all of it and `vite.config.ts` aliases that module to
-  `Landing.embedded.tsx` under `VITE_EMBED=1`, which keeps the assets out of
-  the module graph rather than merely unrendered - hiding the markup still
-  bundled the 2.4MB logo. Embedded build: 282 KB of JS and 16 KB of CSS, no
-  images, no service worker.
-- No service worker (4.5).
-- The device reports the bundled site version, so a bug report from inside Live
-  is traceable to a commit.
-
-Two open questions in `release-device.yml`, both marked in the file: whether the
-`m4l-jweb` device build needs macOS and a Max toolchain (currently assumed, and
-macOS runners bill roughly 10x Linux), and the exact output paths for the
-`.amxd` and the embedded web directory.
+See D7.
 
 ---
 
@@ -676,12 +638,10 @@ macOS runners bill roughly 10x Linux), and the exact output paths for the
 
 | Order | Work | Risk if skipped |
 |---|---|---|
-| 1 | 4.3.1 the options strip UI | The contract has no surface to drive it |
-| 2 | 4.1 VST dependency view | None, but the route is settled and cheap |
-| 3 | 4.3 remaining devices | Contract covers two options only |
-| 4 | 4.4 editor open items | Feature gaps only |
-| 5 | 4.6 save in place | Current download flow works |
-| 6 | 4.7 device bundle | Site already delivers everything |
+| 1 | 4.1 VST dependency view | None, but the route is settled and cheap |
+| 2 | Show a plugin binding (Open risk 1) | A macro reads as unmapped when it is not |
+| 3 | 4.4 editor open items | Feature gaps only |
+| 4 | 4.6 save in place | Current download flow works |
 
 ### Open risks
 
@@ -693,11 +653,15 @@ macOS runners bill roughly 10x Linux), and the exact output paths for the
 2. **"Loads in Live" is not "looks like a rack."** Both Q19 faults produced a
    valid file with working mappings that 122 passing tests could not see. Every
    new device the contract learns to insert gets opened in Live before it
-   ships, not just tested.
-3. **Bindings the codec cannot see** (4.0, fixed). Found once, on the rack's own
-   parameters. The rack device may carry other bindable parameters beyond
-   `ChainSelector`, so it is worth re-checking against a rack that maps several
-   of them, not only `BS.adg`.
+   ships, not just tested - which is outstanding for the Gate, the Compressor,
+   EQ Three and the chain selector (4.3.8), and for the device bundle (D7).
+3. **Bindings the codec cannot see** (4.0 and SCHEMA.md Q22, both fixed). Found
+   twice now: on the rack's own parameters, and on a nested rack's macros,
+   where the binding belongs to the rack ABOVE the element it sits in. Both
+   were silent corruption - a move that permuted variations while moving
+   nothing - and both were found by opening a real rack, not by a test. The
+   rack device may carry other bindable parameters still, so it is worth
+   re-checking against a rack that maps several of them.
 4. **Insertion produces a rack that loads and behaves wrong** (4.3.4). The
    worst failure mode available. Mitigated only by the hygiene checklist and by
    loading every new device type in Live by hand.
@@ -710,9 +674,11 @@ macOS runners bill roughly 10x Linux), and the exact output paths for the
 7. **Live closes the gap.** The whole value proposition of Job 1 is that Live
    cannot move a macro mapping. Its Macro Mappings panel is recent and sits
    directly adjacent. Worth rechecking on each Live release.
-8. **Asset paths in the bundled build (4.7).** The most likely device-side
+8. **Asset paths in the bundled build (D7).** The most likely device-side
    failure is a blank window from absolute paths resolving against the
-   filesystem root.
+   filesystem root. Guarded now, in the device build and in CI
+   (`scripts/check-site-bundle.mjs`), which is a check on the built bytes
+   rather than on the intent.
 
 ### Do not
 
@@ -973,11 +939,12 @@ CI.
   the claim is checkable), and what it costs (nothing, no account).
 - **The getting-started steps are three columns.** A fourth step left an orphan
   row on its own, so finding the file and dragging it in are one step.
-- **The companion device is marked "Soon!"** with no download offered, because
-  it is a scaffold. When it does something, the entry states what it adds
-  (targeting and live values) and what it requires (Live 12, Max for Live). An
-  `.amxd` is executable content and installing one is a real trust decision, so
-  the source and the build workflow get linked at that point.
+- **The companion device is a real download** (D7), pointing at the newest
+  versioned release and showing which version that is. The card states what it
+  adds (the same editor, offline, inside Live), what it requires (Live 12, Max
+  for Live), and that the zip has to be unpacked whole. An `.amxd` is
+  executable content and installing one is a real trust decision, so the source
+  and the workflow that built it are linked from the card.
 
 ### D5. Shipping the device from the site - DONE
 
@@ -992,12 +959,13 @@ file in the repo, so the site is not rebuilt to ship a device update.
 `apps/site/src/companion/download.ts` returns null on any failure and the UI
 always has a hardcoded fallback. GitHub's unauthenticated API is rate-limited
 per IP and will occasionally fail for reasons having nothing to do with the
-user. The download itself stays hidden until the device does something (D4),
-which under 4.7 means until it opens the bundled editor.
+user. It reads the releases LIST and takes the newest `vX.Y.Z` carrying a zip,
+rather than `/releases/latest`, which would hand back the rolling prerelease
+whenever one is newer.
 
-**Decided, and open as work: the site points at VERSIONED releases.** The
-rolling `latest-device` build was a stand-in for having no versioning scheme,
-and `v0.2.0` ends that. See 4.7.
+**The site points at VERSIONED releases**, which is what `v0.2.0` made
+possible. The rolling `latest-device` build stays, as a nightly; it is not what
+the card offers. See D7.
 
 This matches how m4l-gugelhupf distributes: a zip of devices on GitHub
 Releases, with a maxforlive.com listing pointing at it. Worth listing there too
@@ -1016,3 +984,72 @@ form.
 - `release-device.yml` - see D5. Includes a grep guard that fails the build if
   absolute asset paths leak into the bundle, since that is the top device-side
   failure mode.
+
+### D7. The device, as a bundle - DONE
+
+`apps/m4l-device` builds an `.amxd` whose only control is an **Open** button,
+and the window it opens holds the same web app the site serves. It adds no
+editing capability. What it adds is reach: the editor inside Live, with no
+browser and no network, which is the case for authoring a rack on a flight.
+
+- **The site is built for the device and delivered beside it.**
+  `scripts/bundle-site.mjs` runs the site's own build with `VITE_BASE=./` and
+  `VITE_EMBED=1` and copies `dist/` into `apps/m4l-device/site/`, which
+  `surface.ts` declares as the window's content. `m4l-jweb` copies it out as a
+  `rack-editor-site` folder next to the `.amxd` and zips the two together.
+- **The folder is not optional and the release says so.** Every other window in
+  m4l-jweb rides inside the wrapper as base64; a whole site is too big for
+  that, so the `.amxd` alone opens an empty window. The zip is what the
+  download card offers, and the installer scripts copy both.
+- **Two guards, on the bytes that ship** (`scripts/check-site-bundle.mjs`, run
+  by the device build and again in CI): no absolute asset paths, because inside
+  `jweb` a `/ableton-rackutils/...` path resolves against the FILESYSTEM root
+  and 404s into a blank window; and no service worker, because bundling already
+  solves offline and a worker there can only serve a stale UI after an update.
+- **`build-ui.mjs` skips a `site:` window.** It bundles one HTML file per
+  declared window from its `entry`, and a site window has none - it built
+  `src/app/rack-editor/undefined` and failed.
+- **The device view lists no racks.** LOM can enumerate the names of the racks
+  on this track and nothing else: it cannot read their mappings (Constraint 1)
+  and cannot find their files (Constraint 2). A list of names would be a file
+  picker wearing a costume, and the rack has to be saved out of Live either
+  way.
+
+**The download points at the newest `vX.Y.Z` release carrying a device asset**,
+resolved live from the releases list, with the releases page as the fallback
+(D5). `release-device.yml` publishes both: the rolling `latest-device`
+prerelease on every push to `main`, and a versioned release on a `v*` tag.
+
+Not yet done: installing the built `.amxd` in Live and opening the window. It
+builds, the payload is verified, and that is not the same claim (Open risk 2).
+
+### D8. Reading a rack of racks - DONE
+
+Two findings from `donors/KD.adg`, a drum rack of racks, both of which the
+editor was getting wrong on a real rack while every test passed:
+
+- **A binding on a nested rack's `MacroControls.N` belongs to the rack ABOVE
+  it** (SCHEMA.md Q22). A macro cannot drive its own rack's macro, so the
+  ownership walk carries on one level up. `ChainSelector` on the same element
+  goes the other way and belongs to the rack itself, which is Q15 - so the
+  parameter decides the owner, not the depth. Six of that rack's ten macros
+  were credited to the wrong rack, which made every slot-changing mutation on
+  it a silent corruption.
+- **An unnamed macro is labelled after what it drives** (SCHEMA.md Q23), which
+  is how the parent's knob reads `KICK SEL`. `macroLabel()` does it in one
+  place and the knobs and the mapping table share it.
+
+### D9. Map mode - DONE
+
+Binding is modal now, and the button is where Live puts its own: on the rack's
+title bar. Requested after a drag from a nested rack's knob was read as a macro
+move, which is what it had to be while both gestures were live at once.
+
+- **Off, a knob drag moves a macro and a parameter is text.** On, every
+  parameter and every nested rack's knob is a source to drag onto a knob, and
+  moving macros is off.
+- **A nested rack's knob is a mapping source**, addressed from its parent
+  (D8's Q22), which is the only way to map one rack's macro to another's - and
+  it was previously unreachable in the UI.
+- **Every existing cable is drawn while the mode is on**, and taken away when
+  it is off.

@@ -60,10 +60,11 @@ pointer back to the file it came from, so the user must pick the file).
 
 ## Current state
 
-v0.2.0 beta. The codec is built and tested, the site renders the editor through
-`packages/editor-ui`, and racks it edited - and racks the contract authored -
-have been loaded back into Live by hand. Full detail, and what to do next, is in
-[`PLAN.md`](PLAN.md#current-state).
+v0.3.0 beta. The codec is built and tested, the site renders the editor through
+`packages/editor-ui` with the rack features strip on top of it, and the device
+carries the same editor offline. Racks it edited - and racks the contract
+authored - have been loaded back into Live by hand. Full detail, and what to do
+next, is in [`PLAN.md`](PLAN.md#current-state).
 
 ## Setup
 
@@ -83,10 +84,10 @@ Run all four of `lint`, `typecheck`, `test`, `build` clean before committing.
 ## Testing the codec
 
 ```bash
-pnpm test                                  # everything headless, 112 tests
-pnpm --filter @rackutils/adg-codec test    # 88 codec tests
-pnpm --filter @rackutils/editor-ui test    # 24 UI tests
-pnpm test:e2e                              # 22 browser specs, needs Chromium
+pnpm test                                  # everything headless, 188 tests
+pnpm --filter @rackutils/adg-codec test    # 155 codec tests
+pnpm --filter @rackutils/editor-ui test    # 33 UI tests
+pnpm test:e2e                              # 26 browser specs, needs Chromium
 ```
 
 The first time, install the browser: `pnpm --filter @rackutils/site exec
@@ -130,11 +131,11 @@ Playwright - and it would have failed for anyone who flicks a knob quickly.
 Add a spec here whenever a change touches DOM serialization, pointer handling,
 or layout that must not overflow.
 
-Of the codec's 88, 70 are synthetic and always run; 18 run against real
-Ableton-saved racks in
-`packages/adg-codec/tests/fixtures/*.adg`, which are gitignored - they skip
-cleanly when absent (so, in CI) and run locally once you drop the four files
-`SCHEMA.md` asks for there. Four of `editor-ui`'s tests use those same
+Of the codec's 155, most are synthetic and always run, 30 run against the
+donor racks committed in `packages/adg-codec/donors/` - real Ableton-saved
+files that ship with the repo, so they run in CI too - and a handful run
+against `packages/adg-codec/tests/fixtures/*.adg`, which are gitignored and
+skip cleanly when absent. Four of `editor-ui`'s tests use those same
 fixtures.
 
 **Test every mutation against the real fixtures, not only synthetic ones.**
@@ -172,15 +173,33 @@ load in Live without complaint and silently corrupt.
 
 ```bash
 pnpm dev:device       # the device in a browser, with Live mocked beside it
-pnpm build:device     # writes apps/m4l-device/dist/@rackutils/m4l-device/rack-editor.amxd
-pnpm install:device   # copies it into Ableton's User Library
+pnpm build:device     # the .amxd, its site folder, and the release zip
+pnpm install:device   # copies them into Ableton's User Library
 ```
 
-No Max install needed for the first two. It is a scaffold: the device confirms
-the bridge is alive and nothing else, which is why the site lists it as "Soon!"
-rather than offering a download. Its intended job is bundling only - the same
-editor, offline, inside Live - see `PLAN.md` 4.7 and
-`apps/m4l-device/README.md`.
+No Max install needed. `build:device` runs the SITE's build first, with
+`VITE_BASE=./` and `VITE_EMBED=1`, copies it into `apps/m4l-device/site/`, and
+`m4l-jweb` delivers that as a `rack-editor-site` folder beside the `.amxd`:
+
+```
+apps/m4l-device/dist/@rackutils/m4l-device/rack-editor.amxd
+apps/m4l-device/dist/@rackutils/m4l-device/rack-editor-site/editor/
+apps/m4l-device/dist/@rackutils/m4l-device.zip     <- the release asset
+```
+
+**The folder is not optional.** The device opens an empty window without it,
+which is why the zip is what gets published and what the site links.
+
+Two guards run on the built bundle, in the device build and again in CI:
+
+```bash
+pnpm --filter @rackutils/m4l-device check:site
+```
+
+No absolute asset paths - inside `jweb` an absolute path resolves against the
+filesystem root and 404s into a blank window, the top device-side failure - and
+no service worker. See `apps/m4l-device/scripts/check-site-bundle.mjs` and
+`PLAN.md` D7.
 
 ## Pipeline
 
@@ -188,11 +207,12 @@ editor, offline, inside Live - see `PLAN.md` 4.7 and
 |---|---|---|
 | `ci.yml` | PR, push to main | lint, typecheck, codec and UI tests, plus a `browser` job running the Playwright specs in Chromium |
 | `deploy.yml` | push to main | codec tests, then build and deploy to Pages |
-| `release-device.yml` | push to main | build `rack-editor.amxd`, publish to the `latest-device` release (overwritten each push, no versioning yet) |
+| `release-device.yml` | push to main, `v*` tag | build the device and its bundled site, guard the bundle, publish the zip - to the rolling `latest-device` prerelease on main, and to the tag's own release on a `v*` tag |
 
 Codec tests gate the deploy. A broken codec corrupts racks silently, which is
-worse than the site being down. The site's device download reads
-`release-device.yml`'s output live via the GitHub API - see `PLAN.md` D5.
+worse than the site being down. The site's device download reads the releases
+list live via the GitHub API and offers the newest `vX.Y.Z` carrying a device
+zip - see `PLAN.md` D5 and D7.
 
 ## Prior art
 
