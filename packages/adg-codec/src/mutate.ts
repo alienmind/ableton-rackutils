@@ -598,15 +598,7 @@ export function removeMacroSlot(rack: Rack, macroIndex: number): MutationResult 
   assertSlot(macroIndex);
   const warnings = unbindMacro(rack, macroIndex).warnings;
   reorderMacro(rack, macroIndex, MACRO_SLOTS - 1);
-
-  const device = rack.deviceEl;
-  for (const field of PER_SLOT_FIELDS) {
-    const el = child(device, `${field}.${MACRO_SLOTS - 1}`);
-    if (el) el.setAttribute('Value', MACRO_DEFAULTS[field] ?? '');
-  }
-  setChildValue(device, `MacroDisplayNames.${MACRO_SLOTS - 1}`, `Macro ${MACRO_SLOTS}`);
-  const controls = child(device, `MacroControls.${MACRO_SLOTS - 1}`);
-  if (controls) setChildValue(controls, 'Manual', 0);
+  clearMacroSlot(rack, MACRO_SLOTS - 1);
 
   const mapped = rack.collectMacroBindings();
   const highest = Math.max(-1, ...Array.from(mapped.keys()).filter((i) => (mapped.get(i) ?? []).length > 0));
@@ -614,6 +606,33 @@ export function removeMacroSlot(rack: Rack, macroIndex: number): MutationResult 
   const shrunk = rack.macroCount - 1;
   setMacroCount(rack, Math.max(floor, shrunk - (shrunk % 2)));
   return ok(warnings);
+}
+
+/**
+ * Give one macro back to the rack: unbind whatever it drives and put its name,
+ * colour and value back to what an untouched slot carries.
+ *
+ * The slot STAYS where it is - this is the editor's per-knob reset, not
+ * `removeMacroSlot`, which is the contract taking a leading slot away and
+ * closing the gap behind it.
+ */
+export function resetMacro(rack: Rack, macroIndex: number): MutationResult {
+  assertSlot(macroIndex);
+  const warnings = unbindMacro(rack, macroIndex).warnings;
+  clearMacroSlot(rack, macroIndex);
+  return ok(warnings);
+}
+
+/** Write the untouched-slot defaults over one slot. Does NOT unbind: callers do that first, deliberately. */
+function clearMacroSlot(rack: Rack, macroIndex: number): void {
+  const device = rack.deviceEl;
+  for (const field of PER_SLOT_FIELDS) {
+    const el = child(device, `${field}.${macroIndex}`);
+    if (el) el.setAttribute('Value', MACRO_DEFAULTS[field] ?? '');
+  }
+  setChildValue(device, `MacroDisplayNames.${macroIndex}`, `Macro ${macroIndex + 1}`);
+  const controls = child(device, `MacroControls.${macroIndex}`);
+  if (controls) setChildValue(controls, 'Manual', 0);
 }
 
 /**
@@ -629,3 +648,55 @@ const MACRO_DEFAULTS: Record<string, string> = {
   ExcludeMacroFromRandomization: 'false',
   ExcludeMacroFromSnapshots: 'false',
 };
+
+/**
+ * Give every chain an equal slice of the chain selector's 0..127, so the
+ * selector actually selects one chain at a time (SCHEMA.md Q24).
+ *
+ * A chain selector macro on a rack whose chains all span the full range moves
+ * a control that changes nothing: every chain stays active at every position.
+ * `donors/KD.adg`'s Kick rack is the worked example - eight chains, sixteen
+ * wide each, crossfade edges flush with the range so there is no blend.
+ *
+ * Leaves a rack that ALREADY partitions its range alone. A layered rack whose
+ * chains deliberately overlap is somebody's instrument, not a mistake to
+ * correct.
+ */
+export function distributeChainSelector(rack: Rack): MutationResult {
+  const bp = rack.branchPresetsEl;
+  const chains = bp ? elementChildren(bp) : [];
+  if (chains.length < 2) return fail('a rack with one chain has nothing to select between');
+
+  if (alreadyDistributed(chains)) return ok(['the chains already split the selector range, so they were left alone']);
+
+  const width = 128 / chains.length;
+  chains.forEach((chain, i) => {
+    const min = Math.round(i * width);
+    const max = (i === chains.length - 1 ? 128 : Math.round((i + 1) * width)) - 1;
+    let range = child(chain, 'BranchSelectorRange');
+    if (!range) {
+      range = rack.document.createElement('BranchSelectorRange');
+      // Before ZoneSettings, which is where Live writes it. Order is not known
+      // to matter, and matching what Live writes costs nothing.
+      chain.insertBefore(range, child(chain, 'ZoneSettings'));
+    }
+    setChildValue(range, 'Min', min);
+    setChildValue(range, 'Max', max);
+    // Crossfade edges flush with the range: no blend between chains, which is
+    // what a selector wants (a blend is a layer).
+    setChildValue(range, 'CrossfadeMin', min);
+    setChildValue(range, 'CrossfadeMax', max);
+  });
+  return ok();
+}
+
+/** True when the chains hold different selector ranges already - somebody set them, by hand or by us. */
+function alreadyDistributed(chains: readonly Element[]): boolean {
+  const seen = new Set<string>();
+  for (const chain of chains) {
+    const range = child(chain, 'BranchSelectorRange');
+    if (!range) return false;
+    seen.add(`${childValue(range, 'Min')}:${childValue(range, 'Max')}`);
+  }
+  return seen.size === chains.length;
+}

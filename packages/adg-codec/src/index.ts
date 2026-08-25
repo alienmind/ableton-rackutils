@@ -14,6 +14,8 @@ export {
   insertDeviceInEveryChain,
   removeDevice,
   removeMacroSlot,
+  resetMacro,
+  distributeChainSelector,
   setDeviceValue,
   renameMacro,
   renameRack,

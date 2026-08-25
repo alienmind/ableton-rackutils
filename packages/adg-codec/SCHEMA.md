@@ -948,3 +948,43 @@ A macro driving several parameters is normal (Q1), and what Live labels one of
 those has not been checked against a rack that has one. The editor shows the
 first target's name; every macro in this rack drives exactly one thing, so the
 screenshot does not settle the multi-target case.
+
+---
+
+## Q24. What makes a chain selector actually select?
+
+Asked because the chain select feature wrote a macro that moved and changed
+nothing: every chain stayed audible at every position of the knob.
+
+**Answer: each chain carries a `BranchSelectorRange`, and they have to
+partition 0..127.** From `donors/KD.adg`'s Kick rack, eight chains:
+
+```xml
+<InstrumentBranchPreset>
+  <BranchSelectorRange>
+    <Min Value="0" />           <!-- chain 0 -->
+    <Max Value="15" />
+    <CrossfadeMin Value="0" />
+    <CrossfadeMax Value="15" />
+  </BranchSelectorRange>
+  <ZoneSettings>...</ZoneSettings>
+```
+
+`0-15`, `16-31`, ... `112-127`: 128 divided by the chain count, no gaps and no
+overlap. **The crossfade edges sit flush with the range**, which is what makes
+it a selector rather than a blend - Live fades between chains across the
+crossfade region, and there is none here.
+
+Written by `distributeChainSelector`, which the chain select feature calls
+before binding its macro. It leaves a rack whose chains already hold DIFFERENT
+ranges alone: a layered instrument whose chains overlap on purpose is somebody
+else's design, not a mistake to correct.
+
+**A drum rack is the trap.** `DrumGroupDevice` carries a `ChainSelector`
+element of its own - the file allows binding it - and its pads are chains. But
+a pad answers to a note, not to a selector position, so a chain selector on the
+drum rack itself is a control that loads and does nothing. What a drum rack
+wants is what `KD.adg` does by hand: a pad holds a rack, one of THAT rack's
+macros drives ITS chain selector, and the drum rack's macro drives that macro
+(Q22). The feature therefore takes a target rack, and the UI offers the pads
+rather than the drum rack itself.

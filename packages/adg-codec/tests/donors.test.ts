@@ -11,9 +11,19 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
-import { MACRO_SLOTS, Rack } from '../src/model';
+import { MACRO_SLOTS, Rack, UNSET_MACRO_VALUE } from '../src/model';
 import { applyContract, inspectContract, removeContractOption, macroNameFor } from '../src/contract';
-import { insertDeviceInEveryChain, insertMacroSlots, moveMapping, removeDevice, reorderMacro, swapMacros, unbindMacro } from '../src/mutate';
+import {
+  distributeChainSelector,
+  insertDeviceInEveryChain,
+  insertMacroSlots,
+  moveMapping,
+  removeDevice,
+  reorderMacro,
+  resetMacro,
+  swapMacros,
+  unbindMacro,
+} from '../src/mutate';
 
 const load = (name: string) => new Uint8Array(readFileSync(join(__dirname, '..', 'donors', name)));
 
@@ -748,5 +758,136 @@ describe('unticking an option (doc/PLAN.md 4.3.1)', () => {
 
     expect(applyContract(rack, [EQ], { name: 'PD', renameTheRack: false }).ok).toBe(false);
     expect(Rack.parse(rack.serialize()).variations.map((v) => v.values.join(','))).toEqual(before);
+  });
+});
+
+describe('resetting one macro (editor)', () => {
+  test('unbinds it and puts its name and colour back', () => {
+    const rack = Rack.parse(load('BS.adg'));
+    expect(rack.macros[4].name).toBe('BS GAIN');
+    expect(resetMacro(rack, 4).ok).toBe(true);
+
+    const after = Rack.parse(rack.serialize()).macros[4];
+    expect(after.bindings).toHaveLength(0);
+    expect(after.name).toBe('Macro 5');
+    // -1 is Live's "no colour set" (SCHEMA.md Q13), not an index.
+    expect(after.color).toBe(-1);
+  });
+
+  test('the slot stays where it is, and its neighbours are untouched', () => {
+    const rack = Rack.parse(load('BS.adg'));
+    const before = rack.macros.map((m) => `${m.name}:${m.bindings.length}`);
+    const count = rack.macroCount;
+    resetMacro(rack, 4);
+
+    const after = Rack.parse(rack.serialize());
+    expect(after.macroCount).toBe(count);
+    for (const i of [0, 1, 2, 3, 5, 6, 7, 8]) {
+      expect(`${after.macros[i].name}:${after.macros[i].bindings.length}`).toBe(before[i]);
+    }
+  });
+
+  test('a variation stops holding a value for it', () => {
+    const rack = Rack.parse(load('PD.adg'));
+    expect(resetMacro(rack, 15).ok).toBe(true);
+    for (const variation of Rack.parse(rack.serialize()).variations) {
+      expect(variation.values[15]).toBe(UNSET_MACRO_VALUE);
+    }
+  });
+});
+
+describe('chain selector ranges (SCHEMA.md Q24)', () => {
+  const rangesOf = (rack: Rack) =>
+    Array.from(rack.branchPresetsEl!.children).map((chain) => {
+      const range = chain.getElementsByTagName('BranchSelectorRange')[0];
+      const value = (tag: string) => range.getElementsByTagName(tag)[0]?.getAttribute('Value');
+      return `${value('Min')}-${value('Max')}/${value('CrossfadeMin')}-${value('CrossfadeMax')}`;
+    });
+
+  test('splits 0..127 evenly, with the crossfade edges flush', () => {
+    const rack = Rack.parse(load('BS.adg'));
+    expect(distributeChainSelector(rack).ok).toBe(true);
+    // Two chains, so 64 wide each. The shape KD's eight-chain Kick rack has.
+    expect(rangesOf(Rack.parse(rack.serialize()))).toEqual(['0-63/0-63', '64-127/64-127']);
+  });
+
+  test('leaves a rack that already splits its range alone', () => {
+    const kd = Rack.parse(load('KD.adg'));
+    const kick = kd.chains[0].devices.find((d) => d.isRack)!;
+    const inner = kd.subRack(kick.path)!;
+    const before = rangesOf(inner);
+
+    const result = distributeChainSelector(inner);
+    expect(result.ok).toBe(true);
+    expect(result.warnings[0]).toContain('already');
+    expect(rangesOf(inner)).toEqual(before);
+  });
+
+  test('refuses a rack with one chain rather than writing a range that selects nothing', () => {
+    const kd = Rack.parse(load('KD.adg'));
+    const rumble = kd.chains[1].devices.find((d) => d.isRack)!;
+    expect(distributeChainSelector(kd.subRack(rumble.path)!).ok).toBe(false);
+  });
+
+  test('the chain select feature carries the ranges with it', () => {
+    const rack = Rack.parse(load('BS.adg'));
+    applyContract(rack, [{ parameter: 'ChainSelector', namePattern: '{name} SEL' }], { name: 'BS', renameTheRack: false });
+    expect(rangesOf(Rack.parse(rack.serialize()))).toEqual(['0-63/0-63', '64-127/64-127']);
+  });
+});
+
+describe('a feature that lands in a pad rack (doc/PLAN.md 4.3.2)', () => {
+  const kickPad = (rack: Rack) => {
+    const pad = rack.chains[0];
+    return { path: pad.devices.find((d) => d.isRack)!.path, name: pad.name };
+  };
+
+  test('a drum rack chain selector goes to the pad rack, in two links', () => {
+    const rack = Rack.parse(load('KD.adg'));
+    const pad = kickPad(rack);
+    const result = applyContract(
+      rack,
+      [{ parameter: 'ChainSelector', namePattern: '{target} SEL', targetRack: pad.path, targetName: pad.name }],
+      { name: 'KD', renameTheRack: false },
+    );
+
+    expect(result.ok).toBe(true);
+    const after = Rack.parse(rack.serialize());
+    // Outer macro drives the pad rack's macro; that macro drives its selector.
+    expect(after.macros[0].name).toBe('Kick SEL');
+    const inner = after.subRack(kickPad(after).path)!;
+    expect(after.macros[0].bindings.map((b) => b.targetName)).toEqual([inner.macros[1].name]);
+    expect(inner.macros[1].bindings.map((b) => b.targetName)).toEqual(['ChainSelector']);
+  });
+
+  test('it reuses the selector macro the pad rack already has', () => {
+    // KD's Kick rack already carries KICK SEL on its macro 2, which is the
+    // whole shape this feature reproduces.
+    const rack = Rack.parse(load('KD.adg'));
+    const pad = kickPad(rack);
+    applyContract(
+      rack,
+      [{ parameter: 'ChainSelector', namePattern: '{target} SEL', targetRack: pad.path, targetName: pad.name }],
+      { name: 'KD', renameTheRack: false },
+    );
+
+    const after = Rack.parse(rack.serialize());
+    const inner = after.subRack(kickPad(after).path)!;
+    expect(inner.macros[1].name).toBe('KICK SEL');
+    expect(inner.macros.filter((m) => m.bindings.some((b) => b.targetName === 'ChainSelector'))).toHaveLength(1);
+  });
+
+  test('it is recognised on a second run rather than bound twice', () => {
+    const rack = Rack.parse(load('KD.adg'));
+    const pad = kickPad(rack);
+    const feature = { parameter: 'ChainSelector', namePattern: '{target} SEL', targetRack: pad.path, targetName: pad.name };
+    applyContract(rack, [feature], { name: 'KD', renameTheRack: false });
+
+    const again = Rack.parse(rack.serialize());
+    const padAgain = kickPad(again);
+    const result = applyContract(again, [{ ...feature, targetRack: padAgain.path }], { name: 'KD', renameTheRack: false });
+    expect(result.slots).toEqual([0]);
+    expect(again.macroCount).toBe(rack.macroCount);
+    expect(inspectContract(again, [{ ...feature, targetRack: padAgain.path }])[0].state).toBe('satisfied');
   });
 });
