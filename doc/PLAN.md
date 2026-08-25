@@ -528,18 +528,27 @@ on, bind and name the macro. **What it cannot do:** set the source. That stays
 one manual step per Set, and the UI has to say so rather than implying the
 routing came across.
 
-#### 4.3.7 Remembering the convention
+#### 4.3.7 Remembering the convention - BUILT, as templates
 
-The choices - colours, name patterns, which options are on, slot assignments -
-persist in `localStorage` so a second rack comes out like the first.
+A convention is a named **template**: an ordered list of features, each with
+its label, colour, settings and (where it applies) the nested rack it targets.
+Several can be kept, and the strip switches between them - new, duplicate,
+rename, delete, export, import.
 
-Two caveats it has to answer:
+**The order in the list is the order of the knobs**, which is why the list is
+draggable and why the order is part of what a template stores. That is most of
+the value: the same template on two racks puts the same knob in the same place.
 
-- `localStorage` is per browser and per origin, so conventions do not travel
+Templates persist in `localStorage`. The rack's NAME does not - it belongs to
+the rack, not to the convention.
+
+Two caveats it answers:
+
+- `localStorage` is per browser and per origin, so templates do not travel
   between machines, and **the bundled device is a different origin from the
   website**, so they do not travel there either.
-- One export/import button, writing the convention as a JSON file, fixes both
-  for about an hour of work. Build it with the storage, not after.
+- Export and import write a template as a JSON file, which is the only way one
+  travels at all. Built with the storage, not after.
 
 #### 4.3.8 Status: built, and confirmed in Live
 
@@ -557,7 +566,8 @@ recorded as SCHEMA.md Q19:
   rack's height with it. Hand-built racks here top out at 12.
 
 All eight features are built: chain select, Utility gain, Gate, Compressor, Auto
-Filter and EQ Three's three bands. Three of them needed the codec to stop
+Filter and EQ Three's three bands. A feature can be added more than once when
+it targets something - one chain selector per drum pad. Three of them needed the codec to stop
 assuming every option is one device plus one macro:
 
 - **A feature can add a device and bind nothing.** The Compressor does.
@@ -567,6 +577,14 @@ assuming every option is one device plus one macro:
 - **A feature can write values that are not macros** - bass mono, the sidechain
   switch - into every instance of its device, inserted or reused. The sidechain
   SOURCE still does not travel (4.3.6) and the settings column says so.
+- **A feature can land INSIDE a nested rack**, with its macro staying on this
+  one. Chain select on a drum rack has to: pads answer to notes, so a selector
+  on the drum rack itself is a knob that does nothing (SCHEMA.md Q24). It
+  becomes two links - the pad's rack gets a macro driving its own selector, and
+  this rack's macro drives that - which is exactly what `donors/KD.adg` carries
+  by hand as `KICK SEL`. An inner macro already doing that job is reused.
+- **Chain select spreads the selector ranges** so the knob actually selects
+  (Q24). A rack whose chains already split the range is left alone.
 
 What has NOT been done is opening each of the new ones in Live. Gate,
 Compressor, EQ Three and the chain selector have round-tripped through the
@@ -575,6 +593,12 @@ codec and through a browser; "loads in Live" is a different claim (Open risk
 
 ### 4.4 Editor open items
 
+- **A macro's mappings collapse into one row - BUILT.** What the contract
+  writes is one knob across every chain, and four identical rows say nothing
+  four times. A macro with several targets is one summary row, opened by
+  double-clicking it or by Expand all.
+- **A macro resets from its own knob - BUILT.** The `x` unbinds it and puts its
+  name and colour back to an untouched slot's, leaving the slot where it is.
 - **Cables while Map is on - BUILT.** Every mapping in the rack is drawn as a
   cable for as long as Map mode is on, and taken away when it is off. Endpoints
   are found in the DOM by a `data-map-key` on both ends rather than computed,
