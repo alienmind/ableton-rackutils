@@ -631,3 +631,39 @@ test('the rack sits above the two panels, which stack when there is no room', as
   // nothing.
   expect(narrowMappings.y).toBeGreaterThan(narrowFeatures.y + narrowFeatures.height - 1);
 });
+
+test('the page fits a phone, and only the rack and the table scroll sideways', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await loadRack(page);
+
+  // Nothing may push the PAGE sideways: a phone with a horizontal scrollbar
+  // means something is laid out for a desktop and the user gets to hunt for
+  // it. The rack row and the mapping table scroll inside themselves instead.
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+
+  const rackScrolls = await page.locator('.rack-editor-scroll').evaluate((el) => el.scrollWidth > el.clientWidth);
+  expect(rackScrolls).toBe(true);
+  const tableScrolls = await page.locator('.mapping-scroll').evaluate((el) => el.scrollWidth > el.clientWidth);
+  expect(tableScrolls).toBe(true);
+
+  // The two lists stack rather than sharing a line 190px wide.
+  const available = (await page.locator('.contract-column').nth(0).boundingBox())!;
+  const inRack = (await page.locator('.contract-column').nth(1).boundingBox())!;
+  expect(inRack.y).toBeGreaterThan(available.y + available.height - 1);
+});
+
+test('it is installable: icons, theme colour and an apple touch icon', async ({ page }) => {
+  await page.goto('/');
+  // A manifest with no icons is not installable at all - both Chrome and
+  // Safari decline to offer it - and iOS reads the link tags rather than the
+  // manifest.
+  await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveAttribute('href', /apple-touch-icon\.png$/);
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#14151a');
+  await expect(page.locator('meta[name="apple-mobile-web-app-capable"]')).toHaveAttribute('content', 'yes');
+
+  for (const icon of ['icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png', 'favicon.svg']) {
+    const response = await page.request.get(`/${icon}`);
+    expect(response.status(), icon).toBe(200);
+  }
+});

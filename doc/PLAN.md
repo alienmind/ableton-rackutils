@@ -629,11 +629,38 @@ codec and through a browser; "loads in Live" is a different claim (Open risk
   knows the native range per parameter, so importing it would supply this.
 - **Sorting the mapping table** by column header, as Live's own list does.
 
-### 4.5 Offline - DONE
+### 4.5 Offline, installable, and usable on a phone - DONE
 
 `vite-plugin-pwa` in `apps/site/vite.config.ts`, `registerType: 'autoUpdate'`,
 with `scope`, `start_url` and the manifest all taking `VITE_BASE` so one config
 still serves dev, Pages and the device bundle.
+
+**It is actually installable now.** The manifest had no icons, and one without
+icons is not installable at all - Chrome and Safari both decline to offer "Add
+to Home Screen" - while `includeAssets` named a `favicon.svg` that did not
+exist. `apps/site/scripts/make-icons.mjs` draws the set (192, 512, a maskable
+512 whose art stays inside the circle Android crops to, a 180 for iOS) into
+`public/`, and iOS's own tags are in `index.html`, since iOS reads those rather
+than the manifest.
+
+The icons are drawn from code rather than exported from the logo: the logo is a
+2.4MB photo that does not survive being scaled to 192px, and a rasteriser is a
+dependency this repo does not otherwise have. Node's zlib writes the PNGs.
+
+**A phone gets the same app, not a cut-down one.** The rack is a fixed 169px
+row that scrolls sideways, which suits a small screen better than anything
+reflowed would; what needed doing was the rest:
+
+- the features strip and the mapping table stack when there is no room for two
+  columns, and inside the strip the lists stack too;
+- the mapping table keeps its six columns and scrolls inside its own box,
+  rather than squeezing Min and Max down to two characters;
+- **nothing may push the PAGE sideways** - a phone with a horizontal scrollbar
+  means something was laid out for a desktop - which is pinned by a spec;
+- controls that are drawn for a mouse grow under `@media (pointer: coarse)`
+  rather than everywhere, because the rack has no pixels to spare;
+- everything draggable sets `touch-action: none`, or the browser takes the
+  gesture for scrolling.
 
 Two things worth keeping:
 
