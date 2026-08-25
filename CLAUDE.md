@@ -32,18 +32,34 @@ This applies to everything committed: source, comments, docs, commit messages.
 
 **No trunk-based development. Never commit directly to `main`.**
 
-Work happens on a branch and reaches `main` through a pull request:
+**The maintainer decides when a branch starts and when it merges. Do not do
+either unprompted.**
+
+- **Branching is the maintainer's call.** Wait to be told a feature starts.
+  Until then, work in the tree and leave it uncommitted, or ask.
+- **Opening a PR is the maintainer's call.** Do not run `gh pr create`
+  unprompted.
+- **Merging and closing are the maintainer's call.** Never run `gh pr merge`
+  or `gh pr close`. Green CI is not permission; it is a precondition for
+  asking.
+
+The PR summary's shape is not in question - it is the template below, so write
+it that way without asking. The maintainer may then edit the body in the web
+UI; that edit is the current one. Do not overwrite it with `gh pr edit` unless
+asked.
+
+Once a branch is asked for:
 
 - `feat/<short-name>` for a feature, `fix/<short-name>` for a fix,
   `docs/<short-name>` for documentation.
 - `release/<version>` for a version bump and its release notes.
 
-Start by branching from an up-to-date `main`. Push the branch, open a PR with
-`gh pr create`, and let CI run on it - both jobs, `check` and `browser`. Merge
-only when they are green.
+Branch from an up-to-date `main` and commit there. Push and open the PR when
+asked, then let CI run on it - both jobs, `check` and `browser` - report the
+result, and stop.
 
-If you find yourself on `main` with uncommitted work, branch first and commit
-there; do not "just this once" push to `main`.
+If you find yourself on `main` with uncommitted work, ask before committing it
+anywhere; do not "just this once" push to `main`.
 
 ## Commit messages
 
