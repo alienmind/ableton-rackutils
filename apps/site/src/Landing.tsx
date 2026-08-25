@@ -18,7 +18,7 @@ export function Landing({ compact }: { compact: boolean }) {
       <header>
         <img src={logoUrl} alt="ableton-rackutils" className="logo" />
         <h1>
-          ableton-rackutils <span className="badge">v0.1.0 beta</span>
+          ableton-rackutils <span className="badge">v0.2.0 beta</span>
         </h1>
         <p className="tagline">Rearrange the macro knobs on an Ableton rack, in your browser.</p>
       </header>

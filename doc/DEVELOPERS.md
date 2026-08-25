@@ -60,9 +60,9 @@ pointer back to the file it came from, so the user must pick the file).
 
 ## Current state
 
-v0.1.0 beta. The codec is built and tested, the site renders the editor through
-`packages/editor-ui`, and edited files have been round-tripped through Live by
-hand. Full detail, and what to do next, is in
+v0.2.0 beta. The codec is built and tested, the site renders the editor through
+`packages/editor-ui`, and racks it edited - and racks the contract authored -
+have been loaded back into Live by hand. Full detail, and what to do next, is in
 [`PLAN.md`](PLAN.md#current-state).
 
 ## Setup
