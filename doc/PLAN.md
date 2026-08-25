@@ -53,12 +53,13 @@ editing, batch library operations - is out. See Parked.
 
 ## Current state
 
-- **`packages/adg-codec`** - built. Sixteen mutations plus the contract, 155
-  tests, 30 of them against the committed donor racks.
+- **`packages/adg-codec`** - built. Twenty-one mutations plus the contract, 167
+  tests, 42 of them against the committed donor racks.
 - **`packages/editor-ui`** - built. Reproduces Live's layout, plus the rack
-  features strip and Map mode. 33 tests.
+  features strip, feature templates and Map mode. 38 tests.
 - **`apps/site`** - the editor plus a getting-started guide, deployed to Pages.
-  26 Playwright specs against real Chromium in CI.
+  Installable, offline, and laid out for a phone as well as an ultra-wide. 35
+  Playwright specs against real Chromium in CI.
 - **`tools/adg-tool`** - `unpack`/`diff`/`mappings`/`move`/`move-mapping`, plus
   `adg-palette` and `adg-harvest`.
 - **`apps/m4l-device`** - the site, bundled. The `.amxd` opens a window holding
@@ -77,6 +78,12 @@ editing, batch library operations - is out. See Parked.
    `targetPath`.
 3. **Editor open items** (4.4), the mapping table's units and sorting.
 4. **Save in place** (4.6).
+
+None of these is what the next session should do first. **Open the racks in
+Live** (Open risk 2): the Gate, the Compressor, EQ Three, the chain selector
+and its ranges, and the device's own window have all been through the codec, a
+browser and their tests, and none of them through Live. That is the test this
+project keeps learning it cannot skip.
 
 Use it on real racks throughout. Every bug this project has hit came from that,
 not from tests - including a UI whose every interaction was broken while its

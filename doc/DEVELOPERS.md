@@ -84,10 +84,10 @@ Run all four of `lint`, `typecheck`, `test`, `build` clean before committing.
 ## Testing the codec
 
 ```bash
-pnpm test                                  # everything headless, 188 tests
-pnpm --filter @rackutils/adg-codec test    # 155 codec tests
-pnpm --filter @rackutils/editor-ui test    # 33 UI tests
-pnpm test:e2e                              # 26 browser specs, needs Chromium
+pnpm test                                  # everything headless, 205 tests
+pnpm --filter @rackutils/adg-codec test    # 167 codec tests
+pnpm --filter @rackutils/editor-ui test    # 38 UI tests
+pnpm test:e2e                              # 35 browser specs, needs Chromium
 ```
 
 The first time, install the browser: `pnpm --filter @rackutils/site exec
@@ -131,7 +131,7 @@ Playwright - and it would have failed for anyone who flicks a knob quickly.
 Add a spec here whenever a change touches DOM serialization, pointer handling,
 or layout that must not overflow.
 
-Of the codec's 155, most are synthetic and always run, 30 run against the
+Of the codec's 167, most are synthetic and always run, 42 run against the
 donor racks committed in `packages/adg-codec/donors/` - real Ableton-saved
 files that ship with the repo, so they run in CI too - and a handful run
 against `packages/adg-codec/tests/fixtures/*.adg`, which are gitignored and
