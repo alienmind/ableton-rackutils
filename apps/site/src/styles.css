@@ -290,3 +290,44 @@ header h1 {
   margin-top: 0.75rem;
 }
 
+
+
+/* --- phones and tablets --- */
+
+@media (max-width: 640px) {
+  .app {
+    padding: 1rem 0.6rem 2rem;
+  }
+
+  /* The full-bleed rack pulls out by the app's own padding, so that has to
+     match it or the rack sits off centre. */
+  .rack-view {
+    margin-inline: calc(50% - 50vw + 0.6rem);
+  }
+
+  header img {
+    max-width: 160px;
+  }
+
+  header h1 {
+    font-size: 1.5rem;
+  }
+
+  .dropzone {
+    padding: 1rem 0.75rem;
+  }
+}
+
+/*
+ * An installed app on a notched phone: `viewport-fit=cover` lets the page
+ * under the notch, and this keeps the content out of it.
+ */
+@supports (padding: env(safe-area-inset-left)) {
+  @media (display-mode: standalone) {
+    .app {
+      padding-left: max(0.6rem, env(safe-area-inset-left));
+      padding-right: max(0.6rem, env(safe-area-inset-right));
+      padding-bottom: max(2rem, env(safe-area-inset-bottom));
+    }
+  }
+}

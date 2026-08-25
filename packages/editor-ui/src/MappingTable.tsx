@@ -66,7 +66,11 @@ export function MappingTable({ rack }: MappingTableProps) {
           </button>
         )}
       </h4>
-      <table className="mapping-grid">
+      {/* The table has six columns and a phone has none to spare, so it
+          scrolls inside its own box rather than squeezing Min and Max down to
+          two characters or pushing the unbind control off the screen. */}
+      <div className="mapping-scroll">
+        <table className="mapping-grid">
         <thead>
           <tr>
             <th className="col-macro">Macro</th>
@@ -180,7 +184,8 @@ export function MappingTable({ rack }: MappingTableProps) {
             });
           })}
         </tbody>
-      </table>
+        </table>
+      </div>
     </section>
   );
 }

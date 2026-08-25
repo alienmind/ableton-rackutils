@@ -1290,6 +1290,7 @@
 
 .contract-templates {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
   margin-left: auto;
@@ -1450,3 +1451,90 @@
 
 .contract-band .contract-setting { min-width: 44px; }
 .contract-band .contract-pattern:disabled { opacity: 0.4; }
+
+
+/* --- touch, and the small screens that come with it --- */
+
+/*
+ * Every drag in this UI is a pointer gesture (doc/PLAN.md D3), and on a touch
+ * screen the browser claims the same gesture for scrolling unless the element
+ * says otherwise. The knobs already do; these are the other two things that
+ * can be dragged.
+ */
+.contract-grip,
+.param.mappable {
+  touch-action: none;
+}
+
+.mapping-scroll {
+  overflow-x: auto;
+}
+
+/* Below this the table cannot show six columns without lying about the
+   numbers, so it keeps its width and scrolls. */
+.mapping-grid {
+  min-width: 620px;
+}
+
+/*
+ * A finger is about 9mm and these controls are drawn for a mouse: 11px for the
+ * reset x, 15px for the rack's side buttons. Rather than making them bigger
+ * everywhere - the rack is a fixed 169px tall and there is nowhere to put the
+ * pixels - they grow only where the pointer is coarse.
+ */
+@media (pointer: coarse) {
+  .macro-knob-reset,
+  .macro-knob-swatch,
+  .chain-swatch {
+    min-width: 18px;
+    min-height: 18px;
+  }
+
+  .side-btn {
+    width: 22px;
+    height: 22px;
+  }
+
+  .side-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .contract-grip {
+    padding: 0 6px;
+  }
+
+  .contract-arrows button {
+    width: 40px;
+    padding: 8px 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .contract-strip,
+  .mapping-table {
+    padding: 5px;
+  }
+
+  .contract-templates {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .contract-column {
+    flex-basis: 100%;
+  }
+
+  /* The arrows sit between two stacked lists here, so they read across rather
+     than down. */
+  .contract-arrows {
+    flex-direction: row;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .contract-arrows button {
+    flex: 1;
+    max-width: 120px;
+  }
+}
