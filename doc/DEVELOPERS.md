@@ -59,10 +59,10 @@ pointer back to the file it came from, so the user must pick the file).
 
 ## Current state
 
-Pre-alpha. The codec is built and tested, and the site now renders the macro
-editor through `packages/editor-ui`. Nobody has loaded an edited file back
-into Live from the UI yet, which is the test that matters. Full detail, and
-what to do next, is in [`PLAN.md`](PLAN.md#current-state-and-next-steps).
+v0.1.0 beta. The codec is built and tested, the site renders the editor through
+`packages/editor-ui`, and edited files have been round-tripped through Live by
+hand. Full detail, and what to do next, is in
+[`PLAN.md`](PLAN.md#current-state).
 
 ## Setup
 
@@ -82,10 +82,10 @@ Run all four of `lint`, `typecheck`, `test`, `build` clean before committing.
 ## Testing the codec
 
 ```bash
-pnpm test                                  # everything headless, 109 tests
-pnpm --filter @rackutils/adg-codec test    # 84 codec tests
-pnpm --filter @rackutils/editor-ui test    # 25 UI tests
-pnpm test:e2e                              # 20 browser specs, needs Chromium
+pnpm test                                  # everything headless, 112 tests
+pnpm --filter @rackutils/adg-codec test    # 88 codec tests
+pnpm --filter @rackutils/editor-ui test    # 24 UI tests
+pnpm test:e2e                              # 22 browser specs, needs Chromium
 ```
 
 The first time, install the browser: `pnpm --filter @rackutils/site exec
@@ -115,7 +115,7 @@ running in. So:
 pnpm test:e2e            # Playwright, real Chromium, against the dev server
 ```
 
-Nine specs in `apps/site/e2e/`, run in CI as a separate `browser` job. They
+The specs in `apps/site/e2e/` run in CI as a separate `browser` job. They
 drive the real gestures - a pointer drag between two knobs, a click on the
 unbind "x", a colour pick - and one of them saves a file and checks the bytes,
 which is the direct guard on Q12. They use the codec's synthetic racks written
@@ -129,7 +129,7 @@ Playwright - and it would have failed for anyone who flicks a knob quickly.
 Add a spec here whenever a change touches DOM serialization, pointer handling,
 or layout that must not overflow.
 
-Of the codec's 84, 66 are synthetic and always run; 18 run against real
+Of the codec's 88, 70 are synthetic and always run; 18 run against real
 Ableton-saved racks in
 `packages/adg-codec/tests/fixtures/*.adg`, which are gitignored - they skip
 cleanly when absent (so, in CI) and run locally once you drop the four files
@@ -176,7 +176,8 @@ pnpm install:device   # copies it into Ableton's User Library
 ```
 
 No Max install needed for the first two. It is a scaffold: the device confirms
-the bridge is alive and nothing else. See `apps/m4l-device/README.md`.
+the bridge is alive and nothing else, which is why the site lists it as "Soon!"
+rather than offering a download. See `apps/m4l-device/README.md`.
 
 ## Pipeline
 

@@ -46,7 +46,7 @@ describe('RackEditor', () => {
 
   test('lists every mapping below the row, with an unbind control', () => {
     const html = render(Rack.parse(buildFixtureBytes()));
-    expect(html).toContain('mapping-rows');
+    expect(html).toContain('mapping-grid');
     expect(html).toContain('mapping-unbind');
     expect(html).toContain('ParamA');
     expect(html).toContain('ParamC');

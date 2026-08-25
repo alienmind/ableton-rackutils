@@ -7,6 +7,11 @@ export interface MappingTarget {
   /** The parameter itself, e.g. "DecayTime". */
   parameter: string;
   targetPath: string;
+  /** In the target parameter's own units, not 0..127 (SCHEMA.md Q4). */
+  rangeMin: number;
+  rangeMax: number;
+  /** Stored as Min > Max, which Live drives backwards. */
+  inverted: boolean;
 }
 
 export interface MacroMapping {
@@ -60,6 +65,9 @@ export function collectMappings(root: Rack): MacroMapping[] {
           device: deviceOf.get(b.targetPath) ?? 'unknown device',
           parameter: b.targetName,
           targetPath: b.targetPath,
+          rangeMin: b.rangeMin,
+          rangeMax: b.rangeMax,
+          inverted: b.inverted,
         })),
       });
     }

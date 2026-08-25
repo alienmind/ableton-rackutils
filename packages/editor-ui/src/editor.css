@@ -791,7 +791,7 @@
 
 .patch-plug.connected { fill: #9ad49a; }
 
-/* --- the mapping table: every rack -> macro -> device -> parameter --- */
+/* --- the mapping table, laid out like Live's own Macro Mappings list --- */
 
 .mapping-table {
   margin-top: 10px;
@@ -818,91 +818,88 @@
   color: var(--edit-dim);
 }
 
-.mapping-rows {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.mapping-grid {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
 }
 
-.mapping-rows > li {
-  display: flex;
-  align-items: flex-start;
-  gap: 5px;
-  padding: 2px 4px;
-  background: var(--edit-panel);
-  border: 1px solid var(--edit-line);
-  border-left: 3px solid var(--mapped-color, var(--edit-accent));
-  border-radius: 2px;
-}
-
-.mapping-rack {
+.mapping-grid th {
+  text-align: left;
+  font-weight: 500;
   color: var(--edit-dim);
-  min-width: 120px;
+  background: #23252b;
+  border-bottom: 1px solid var(--edit-line);
+  padding: 1px 4px;
+}
+
+.mapping-grid td {
+  padding: 1px 4px;
+  border-bottom: 1px solid var(--edit-line);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.mapping-arrow { color: #5d616b; }
+.mapping-grid tbody tr:hover td { background: #23252b; }
 
-.mapping-macro {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 130px;
+.mapping-grid .col-macro {
+  width: 26%;
+  border-left: 3px solid var(--mapped-color, var(--edit-accent));
   color: var(--mapped-color, var(--edit-text));
   font-weight: 600;
 }
 
+.mapping-grid th.col-macro { border-left: 3px solid transparent; }
+
+.mapping-grid .col-path {
+  width: 26%;
+  color: var(--edit-dim);
+}
+
+.mapping-grid .col-name {
+  width: 22%;
+  color: var(--edit-text);
+}
+
+.mapping-grid .col-num {
+  width: 9%;
+  text-align: right;
+}
+
+.mapping-grid .col-actions {
+  width: 8%;
+  text-align: right;
+  white-space: nowrap;
+}
+
 .mapping-slot {
+  display: inline-block;
   background: var(--mapped-color, var(--edit-accent));
   color: #14151a;
   border-radius: 2px;
   padding: 0 3px;
+  margin-right: 4px;
   font-size: 9px;
 }
 
-/* A macro's several parameters stack under it rather than wrapping across.
-   The list takes the remaining width so each row's unbind button can sit hard
-   against the right edge, in one column, instead of trailing whatever the
-   parameter name happened to be. */
-.mapping-targets {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.mapping-targets li {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.mapping-targets li .mapping-unbind {
-  margin-left: auto;
-}
-
-.mapping-device {
-  color: var(--edit-dim);
-  min-width: 90px;
-}
-
-.mapping-param {
+.mapping-range {
+  width: 100%;
+  background: #14151a;
+  border: 1px solid var(--edit-line);
+  border-radius: 2px;
   color: var(--edit-text);
-  min-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font: inherit;
+  text-align: right;
+  padding: 0 3px;
 }
 
+.mapping-range:focus {
+  outline: none;
+  border-color: var(--edit-accent);
+}
+
+.mapping-invert,
 .mapping-unbind {
   background: #3a3d45;
   color: var(--edit-text);
@@ -913,6 +910,13 @@
   line-height: 13px;
   cursor: pointer;
 }
+
+.mapping-invert.is-inverted {
+  background: var(--edit-accent);
+  color: #14151a;
+}
+
+.mapping-invert:hover { border-color: var(--edit-accent); }
 
 .mapping-unbind:hover {
   background: #7a3a3a;
