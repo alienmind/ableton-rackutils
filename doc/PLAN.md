@@ -627,6 +627,23 @@ one either offer a matching `.adg` from the User Library or tell the user to
 save it first. It is a shortcut to the file picker, not a way to read a live
 rack. Do not let it imply otherwise in the UI.
 
+**The download points at a versioned release, not the rolling build.** The site
+should resolve the newest `vX.Y.Z` tag carrying a device asset and link that,
+showing the version it is offering. Three reasons the rolling `latest-device`
+tag stops being right once real tags exist (D5):
+
+- A user who reports a bug can say which device they have.
+- A device and the site that documents it move together, instead of the device
+  silently changing under a fixed link.
+- `/releases/latest` becomes usable, since a real release is not a prerelease -
+  which is exactly the endpoint the rolling tag forced the site to avoid.
+
+`apps/site/src/companion/download.ts` fetches `/releases/tags/latest-device`
+today and falls back to a hardcoded link on any failure, which stays: GitHub's
+unauthenticated API is rate-limited per IP and fails for reasons unrelated to
+the user. Keep the rolling build if a nightly is wanted, but the card the
+public sees offers the tagged one.
+
 Bundling checklist, most of which the site already satisfies because it was
 designed backend-free:
 
@@ -978,9 +995,9 @@ per IP and will occasionally fail for reasons having nothing to do with the
 user. The download itself stays hidden until the device does something (D4),
 which under 4.7 means until it opens the bundled editor.
 
-Once the codec's versioning matures enough for real `device-vX` releases to
-make sense, revisit: either the site should prefer a real tagged release over
-the rolling one, or the rolling-build concept should retire entirely.
+**Decided, and open as work: the site points at VERSIONED releases.** The
+rolling `latest-device` build was a stand-in for having no versioning scheme,
+and `v0.2.0` ends that. See 4.7.
 
 This matches how m4l-gugelhupf distributes: a zip of devices on GitHub
 Releases, with a maxforlive.com listing pointing at it. Worth listing there too
