@@ -372,3 +372,77 @@ describe('rack features, the contract strip (doc/PLAN.md 4.3.1)', () => {
     expect(bassMono.getAttribute('Value')).toBe('true');
   });
 });
+
+describe('a feature with several knobs (EQ Three)', () => {
+  const columns = () => [...container.querySelectorAll('.contract-column')];
+  const addFeature = (label: string) => {
+    const entry = [...columns()[0].querySelectorAll('.contract-entry')].find((el) => el.textContent?.includes(label))!;
+    act(() => (entry as HTMLElement).click());
+    act(() => (container.querySelectorAll('.contract-arrows button')[0] as HTMLElement).click());
+  };
+  const setCode = (code: string) => {
+    const input = container.querySelector('.contract-code') as HTMLInputElement;
+    act(() => {
+      input.value = code;
+      input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    });
+  };
+
+  test('is ONE entry in the list and three knobs on the rack', () => {
+    setCode('BS');
+    // One EQ Three, not three EQ features: it is one device carrying three
+    // band gains, and adding it three times would insert three EQs.
+    expect([...columns()[0].querySelectorAll('.contract-entry-name')].map((el) => el.textContent)).toContain('EQ Three');
+    addFeature('EQ Three');
+
+    expect([...columns()[1].querySelectorAll('.contract-entry-name')].map((el) => el.textContent)).toEqual(['BS EQ (Lo, Mid, Hi)']);
+    expect(rack.macros.slice(0, 3).map((m) => m.name)).toEqual(['BS LO', 'BS MID', 'BS HI']);
+    // One EQ per chain, shared by the three knobs.
+    for (const chain of rack.chains) {
+      expect(chain.devices.filter((d) => d.type === 'FilterEQ3')).toHaveLength(1);
+    }
+  });
+
+  test('a band can be dropped on its own, and the device stays', () => {
+    setCode('BS');
+    addFeature('EQ Three');
+    const mid = [...container.querySelectorAll('.contract-band')].find((el) => el.textContent?.includes('Mid'))!;
+    act(() => (mid.querySelector('input[type="checkbox"]') as HTMLInputElement).click());
+
+    expect(rack.macros.slice(0, 2).map((m) => m.name)).toEqual(['BS LO', 'BS HI']);
+    expect(rack.macros.some((m) => m.name === 'BS MID')).toBe(false);
+    expect(rack.chains.every((c) => c.devices.some((d) => d.type === 'FilterEQ3'))).toBe(true);
+  });
+
+  test('taking the feature out takes all three knobs and the device with it', () => {
+    setCode('BS');
+    const before = { count: rack.macroCount, names: rack.macros.map((m) => m.name) };
+    addFeature('EQ Three');
+
+    const entry = [...columns()[1].querySelectorAll('.contract-entry')][0] as HTMLElement;
+    act(() => entry.click());
+    act(() => (container.querySelectorAll('.contract-arrows button')[1] as HTMLElement).click());
+
+    expect(rack.macroCount).toBe(before.count);
+    expect(rack.macros.map((m) => m.name)).toEqual(before.names);
+    expect(rack.chains.some((c) => c.devices.some((d) => d.type === 'FilterEQ3'))).toBe(false);
+  });
+});
+
+describe('chain colour (SCHEMA.md Q13)', () => {
+  test('picking a chain colour paints the row and the macros that only drive it', () => {
+    const chainSwatch = container.querySelector('.chain-swatch') as HTMLElement;
+    act(() => chainSwatch.click());
+    const swatches = [...document.querySelectorAll('.color-swatch')] as HTMLElement[];
+    act(() => swatches[21].click());
+
+    expect(rack.chains[0].colorIndex).toBe(21);
+    // Macro 1 drives two parameters, both inside that chain, so it takes the
+    // chain's colour. A macro reaching outside it would not.
+    expect(rack.macros[0].color).toBe(21);
+
+    const row = container.querySelector('.chain-row') as HTMLElement;
+    expect(row.style.getPropertyValue('--chain-color')).not.toBe('');
+    expect(row.style.getPropertyValue('--chain-ink')).not.toBe('');
+  });
+});

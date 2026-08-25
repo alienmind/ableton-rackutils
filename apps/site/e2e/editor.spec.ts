@@ -562,3 +562,50 @@ test('a rack feature is added with the arrow and reordered by dragging', async (
   await removeButton.click();
   await expect(inRack.locator('.contract-entry-name')).toHaveText(['BS FILTER']);
 });
+
+test('EQ Three is one feature with three knobs, and a band can be dropped', async ({ page }) => {
+  await loadRack(page);
+  await page.locator('.contract-code').fill('BS');
+  await page.locator('.contract-code').press('Enter');
+
+  const available = page.locator('.contract-column').nth(0);
+  await expect(available.locator('.contract-entry', { hasText: 'EQ Three' })).toHaveCount(1);
+  await available.locator('.contract-entry', { hasText: 'EQ Three' }).click();
+  await page.locator('.contract-arrows button').first().click();
+
+  await expect(page.locator('.contract-column').nth(1).locator('.contract-entry-name')).toHaveText(['BS EQ (Lo, Mid, Hi)']);
+  await expect(rootKnobs(page).nth(0).locator('.macro-knob-name')).toHaveText('BS LO');
+  await expect(rootKnobs(page).nth(2).locator('.macro-knob-name')).toHaveText('BS HI');
+
+  // Dropping the Mid band drops its knob and keeps the EQ.
+  await page.locator('.contract-band', { hasText: 'Mid' }).locator('input[type="checkbox"]').uncheck();
+  await expect(rootKnobs(page).nth(1).locator('.macro-knob-name')).toHaveText('BS HI');
+  await expect(page.locator('.contract-column').nth(1).locator('.contract-entry-name')).toHaveText(['BS EQ (Lo, Hi)']);
+});
+
+test('a chain wears its colour, and so do the macros that only drive it', async ({ page }) => {
+  await loadRack(page);
+  await rootChainRows(page).first().locator('.chain-swatch').click();
+  await page.locator('.color-swatch').nth(21).click();
+
+  const row = rootChainRows(page).first();
+  await expect
+    .poll(() => row.evaluate((el) => getComputedStyle(el).backgroundColor))
+    .not.toBe('rgb(58, 61, 69)'); // the default row grey
+  // The knob that drives only that chain now matches it.
+  const knobColour = await rootKnobs(page).first().evaluate((el) => getComputedStyle(el).getPropertyValue('--macro-color').trim());
+  const rowColour = await row.evaluate((el) => getComputedStyle(el).getPropertyValue('--chain-color').trim());
+  expect(knobColour).toBe(rowColour);
+});
+
+test('the cables stay inside the rack row', async ({ page }) => {
+  await loadRack(page);
+  await openFirstDevice(page);
+  await turnMapOn(page);
+  await expect(page.locator('.mapping-cable').first()).toBeVisible();
+
+  // The layer covers the viewport, so it is clipped to the row: without that,
+  // a cable to a control scrolled out of view was drawn across the page.
+  const clip = await page.locator('.mapping-cable-layer').evaluate((el) => getComputedStyle(el).clipPath);
+  expect(clip).toContain('inset');
+});

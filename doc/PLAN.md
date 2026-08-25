@@ -585,6 +585,10 @@ assuming every option is one device plus one macro:
   by hand as `KICK SEL`. An inner macro already doing that job is reused.
 - **Chain select spreads the selector ranges** so the knob actually selects
   (Q24). A rack whose chains already split the range is left alone.
+- **A feature can carry several knobs.** EQ Three is ONE feature with three
+  band macros, not three features: it is one device, and offering it three
+  times would insert three EQs. Each band can be dropped on its own, and the
+  EQ stays as long as one band wants it.
 
 What has NOT been done is opening each of the new ones in Live. Gate,
 Compressor, EQ Three and the chain selector have round-tripped through the
@@ -597,6 +601,18 @@ codec and through a browser; "loads in Live" is a different claim (Open risk
   writes is one knob across every chain, and four identical rows say nothing
   four times. A macro with several targets is one summary row, opened by
   double-clicking it or by Expand all.
+- **Colour follows the chain - BUILT.** A chain row wears its own colour
+  rather than a stripe on grey, and colouring a chain colours every macro that
+  drives only that chain. A macro reaching across chains keeps its own colour,
+  because that is what a macro across chains is. Ink is picked per colour:
+  Live's palette runs from near black to white and a fixed foreground vanishes
+  at one end.
+- **Cables are clipped to the rack row - BUILT.** The layer covers the
+  viewport, so a cable to a control scrolled out of the row used to be drawn
+  across the page beside it.
+- **The rack row is as wide as the window - BUILT.** Prose reads badly past
+  900px and a rack of racks runs to thousands, so the rack breaks out of the
+  text column rather than sharing its width.
 - **A macro resets from its own knob - BUILT.** The `x` unbinds it and puts its
   name and colour back to an untouched slot's, leaving the slot where it is.
 - **Cables while Map is on - BUILT.** Every mapping in the rack is drawn as a
