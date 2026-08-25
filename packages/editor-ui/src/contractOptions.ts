@@ -24,6 +24,19 @@ export interface ContractSetting {
   note?: string;
 }
 
+/**
+ * One knob of a feature that has several. EQ Three is ONE device with three
+ * band gains: adding it three times would insert three EQs, and offering it as
+ * three features says the wrong thing about what it is.
+ */
+export interface ContractBand {
+  id: string;
+  label: string;
+  /** The device parameter this band's macro drives. */
+  parameter: string;
+  namePattern: string;
+}
+
 export interface ContractOptionSpec {
   id: string;
   label: string;
@@ -41,6 +54,12 @@ export interface ContractOptionSpec {
   targetsNestedRack?: boolean;
   /** The codec's half of it. `namePattern` and `colorIndex` here are DEFAULTS; the convention may override both. */
   device: ContractDevice;
+  /**
+   * The knobs this one feature carries, if it carries more than one. Each can
+   * be dropped on its own - a rack that wants only a low shelf takes the Lo
+   * band and leaves the others - and the device is inserted once either way.
+   */
+  bands?: readonly ContractBand[];
   settings?: readonly ContractSetting[];
   /** One line under the tile, for something the option cannot do. */
   note?: string;
@@ -107,21 +126,16 @@ export const CONTRACT_OPTIONS: readonly ContractOptionSpec[] = [
     device: { deviceTag: 'AutoFilter2', parameter: 'Filter_Frequency', namePattern: '{name} FILTER', colorIndex: 3 },
   },
   {
-    id: 'eqLo',
-    label: 'EQ Three - Lo',
-    device: { deviceTag: 'FilterEQ3', parameter: 'GainLo', namePattern: '{name} LO', deviceNamePattern: '{name} EQ', colorIndex: 9 },
-  },
-  {
-    id: 'eqMid',
-    label: 'EQ Three - Mid',
-    device: { deviceTag: 'FilterEQ3', parameter: 'GainMid', namePattern: '{name} MID', deviceNamePattern: '{name} EQ', colorIndex: 9 },
-  },
-  {
-    id: 'eqHi',
-    label: 'EQ Three - Hi',
-    // The three bands share ONE EQ per chain: whichever of them lands first
-    // inserts it and the others find it (doc/PLAN.md 4.3.2).
-    device: { deviceTag: 'FilterEQ3', parameter: 'GainHi', namePattern: '{name} HI', deviceNamePattern: '{name} EQ', colorIndex: 9 },
+    id: 'eq3',
+    label: 'EQ Three',
+    // ONE device, three macros. The bands share the EQ that whichever of them
+    // lands first inserted (doc/PLAN.md 4.3.2).
+    device: { deviceTag: 'FilterEQ3', namePattern: '{name} EQ', deviceNamePattern: '{name} EQ', colorIndex: 9 },
+    bands: [
+      { id: 'lo', label: 'Lo', parameter: 'GainLo', namePattern: '{name} LO' },
+      { id: 'mid', label: 'Mid', parameter: 'GainMid', namePattern: '{name} MID' },
+      { id: 'hi', label: 'Hi', parameter: 'GainHi', namePattern: '{name} HI' },
+    ],
   },
 ];
 

@@ -27,6 +27,10 @@ export interface Feature {
   colorIndex?: number;
   /** Per-option checkboxes, by `ContractSetting.id`. */
   settings: Record<string, boolean>;
+  /** Which of a multi-knob feature's bands are on, by `ContractBand.id`. Absent means all of them. */
+  bands?: Record<string, boolean>;
+  /** Per-band label patterns, by `ContractBand.id`, where they differ from the band's default. */
+  bandNames?: Record<string, string>;
   /** Device path of the nested rack this instance applies inside of - a drum pad's rack (SCHEMA.md Q24). */
   targetRack?: string;
   /** The pad or chain that rack sits in, which fills `{target}` in the label. */
@@ -64,6 +68,7 @@ export function newFeature(option: string, patch: Partial<Feature> = {}): Featur
     namePattern: spec.device.namePattern,
     colorIndex: spec.device.colorIndex,
     settings: Object.fromEntries((spec.settings ?? []).map((s) => [s.id, false])),
+    ...(spec.bands ? { bands: Object.fromEntries(spec.bands.map((b) => [b.id, true])) } : {}),
     ...patch,
   };
 }
@@ -134,29 +139,54 @@ function readTemplate(value: unknown): Template | null {
       namePattern: typeof f.namePattern === 'string' ? f.namePattern : optionSpec(f.option)!.device.namePattern,
       colorIndex: typeof f.colorIndex === 'number' ? f.colorIndex : optionSpec(f.option)!.device.colorIndex,
       settings: typeof f.settings === 'object' && f.settings !== null ? { ...f.settings } : {},
+      ...(typeof f.bands === 'object' && f.bands !== null ? { bands: { ...f.bands } } : {}),
+      ...(typeof f.bandNames === 'object' && f.bandNames !== null ? { bandNames: { ...f.bandNames } } : {}),
       ...(typeof f.targetRack === 'string' ? { targetRack: f.targetRack } : {}),
       ...(typeof f.targetName === 'string' ? { targetName: f.targetName } : {}),
     }));
   return { id: typeof data.id === 'string' ? data.id : id(), name: data.name, features };
 }
 
-/** One feature as the codec wants it: the option's device, with this instance written over it. */
-export function deviceFor(feature: Feature): ContractDevice | null {
+/**
+ * One feature as the codec wants it - which is one device per KNOB, not one
+ * per feature.
+ *
+ * EQ Three is the reason: it is one device carrying three band gains, so it is
+ * one feature with three knobs, and the codec sees three entries sharing a
+ * device tag. `insertDeviceInEveryChain` reuses the EQ the first of them
+ * inserted, so a chain still ends up with exactly one.
+ *
+ * A banded feature with every band switched off keeps the device and drops the
+ * knobs, which is the same shape the Compressor has.
+ */
+export function devicesFor(feature: Feature): ContractDevice[] {
   const spec = optionSpec(feature.option);
-  if (!spec) return null;
+  if (!spec) return [];
   const values = (spec.settings ?? []).flatMap((setting) => (feature.settings[setting.id] ? setting.on : setting.off));
-  return {
+  const common = {
     ...spec.device,
-    namePattern: feature.namePattern || spec.device.namePattern,
     colorIndex: feature.colorIndex ?? spec.device.colorIndex,
     ...(feature.targetRack ? { targetRack: feature.targetRack, targetName: feature.targetName } : {}),
     ...(values.length > 0 ? { values } : {}),
   };
+
+  if (!spec.bands) return [{ ...common, namePattern: feature.namePattern || spec.device.namePattern }];
+
+  const on = spec.bands.filter((band) => bandIsOn(feature, band.id));
+  if (on.length === 0) return [{ ...common, parameter: undefined, namePattern: feature.namePattern || spec.device.namePattern }];
+  return on.map((band) => ({
+    ...common,
+    parameter: band.parameter,
+    namePattern: feature.bandNames?.[band.id] || band.namePattern,
+  }));
 }
+
+/** A band is on unless the template says otherwise, so an older template that predates a band still gets it. */
+export const bandIsOn = (feature: Feature, bandId: string): boolean => feature.bands?.[bandId] !== false;
 
 /** Every feature of a template, in order - which is the order their macros land in. */
 export function devicesOf(template: Template): ContractDevice[] {
-  return template.features.map(deviceFor).filter((d): d is ContractDevice => d !== null);
+  return template.features.flatMap(devicesFor);
 }
 
 /** Options that can still be added: everything, minus the ones already in and not repeatable. */

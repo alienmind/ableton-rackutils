@@ -10,7 +10,7 @@ export { MappingCables } from './MappingCables';
 export { ContractStrip } from './ContractStrip';
 export { CONTRACT_OPTIONS } from './contractOptions';
 export type { ContractOptionSpec, ContractSetting } from './contractOptions';
-export { loadLibrary, saveLibrary, exportTemplate, importTemplate, newTemplate, newFeature, deviceFor, devicesOf } from './templates';
+export { loadLibrary, saveLibrary, exportTemplate, importTemplate, newTemplate, newFeature, devicesFor, devicesOf } from './templates';
 export type { Feature, Template, Library } from './templates';
 export { macroColor, MACRO_PALETTE, PALETTE_INDICES, PALETTE_COLUMNS } from './macroColors';
 export { LIVE_PALETTE } from './livePalette';

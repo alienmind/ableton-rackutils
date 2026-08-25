@@ -1,12 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { applyContract, inspectContract, removeContractOption, type ContractStatus, type Rack } from '@rackutils/adg-codec';
+import {
+  applyContract,
+  evenMacroCount,
+  inspectContract,
+  removeContractOption,
+  type ContractDevice,
+  type ContractStatus,
+  type Rack,
+} from '@rackutils/adg-codec';
 import { ColorPicker } from './ColorPicker';
 import { optionSpec, type ContractOptionSpec } from './contractOptions';
-import { macroColor } from './macroColors';
+import { contrastInk, macroColor } from './macroColors';
 import { useEditor } from './context';
 import {
   availableOptions,
-  deviceFor,
+  bandIsOn,
+  devicesFor,
   devicesOf,
   emptyLibrary,
   exportTemplate,
@@ -50,6 +59,10 @@ export interface ContractStripProps {
   onSave?: () => void;
 }
 
+/** Two entries describe the same knob when they drive the same thing in the same place. */
+const sameDevice = (a: ContractDevice, b: ContractDevice) =>
+  a.deviceTag === b.deviceTag && a.parameter === b.parameter && a.targetRack === b.targetRack;
+
 /** A nested rack a targeted feature can point at: one per chain that holds one. */
 interface RackTarget {
   path: string;
@@ -74,12 +87,19 @@ export function ContractStrip({ rack, onSave }: ContractStripProps) {
   const spec = feature ? optionSpec(feature.option) : null;
   const name = rackName || rack.name;
 
-  // Memoised on the rack handle: every mutation replaces it, and inspecting
-  // reads the whole document.
-  const statuses = useMemo(
-    () => inspectContract(rack, template.features.map((f) => deviceFor(f)!)),
-    [rack, template],
-  );
+  /**
+   * One status per FEATURE, not per knob. A feature can carry several - EQ
+   * Three is one device with three band macros - and the list shows the
+   * feature, so its knobs' states are summarised into one.
+   *
+   * Memoised on the rack handle: every mutation replaces it, and inspecting
+   * reads the whole document.
+   */
+  const statuses = useMemo(() => {
+    const perDevice = inspectContract(rack, template.features.flatMap(devicesFor));
+    let at = 0;
+    return template.features.map((f) => summarise(perDevice.slice(at, (at += devicesFor(f).length))));
+  }, [rack, template]);
 
   const targets = useMemo(() => nestedRackTargets(rack), [rack]);
   const isDrumRack = rack.deviceEl.tagName === 'DrumGroupDevice';
@@ -94,20 +114,37 @@ export function ContractStrip({ rack, onSave }: ContractStripProps) {
    * ranks.
    */
   const materialise = useCallback(
-    (next: Template, removed?: Feature) => {
+    (next: Template) => {
       const previous = library;
+      const before = devicesOf(template);
+      const after = devicesOf(next);
       setLibrary((lib) => ({ ...lib, templates: lib.templates.map((t) => (t.id === next.id ? next : t)) }));
+
       const applied = apply([], (r) => {
-        if (removed) {
-          const device = deviceFor(removed);
-          if (device) {
-            const result = removeContractOption(r, device, { name: rackName || r.name });
-            if (!result.ok) return result;
-          }
+        // Whatever the change was, anything the template no longer asks for
+        // comes off first. Its KNOB always; its DEVICE only when nothing else
+        // in the template still wants that device - EQ Three's three bands
+        // share one, so dropping a band must not take the EQ with it.
+        const gone = before.filter((d) => !after.some((keep) => sameDevice(d, keep)));
+        const tagsKept = new Set(after.map((d) => d.deviceTag).filter(Boolean));
+
+        // Knobs first, every one of them, and only then the devices. The other
+        // way round, removing the device takes its remaining bindings with it
+        // (a KeyMidi lives inside the parameter it drives, SCHEMA.md Q1), and
+        // the slots those knobs were on are left behind as empty macros.
+        for (const device of gone) {
+          const result = removeContractOption(r, device, { name: rackName || r.name, keepDevices: true });
+          if (!result.ok) return result;
         }
-        const devices = devicesOf(next);
-        if (devices.length === 0 && !removed) return { ok: true, warnings: [] };
-        return applyContract(r, devices, { name: rackName || undefined });
+        for (const device of gone) {
+          if (device.deviceTag === undefined || tagsKept.has(device.deviceTag)) continue;
+          const result = removeContractOption(r, device, { name: rackName || r.name });
+          if (!result.ok) return result;
+        }
+        // An empty template still has to leave the bank even: removals get
+        // there one slot at a time (SCHEMA.md Q19).
+        if (after.length === 0) return evenMacroCount(r);
+        return applyContract(r, after, { name: rackName || undefined });
       });
       // Put the list back when the codec refuses - a rack with no room for
       // another macro, a drum rack asked for a chain selector of its own. A
@@ -115,7 +152,7 @@ export function ContractStrip({ rack, onSave }: ContractStripProps) {
       // this strip must never show.
       if (!applied) setLibrary(previous);
     },
-    [apply, library, rackName],
+    [apply, library, template, rackName],
   );
 
   const patch = (key: string, changes: Partial<Feature>) =>
@@ -148,7 +185,7 @@ export function ContractStrip({ rack, onSave }: ContractStripProps) {
   const removeSelected = () => {
     if (!feature) return;
     setSelected(null);
-    materialise({ ...template, features: template.features.filter((f) => f.key !== feature.key) }, feature);
+    materialise({ ...template, features: template.features.filter((f) => f.key !== feature.key) });
   };
 
   const move = (key: string, to: number) => {
@@ -334,12 +371,12 @@ export function ContractStrip({ rack, onSave }: ContractStripProps) {
                   <button
                     type="button"
                     className={`contract-entry filled${selected === f.key ? ' selected' : ''}`}
-                    style={{ background: colour, color: contrastOn(colour) }}
+                    style={{ background: colour, color: contrastInk(colour) }}
                     onClick={() => setSelected(f.key)}
                     title={stateTitle(status)}
                   >
                     <span className="contract-entry-slot">{i + 1}</span>
-                    <span className="contract-entry-name">{labelOf(optionSpec(f.option)!, f, name)}</span>
+                    <span className="contract-entry-name">{entryLabel(optionSpec(f.option)!, f, name)}</span>
                   </button>
                 </li>
               );
@@ -354,7 +391,7 @@ export function ContractStrip({ rack, onSave }: ContractStripProps) {
           {feature && spec && (
             <>
               <label className="contract-field">
-                {spec.device.parameter === undefined ? 'Device name' : 'Macro label'}
+                {spec.bands || spec.device.parameter === undefined ? 'Device name' : 'Macro label'}
                 <span className="contract-field-row">
                   <button
                     type="button"
@@ -381,6 +418,38 @@ export function ContractStrip({ rack, onSave }: ContractStripProps) {
                 </span>
               </label>
 
+              {spec.bands && (
+                <div className="contract-bands">
+                  {/* One device, one knob per band. Dropping a band drops its
+                      knob and keeps the EQ. */}
+                  {spec.bands.map((band) => (
+                    <div key={band.id} className="contract-band">
+                      <label className="contract-setting">
+                        <input
+                          type="checkbox"
+                          checked={bandIsOn(feature, band.id)}
+                          onChange={(e) => patch(feature.key, { bands: { ...feature.bands, [band.id]: e.target.checked } })}
+                        />
+                        <span>{band.label}</span>
+                      </label>
+                      <input
+                        className="contract-pattern"
+                        key={`${feature.key}:${band.id}:${feature.bandNames?.[band.id] ?? band.namePattern}`}
+                        defaultValue={feature.bandNames?.[band.id] ?? band.namePattern}
+                        disabled={!bandIsOn(feature, band.id)}
+                        title={`Label for the ${band.label} knob`}
+                        onBlur={(e) =>
+                          patch(feature.key, { bandNames: { ...feature.bandNames, [band.id]: e.target.value || band.namePattern } })
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') e.currentTarget.blur();
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {spec.targetsNestedRack && (
                 <label className="contract-field">
                   Applies to
@@ -403,9 +472,10 @@ export function ContractStrip({ rack, onSave }: ContractStripProps) {
                 </label>
               )}
 
-              {spec.device.parameter !== undefined && isLongLabel(labelOf(spec, feature, name)) && (
+              {longestLabel(spec, feature, name) !== null && (
                 <p className="contract-note warn">
-                  Live wraps a label this long onto a second line and the whole rack grows with it. Twelve characters fit.
+                  <strong>{longestLabel(spec, feature, name)}</strong> is long enough to wrap onto a second line in Live, and the
+                  whole rack grows with it. Twelve characters fit.
                 </p>
               )}
 
@@ -527,25 +597,42 @@ function swatchColor(colorIndex?: number): string {
   return colorIndex === undefined || colorIndex < 0 ? '#4a4f5c' : macroColor(colorIndex);
 }
 
-/**
- * Black or white text over a swatch colour. Live's palette runs from near
- * black to white, so one fixed foreground is unreadable at one end or the
- * other.
- */
-function contrastOn(color: string): string {
-  const hex = /^#([0-9a-f]{6})$/i.exec(color.trim());
-  if (!hex) return '#f4f5f8';
-  const n = parseInt(hex[1], 16);
-  // Rec. 601 luma, which is what "does this read as light or dark" wants.
-  const luma = (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
-  return luma > 0.55 ? '#101116' : '#f4f5f8';
+const fill = (pattern: string, feature: Feature, name: string) =>
+  pattern.replace(/\{name\}/g, name).replace(/\{target\}/g, feature.targetName ?? '');
+
+/** What the list shows: the feature's own name, plus which of its knobs are on when it has several. */
+function entryLabel(spec: ContractOptionSpec, feature: Feature, name: string): string {
+  const own = fill(feature.namePattern || spec.device.namePattern, feature, name);
+  if (!spec.bands) return own;
+  const on = spec.bands.filter((band) => bandIsOn(feature, band.id));
+  return on.length === 0 ? `${own} (no knobs)` : `${own} (${on.map((b) => b.label).join(', ')})`;
 }
 
-const labelOf = (spec: ContractOptionSpec, feature: Feature, name: string) =>
-  (feature.namePattern || spec.device.namePattern).replace(/\{name\}/g, name).replace(/\{target\}/g, feature.targetName ?? '');
+/**
+ * The label that would wrap, or null. Twelve characters fit on a knob and
+ * twenty-one takes the rack's height with it (SCHEMA.md Q19), and a feature
+ * with several knobs has several chances to trip over that.
+ */
+function longestLabel(spec: ContractOptionSpec, feature: Feature, name: string): string | null {
+  const labels = spec.bands
+    ? spec.bands.filter((b) => bandIsOn(feature, b.id)).map((b) => fill(feature.bandNames?.[b.id] ?? b.namePattern, feature, name))
+    : spec.device.parameter === undefined
+      ? []
+      : [fill(feature.namePattern || spec.device.namePattern, feature, name)];
+  const longest = [...labels].sort((a, b) => b.length - a.length)[0];
+  return longest && longest.length > 12 ? longest : null;
+}
 
-/** Twelve fits on a knob, twenty-one wraps and takes the rack's height with it (SCHEMA.md Q19). */
-const isLongLabel = (label: string) => label.length > 12;
+/**
+ * One state for a feature out of the state of each of its knobs: satisfied
+ * only when every one of them is, absent only when none of them is anywhere.
+ */
+function summarise(statuses: readonly ContractStatus[]): ContractStatus {
+  const first = statuses[0] ?? { slot: null, state: 'absent' as const, chainsCovered: 0, chainCount: 0 };
+  if (statuses.every((s) => s.state === 'satisfied')) return first;
+  if (statuses.every((s) => s.state === 'absent')) return { ...first, state: 'absent' };
+  return { ...first, state: 'partial' };
+}
 
 /**
  * What the rack already does about this feature. Partial is worth its own

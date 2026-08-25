@@ -30,6 +30,7 @@ import {
   renameMacro,
   reorderMacro,
   setDeviceValue,
+  evenMacroCount,
   setMacroColor,
   setMacroCount,
   type InsertedDevice,
@@ -121,6 +122,12 @@ export interface ContractOptions {
   name?: string;
   /** Set false to leave the rack's own name alone and only use `name` for labels. */
   renameTheRack?: boolean;
+  /**
+   * Take the macro away and LEAVE the device. For one knob of a feature that
+   * has several: EQ Three's three bands share one device per chain, so
+   * dropping the Mid band must not take the EQ with it.
+   */
+  keepDevices?: boolean;
 }
 
 export interface ContractResult extends MutationResult {
@@ -261,12 +268,20 @@ export function applyContract(
   }
 
   orderContractMacros(rack, slots);
+
+  // Even out the bank once, at the end (see `evenMacroCount`).
+  evenMacroCount(rack);
+
   return { ok: true, warnings, slots };
 }
 
 /**
  * Take one option back off the rack: unbind and remove its macro, and remove
  * the devices the contract itself put there.
+ *
+ * The visible macro count is left odd if that is where it lands: a caller
+ * taking several knobs off runs `applyContract` or `evenMacroCount` when the
+ * batch is done, which is the only point that knows it is done.
  *
  * A device the contract did NOT insert is left alone and reported. The tell is
  * its name: the contract writes `{name} GAIN` onto what it inserts and never
@@ -279,7 +294,7 @@ export function removeContractOption(rack: Rack, device: ContractDevice, options
   const warnings: string[] = [];
   const slot = findSatisfiedSlot(rack, device) ?? findPartialSlot(rack, device);
 
-  if (device.deviceTag) {
+  if (device.deviceTag && !options.keepDevices) {
     const ours = macroNameFor(device.deviceNamePattern ?? device.namePattern, name, device.targetName);
     const present = candidateDevices(rack, device, slot);
     const mine = present.filter((el) => deviceNameOf(el) === ours);
