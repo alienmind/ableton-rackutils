@@ -66,13 +66,14 @@ editing, batch library operations - is out. See Parked.
 
 ## Next steps, in order
 
-1. **Fix rack-level bindings** (4.0). A shipped correctness bug that corrupts
-   any rack whose macro drives the chain selector.
-2. **VST dependency view** (4.1). Read-only, cheap, useful on its own.
-3. **The contract, one device end to end** (4.3). Utility Gain only, applied
-   across every chain. Prove the donor pipeline and the insertion hygiene on
-   the simplest possible case before building any options strip.
-4. **Offline** (4.5). Done.
+1. **The options strip UI** (4.3.1). The contract's codec side is built,
+   tested, and confirmed in Live. What is missing is the surface that drives
+   it: tick an option, see it land.
+2. **VST dependency view** (4.1). The resolution route is settled (SCHEMA.md
+   Q18): pick the plugin folder once, byte-search each `.vst3` for the class
+   id, cache the answer.
+3. **Editor open items** (4.4), cables on selection first.
+4. **Save in place** (4.6), then the device bundle (4.7).
 
 Use it on real racks throughout. Every bug this project has hit came from that,
 not from tests - including a UI whose every interaction was broken while its
@@ -316,9 +317,23 @@ It answers a question nothing else answers: will this rack load on this
 machine, and what does it drag in. Useful for a rack downloaded from elsewhere,
 and for an old rack of your own built on a plugin you have since removed.
 
-Needs one schema finding, since no recorded question covers plugin devices:
-save a rack containing one VST3 and one AU, unpack, record the element names in
-`SCHEMA.md`. Do not guess them from the names above.
+The schema is settled (SCHEMA.md Q17, Q18). A plugin is a `Vst3Preset`, a
+sibling wrapper of `AbletonDevicePreset` with no `Device` child, and it carries
+a `Uid` of four big-endian ints and NO plugin name.
+
+Resolving that to a name is a byte search, not a lookup:
+`showDirectoryPicker()` on the user's VST3 folder once, then stream each
+`.vst3` looking for the 16 bytes in both COM and plain order - Windows embeds
+the COM form, and the SDK is not COM-ordered everywhere. The filename is the
+answer, and the result is a `uid -> name` table worth caching in IndexedDB so
+the scan happens once rather than per rack.
+
+`moduleinfo.json` is the documented route and is not usable as the primary
+one: it is opt-in for vendors and there are zero of them on the maintainer's
+machine, where every `.vst3` is a bare DLL.
+
+A MISS is a useful answer. A class id no local plugin contains is a rack this
+machine cannot fully load, which is the question the view exists to answer.
 
 ### 4.2 Colour index mapping - CLOSED
 
@@ -340,8 +355,15 @@ materializes it: the device is added if absent, a macro is bound to the
 relevant parameter, named from a pattern, coloured, and placed in the slot the
 contract assigns it.
 
-Global settings sit alongside: the rack name (for example `BS`), written to the
-rack's name and used for the output filename.
+Global settings sit alongside: the rack name (for example `BS`), written to
+the rack's name and used for the output filename.
+
+**One code, everywhere.** That name reaches the rack, every macro the contract
+adds, and every device it inserts, so a rack is identifiable from any one of
+them. A device already in the chain keeps whatever its owner called it -
+renaming someone else's device is not this tool's job. Keep the code short:
+`BS GAIN` fits on a knob, a 21-character label wraps and grows the whole rack
+(SCHEMA.md Q19).
 
 **A piece already present is detected, not duplicated.** If the rack already
 ends in a Utility, the option shows as satisfied, coloured differently, and the
@@ -504,19 +526,23 @@ Two caveats it has to answer:
 - One export/import button, writing the convention as a JSON file, fixes both
   for about an hour of work. Build it with the storage, not after.
 
-#### 4.3.8 Build order within 4.3
+#### 4.3.8 Status: the codec half is done and confirmed in Live
 
-**One device end to end before any options strip UI.** Utility Gain: detect an
-existing `StereoGain` at the end of the chain, insert from donor if absent,
-bind `Gain`, name from pattern, colour, place in the contract's slot, run the
-loadable check, and load the result in Live.
+`applyContract` is built and tested, and its output has been loaded in Live on
+a real rack. Utility Gain and AutoFilter both land: a new device at the end of
+every chain, one macro driving all of them, the rack's own macros shifted
+right, and an existing device recognised and reused rather than duplicated.
 
-The strip is easy. The insertion is where this lives or dies, and that wants
-finding out on device one.
+Two things that only opening it in Live could have caught, both now fixed and
+recorded as SCHEMA.md Q19:
 
-Then Gate and Compressor (a device with no macro of its own in the Compressor's
-case, plus the sidechain switch), AutoFilter, and EQ Three last since it needs
-a donor and a tag established first.
+- `NumVisibleMacroControls` must be EVEN. An odd count loads and draws the
+  macro grid wrong, making the rack taller than a rack may be.
+- A macro label of 21 characters wraps onto a second line and takes the whole
+  rack's height with it. Hand-built racks here top out at 12.
+
+Still to do here: Gate and Compressor (both have donors; the sidechain source
+stays manual per 4.3.6), then EQ Three once a donor for it exists.
 
 ### 4.4 Editor open items
 
@@ -631,33 +657,36 @@ macOS runners bill roughly 10x Linux), and the exact output paths for the
 
 | Order | Work | Risk if skipped |
 |---|---|---|
-| 1 | 4.0 rack-level binding fix | Silent corruption on any rack with a chain-selector macro |
-| 2 | 4.1 VST dependency view | None, but it is the cheapest useful thing left |
-| 3 | 4.3 contract, Utility Gain only, plus the slot-shift mutation | The whole direction stays unproven |
-| 4 | 4.3 remaining devices | Contract covers one case only |
-| 5 | 4.4 editor open items | Feature gaps only |
-| 6 | 4.6 save in place | Current download flow works |
-| 7 | 4.7 device bundle | Site already delivers everything |
+| 1 | 4.3.1 the options strip UI | The contract has no surface to drive it |
+| 2 | 4.1 VST dependency view | None, but the route is settled and cheap |
+| 3 | 4.3 remaining devices | Contract covers two options only |
+| 4 | 4.4 editor open items | Feature gaps only |
+| 5 | 4.6 save in place | Current download flow works |
+| 6 | 4.7 device bundle | Site already delivers everything |
 
 ### Open risks
 
-1. **Bindings the codec cannot see** (4.0). Found once, on the rack's own
+1. **"Loads in Live" is not "looks like a rack."** Both Q19 faults produced a
+   valid file with working mappings that 122 passing tests could not see. Every
+   new device the contract learns to insert gets opened in Live before it
+   ships, not just tested.
+2. **Bindings the codec cannot see** (4.0, fixed). Found once, on the rack's own
    parameters. The rack device may carry other bindable parameters beyond
-   `ChainSelector`, so the fix should be verified against a rack that maps
-   several of them, not only `BS.adg`.
-2. **Insertion produces a rack that loads and behaves wrong** (4.3.4). The
+   `ChainSelector`, so it is worth re-checking against a rack that maps several
+   of them, not only `BS.adg`.
+3. **Insertion produces a rack that loads and behaves wrong** (4.3.4). The
    worst failure mode available. Mitigated only by the hygiene checklist and by
    loading every new device type in Live by hand.
-3. **Range inversion semantics (SCHEMA.md Q4).** The editor writes inverted
+4. **Range inversion semantics (SCHEMA.md Q4).** The editor writes inverted
    ranges and the only direct evidence that Live honours `Min > Max` is
    patchbay's Live 12.4.3 note. Confirm with our own diff.
-4. **The macro shift can have nowhere to go** (4.3.1). A rack using all 16
+5. **The macro shift can have nowhere to go** (4.3.1). A rack using all 16
    slots cannot take the contract's macros without being wrapped. `PD.adg` is
    exactly that case, so it will be hit immediately.
-5. **Live closes the gap.** The whole value proposition of Job 1 is that Live
+6. **Live closes the gap.** The whole value proposition of Job 1 is that Live
    cannot move a macro mapping. Its Macro Mappings panel is recent and sits
    directly adjacent. Worth rechecking on each Live release.
-6. **Asset paths in the bundled build (4.7).** The most likely device-side
+7. **Asset paths in the bundled build (4.7).** The most likely device-side
    failure is a blank window from absolute paths resolving against the
    filesystem root.
 

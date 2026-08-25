@@ -10,10 +10,11 @@
  * cheap answer anyone can do in Live in seconds, and it costs a menu dive on
  * Push to reach the knobs it hides.
  */
-import { child, childValue } from './dom';
+import { child, childValue, setChildValue } from './dom';
 import { MACRO_SLOTS, Rack, type ParamRef } from './model';
 import {
   bindParameter,
+  renameRack,
   insertDeviceInEveryChain,
   insertMacroSlots,
   renameMacro,
@@ -26,22 +27,35 @@ export interface ContractDevice {
   deviceTag: string;
   /** The device parameter the macro drives, e.g. `Gain`. A direct child of the device element. */
   parameter: string;
-  /** Macro name. `{name}` is replaced by the rack's name, so `{name} GAIN` becomes `BS GAIN`. */
+  /** Macro name. `{name}` is replaced by the contract's name, so `{name} GAIN` becomes `BS GAIN`. */
   namePattern: string;
+  /**
+   * Name written onto the inserted device itself, in every chain. Defaults to
+   * `namePattern`, so the device Live shows in the chain reads `BS GAIN` like
+   * the knob driving it. Not applied to a device that was already there.
+   */
+  deviceNamePattern?: string;
   /** `MacroColor.N`, a palette index (SCHEMA.md Q13). Omit to leave the slot's colour alone. */
   colorIndex?: number;
 }
 
 export interface ContractOptions {
   /**
-   * What `{name}` expands to. The rack's own name by default, which is usually
-   * WRONG for a macro label: a rack called "AlienMind Bass" produces
-   * "AlienMind Bass GAIN", 21 characters, and Live wraps a label that long onto
-   * a second line, making every macro cell taller and the rack taller with it.
-   * Pass the short track code the convention is built on - "BS" - which is what
-   * the UI's rack name field is for (doc/PLAN.md 4.3.1).
+   * What `{name}` expands to, and what the rack is renamed to.
+   *
+   * The rack's own name by default, which is usually WRONG for a macro label:
+   * a rack called "AlienMind Bass" produces "AlienMind Bass GAIN", 21
+   * characters, and Live wraps a label that long onto a second line, making
+   * every macro cell taller and the rack taller with it (SCHEMA.md Q19). Pass
+   * the short track code the convention is built on - "BS" - which is what the
+   * UI's rack name field is for (doc/PLAN.md 4.3.1).
+   *
+   * One code, everywhere: the rack, its macros and the devices the contract
+   * adds all read `BS`, so a rack is identifiable from any one of them.
    */
   name?: string;
+  /** Set false to leave the rack's own name alone and only use `name` for labels. */
+  renameTheRack?: boolean;
 }
 
 export interface ContractResult extends MutationResult {
@@ -77,6 +91,8 @@ export function applyContract(
   const name = options.name ?? rack.name;
   const slots: number[] = [];
 
+  if (options.name !== undefined && options.renameTheRack !== false) renameRack(rack, options.name);
+
   // Split into what is already on the rack and what has to be made room for,
   // before touching anything: the shift has to be sized once.
   const existing = new Map<number, number>(); // index into devices -> macro slot
@@ -103,7 +119,12 @@ export function applyContract(
       if (!inserted.ok) return { ok: false, warnings: [...warnings, ...inserted.warnings], slots: [] };
       warnings.push(...inserted.warnings);
 
-      for (const { path } of inserted.devices) {
+      const deviceName = macroNameFor(device.deviceNamePattern ?? device.namePattern, name);
+      for (const { path, reused } of inserted.devices) {
+        // A device that was already in the chain keeps whatever the user
+        // called it. Renaming someone else's device is not this tool's job.
+        if (!reused) nameDevice(rack, path, deviceName);
+
         const param = parameterRef(rack, path, device.parameter);
         if (!param) {
           warnings.push(`${device.deviceTag} has no "${device.parameter}" parameter to bind`);
@@ -155,4 +176,10 @@ function parameterRef(rack: Rack, devicePath: string, parameter: string): ParamR
     name: childValue(param, 'Name') ?? parameter,
     boundToMacro: null,
   };
+}
+
+/** Write the device's own title, the one Live shows on it in the chain. */
+function nameDevice(rack: Rack, devicePath: string, name: string): void {
+  const deviceEl = child(rack.resolveTarget(devicePath), 'Device')?.firstElementChild;
+  if (deviceEl) setChildValue(deviceEl, 'UserName', name);
 }

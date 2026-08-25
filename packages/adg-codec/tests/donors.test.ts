@@ -342,3 +342,50 @@ describe('the shape Live actually renders', () => {
   });
 });
 
+describe('one code, everywhere (doc/PLAN.md 4.3.1)', () => {
+  const FILTER = {
+    deviceTag: 'AutoFilter2',
+    parameter: 'Filter_Frequency',
+    namePattern: '{name} FILTER',
+  };
+
+  test('renames the rack, the macro and the inserted device to the same code', () => {
+    const rack = Rack.parse(load('BS.adg'));
+    applyContract(rack, [FILTER], { name: 'BS' });
+
+    const after = Rack.parse(rack.serialize());
+    expect(after.name).toBe('BS');
+    expect(after.macros[0].name).toBe('BS FILTER');
+    for (const chain of after.chains) {
+      expect(chain.devices[chain.devices.length - 1].name).toBe('BS FILTER');
+    }
+  });
+
+  test('leaves a device that was already there named as its owner called it', () => {
+    const rack = Rack.parse(load('BS.adg'));
+    const before = rack.chains.map((c) => c.devices[c.devices.length - 1].name);
+    // The Utility at the end of both chains is reused, not inserted.
+    applyContract(rack, [{ deviceTag: 'StereoGain', parameter: 'Gain', namePattern: '{name} GAIN' }], { name: 'BS' });
+
+    expect(Rack.parse(rack.serialize()).chains.map((c) => c.devices[c.devices.length - 1].name)).toEqual(before);
+  });
+
+  test('renameTheRack false keeps the rack name and still shortens the labels', () => {
+    const rack = Rack.parse(load('BS.adg'));
+    applyContract(rack, [FILTER], { name: 'BS', renameTheRack: false });
+
+    const after = Rack.parse(rack.serialize());
+    expect(after.name).toBe('AlienMind Bass');
+    expect(after.macros[0].name).toBe('BS FILTER');
+  });
+
+  test('a separate device name pattern overrides the macro one', () => {
+    const rack = Rack.parse(load('BS.adg'));
+    applyContract(rack, [{ ...FILTER, deviceNamePattern: '{name} AF' }], { name: 'BS' });
+
+    const after = Rack.parse(rack.serialize());
+    expect(after.macros[0].name).toBe('BS FILTER');
+    expect(after.chains[0].devices.at(-1)!.name).toBe('BS AF');
+  });
+});
+
