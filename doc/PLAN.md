@@ -66,13 +66,15 @@ editing, batch library operations - is out. See Parked.
 
 ## Next steps, in order
 
-1. **VST dependency view** (4.1). Read-only, cheap, useful on its own.
-2. **Confirm the colour index mapping** (4.2). Every colour convention rests on
+1. **Fix rack-level bindings** (4.0). A shipped correctness bug that corrupts
+   any rack whose macro drives the chain selector.
+2. **VST dependency view** (4.1). Read-only, cheap, useful on its own.
+3. **Confirm the colour index mapping** (4.2). Every colour convention rests on
    it, and the editor already writes colours today.
-3. **The contract, one device end to end** (4.3). Utility Gain only. Prove the
-   donor pipeline and the insertion hygiene on the simplest possible case
-   before building any options strip.
-4. **Offline** (4.5). The flight case is real and the PWA is a tenth of the
+4. **The contract, one device end to end** (4.3). Utility Gain only, applied
+   across every chain. Prove the donor pipeline and the insertion hygiene on
+   the simplest possible case before building any options strip.
+5. **Offline** (4.5). The flight case is real and the PWA is a tenth of the
    cost of the device.
 
 Use it on real racks throughout. Every bug this project has hit came from that,
@@ -267,6 +269,42 @@ routes, nothing that assumes a Node process at runtime.
 
 ## Part 4: Open work
 
+### 4.0 Fix: bindings on the rack's own parameters are invisible
+
+**A correctness bug in shipped code, found in `donors/BS.adg`. Do this first.**
+
+A macro can drive a parameter of the rack device itself, not only parameters of
+devices inside its chains. `BS.adg`'s macro 1 drives `ChainSelector`, whose
+`KeyMidi` sits as a sibling of `BranchPresets` rather than inside it. Full
+evidence in SCHEMA.md Q15.
+
+`collectMacroBindings()` scans inside `BranchPresets` only, so it never sees
+that binding, and `owningRackDevice()` cannot attribute it either. Every
+slot-changing mutation routes through both. On a rack like this one:
+
+- `moveMapping` moves nothing while permuting variation values as if it had.
+- `reorderMacro` and `swapMacros` leave the `ChainSelector` binding on the
+  vacated index, so the chain selector ends up driven by whichever macro lands
+  there.
+- `unbindMacro` clears nothing and resets the variation value.
+
+The editor offers all of these on macro 1 today.
+
+The fix has three parts:
+
+1. Scan for `KeyMidi` from the rack device element, not from `BranchPresets`.
+2. Establish ownership by walking up to the nearest group-device ancestor
+   (`InstrumentGroupDevice`, `AudioEffectGroupDevice`, `DrumGroupDevice`,
+   `MidiEffectGroupDevice`) instead of via `BranchPresets`. Correct for both
+   shapes, and still excludes a nested rack's own macros.
+3. Root `pathOf`/`resolveTarget` at the rack device rather than at
+   `BranchPresets`, since a path relative to `BranchPresets` cannot address the
+   rack's own parameters at all. This touches every stored path, but paths are
+   runtime-only and never persisted.
+
+Test against `BS.adg`: 19 `KeyMidi` elements, `NoteOrController` 0 through 8,
+and the codec must report bindings for all nine macros rather than eight.
+
 ### 4.1 VST dependency view
 
 **Build this first.** Read-only, no donors, no insertion, no ambiguity, useful
@@ -333,8 +371,8 @@ variation, so this is testable against a real rack from day one.
 
 **The shift can fail, and the donor proves it.** `PD.adg` already uses all 16
 slots. There is no room to insert anything, and `setMacroCount` cannot go past
-16 (Constraint 6). When the contract does not fit, the answer is the parent
-rack in 4.3.3, which brings a fresh 16.
+16 (Constraint 6). Running out is the one case that forces a parent rack, which
+4.3.3 treats as a last resort rather than a choice.
 
 #### 4.3.2 The options, as specified
 
@@ -362,31 +400,49 @@ not in patchbay's `donors/` or `racks/`. `Eq8` is EQ Eight, a different device.
 Save one from Live, drop it in `packages/adg-codec/donors/`, and record the tag
 before this option can exist.
 
-#### 4.3.3 Where the devices go
+#### 4.3.3 Where the devices go: in parallel, across every chain
 
-**Wrapping is a checkable option, not something the tool decides.**
+**One device per chain, one macro driving all of them. No parent rack.**
 
-Unwrapped: append the devices at the end of the chain and shift the rack's own
-macros right (4.3.1). Cheaper, no nesting level added, and it is what a
-single-chain rack usually wants.
+This is the behaviour that justifies the tool, and `donors/BS.adg` is the
+worked example. It has two parallel terminal chains, and:
 
-Wrapped: produce a **new parent rack** holding the original rack followed by
-the contract's devices. The contract's macros live on the parent, one level
-above the original rack's own, so they can never collide and the convention is
-always on the outermost rack.
+- `BS GAIN` (macro 5) drives `Gain` on a `StereoGain` at the end of **each**
+  chain.
+- `GATE ON/OFF` (macro 9) drives `On` on a `Gate` in **each** chain.
+- `ARP TOGGLE`, `ARP STEPS` and `ARP STYLE` each drive the same parameter of a
+  `MidiArpeggiator` in **each** chain.
 
-Wrapping is the answer, not merely an alternative, in two cases:
+So the rule is: insert the option's device at the end of every chain, then bind
+one macro to every instance. A macro driving several parameters at once is
+already normal in this codec - `Macro.bindings` is an array and every mutation
+operates on all of them - so the mechanism exists.
 
-- **Parallel chains.** Chains are parallel and a rack has no post-sum device
-  slot, so a Utility "at the end" of a multi-chain rack can only mean after the
-  sum, which is outside the rack.
-- **No room to shift.** `PD.adg` uses all 16 slots, and the contract cannot
-  insert into a full rack.
+Nothing about this needs the parameters to match. `LPF` (macro 3) drives
+`Filter_Frequency` on a `Drift` in one chain and `Freq` on an `Eq8` band in the
+other. One knob, one musical idea, whatever each chain needs to do to deliver
+it.
 
-The tool should say which case applies rather than silently choosing. The
-parent must match the rack it wraps: `InstrumentGroupDevice` around an
-instrument rack, `AudioEffectGroupDevice` around an effect rack. `PD.adg` is an
-instrument rack; patchbay carries `AudioEffectGroupDevice` in 25 files.
+**Why not a parent rack.** Wrapping is the cheap answer and anyone can do it by
+hand in Live in a few seconds, so a tool that does it adds nothing. It also
+costs real ergonomics: an extra layer forces a menu dive on Push to reach the
+knobs that are not mapped on the outer rack. Applying the same macro across
+parallel chains is the part that is tedious by hand and is exactly what this
+tool should do.
+
+**Wrapping stays as a last resort, not an option to pick.** The only case that
+forces it is running out of macro slots: the contract's macros go at the front
+(4.3.1) and a rack cannot exceed 16 (Constraint 6). `donors/PD.adg` is that
+case, with all 16 slots in use. When it happens the tool should say so and
+offer the wrap rather than performing it silently, and the parent must match
+what it wraps - `InstrumentGroupDevice` around an instrument rack,
+`AudioEffectGroupDevice` around an effect rack.
+
+**Open question this raises.** When a chain already has the device (a
+`StereoGain` at the end of chain 1 but not chain 2), the option is partially
+satisfied. Reuse the one that is there, insert into the chain that lacks it,
+and bind the macro to both. The UI should show partial satisfaction as its own
+state, distinct from present and absent.
 
 #### 4.3.4 Insertion hygiene, which is mandatory
 
@@ -575,31 +631,36 @@ macOS runners bill roughly 10x Linux), and the exact output paths for the
 
 | Order | Work | Risk if skipped |
 |---|---|---|
-| 1 | 4.1 VST dependency view | None, but it is the cheapest useful thing left |
-| 2 | 4.2 colour index confirmation | Wrong colours written to files |
-| 3 | 4.3 contract, Utility Gain only, plus the slot-shift mutation | The whole direction stays unproven |
-| 4 | 4.5 offline | No authoring on a flight |
-| 5 | 4.3 remaining devices | Contract covers one case only |
-| 6 | 4.4 editor open items | Feature gaps only |
-| 7 | 4.6 save in place | Current download flow works |
-| 8 | 4.7 device bundle | Site already delivers everything |
+| 1 | 4.0 rack-level binding fix | Silent corruption on any rack with a chain-selector macro |
+| 2 | 4.1 VST dependency view | None, but it is the cheapest useful thing left |
+| 3 | 4.2 colour index confirmation | Wrong colours written to files |
+| 4 | 4.3 contract, Utility Gain only, plus the slot-shift mutation | The whole direction stays unproven |
+| 5 | 4.5 offline | No authoring on a flight |
+| 6 | 4.3 remaining devices | Contract covers one case only |
+| 7 | 4.4 editor open items | Feature gaps only |
+| 8 | 4.6 save in place | Current download flow works |
+| 9 | 4.7 device bundle | Site already delivers everything |
 
 ### Open risks
 
-1. **Insertion produces a rack that loads and behaves wrong** (4.3.4). The
+1. **Bindings the codec cannot see** (4.0). Found once, on the rack's own
+   parameters. The rack device may carry other bindable parameters beyond
+   `ChainSelector`, so the fix should be verified against a rack that maps
+   several of them, not only `BS.adg`.
+2. **Insertion produces a rack that loads and behaves wrong** (4.3.4). The
    worst failure mode available. Mitigated only by the hygiene checklist and by
    loading every new device type in Live by hand.
-2. **Colour index order (4.2).** Unverified, and the contract assigns colours.
-3. **Range inversion semantics (SCHEMA.md Q4).** The editor writes inverted
+3. **Colour index order (4.2).** Unverified, and the contract assigns colours.
+4. **Range inversion semantics (SCHEMA.md Q4).** The editor writes inverted
    ranges and the only direct evidence that Live honours `Min > Max` is
    patchbay's Live 12.4.3 note. Confirm with our own diff.
-4. **The macro shift can have nowhere to go** (4.3.1). A rack using all 16
+5. **The macro shift can have nowhere to go** (4.3.1). A rack using all 16
    slots cannot take the contract's macros without being wrapped. `PD.adg` is
    exactly that case, so it will be hit immediately.
-5. **Live closes the gap.** The whole value proposition of Job 1 is that Live
+6. **Live closes the gap.** The whole value proposition of Job 1 is that Live
    cannot move a macro mapping. Its Macro Mappings panel is recent and sits
    directly adjacent. Worth rechecking on each Live release.
-6. **Asset paths in the bundled build (4.7).** The most likely device-side
+7. **Asset paths in the bundled build (4.7).** The most likely device-side
    failure is a blank window from absolute paths resolving against the
    filesystem root.
 

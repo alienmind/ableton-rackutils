@@ -585,3 +585,78 @@ preset save.
 its sidechain on, and bind a macro to it. It may NOT set the source, and the UI
 must not imply the routing came across. That stays one manual step per Set.
 
+---
+
+## Q15. A macro can drive the rack's OWN parameters, not only its chains'
+
+Found by running `pnpm adg-tool mappings` on `donors/BS.adg` and noticing that
+macro 1, which the author says drives the chain selector, was missing from the
+output while macros 2 to 9 were listed.
+
+**Answer: the rack device carries bindable parameters of its own, and
+`ChainSelector` is one.** Macro 1's `KeyMidi` sits directly on it:
+
+```
+macro 1  <- ChainSelector < InstrumentGroupDevice < Device < GroupDevicePreset
+macro 5  <- Gain < StereoGain < Device < AbletonDevicePreset < DevicePresets
+```
+
+The second line is the shape every previously recorded binding has: down inside
+`BranchPresets`, on a device in a chain. The first is a sibling of
+`BranchPresets`, one level up.
+
+**This breaks two assumptions the codec was built on.**
+
+1. `collectMacroBindings()` scans `branchPresetsEl.getElementsByTagName(
+   'KeyMidi')`, so a binding on the rack's own parameter is never seen. In
+   `BS.adg` the file holds 19 `KeyMidi` elements with `NoteOrController` 0
+   through 8, and the codec reports bindings for 1 through 8 only.
+2. `owningRackDevice()` establishes ownership by walking up to the nearest
+   `BranchPresets` and taking that element's parent's `Device` child. A KeyMidi
+   on the rack's own parameter has no `BranchPresets` ancestor within its rack,
+   so the walk runs past it and returns null.
+
+Ownership is better established by walking up to the nearest ancestor whose tag
+is a group device (`InstrumentGroupDevice`, `AudioEffectGroupDevice`,
+`DrumGroupDevice`, `MidiEffectGroupDevice`). That answer is correct for both
+shapes and still excludes a nested rack's own macros, which is what the
+BranchPresets walk was for.
+
+**Consequence, which is a silent corruption bug.** Every slot-changing mutation
+routes through `collectMacroBindings()`. On a rack whose macro drives the chain
+selector, `moveMapping` moves nothing while permuting variation values as if it
+had, and `reorderMacro`/`swapMacros` leave the `ChainSelector` KeyMidi pointing
+at the vacated index, so the chain selector ends up driven by whichever macro
+lands there. `unbindMacro` clears nothing and resets the variation value.
+
+A path fix is needed alongside: `pathOf`/`resolveTarget` are rooted at
+`BranchPresets`, which cannot address the rack's own parameters at all.
+
+Third time this pattern has held. Q11 was the same lesson: the synthetic
+fixture modelled only the shape the codec already assumed.
+
+## Q13 data points, not yet an answer
+
+`donors/BS.adg` carries hand-picked macro colours, reported by its author as:
+macro 1 white, macro 5 grey, macro 9 grey. The stored values are:
+
+| Macro | Name | `MacroColor.N` | Author says |
+|---|---|---|---|
+| 1 | BS SELECT | 13 | white |
+| 2 | Dist | 9 | - |
+| 3 | LPF | 3 | - |
+| 4 | Pluck / Long | 0 | - |
+| 5 | BS GAIN | 69 | grey |
+| 6-8 | ARP * | 39 | - |
+| 9 | GATE ON/OFF | -1 | grey |
+
+**`-1` means no colour set.** Macro 9 reads grey in Live while storing -1, so
+the default rendering is grey and -1 is not an index into the palette.
+`macroColor()` already falls through to a neutral for it, which is right by
+accident rather than by design.
+
+Not enough to settle Q13: it needs the swatch POSITIONS the author clicked, not
+the colour names, since the question is whether grid position equals stored
+index. But 69 being the highest index in a 70-colour palette and reading grey is
+consistent with the greys sitting at the end of Live's picker.
+

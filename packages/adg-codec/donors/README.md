@@ -40,12 +40,39 @@ Two things it establishes beyond the tags:
   survives the save, the source does not. This file is the evidence for
   SCHEMA.md Q14.
 
-It also happens to be the case that forces the wrap option: all 16 macro slots
-are already in use, so there is no room to shift the contract's macros in
-without a parent rack.
+It is also the case that forces a parent rack: all 16 macro slots are in use,
+so there is no room to shift the contract's macros in. See `doc/PLAN.md` 4.3.3,
+where wrapping is a last resort rather than a choice.
 
 ## Adding a device the contract can insert
 
 Put it in a rack in Live, save, drop the file here, and record what it yields
 in the table above. One harvest source with many devices is fine; what matters
 is that every insertable device traces to a file in this directory.
+
+## `BS.adg`
+
+An instrument rack with **two parallel terminal chains**, and the reference case
+for how the contract applies (`doc/PLAN.md` 4.3.3): one device per chain, one
+macro driving every instance.
+
+| Macro | Name | Drives |
+|---|---|---|
+| 1 | BS SELECT | the rack's own `ChainSelector` |
+| 2 | Dist | `Output_DryWet` on a `Roar` in each chain |
+| 3 | LPF | `Filter_Frequency` on a `Drift`, and `Freq` on an `Eq8` band |
+| 4 | Pluck / Long | four envelope sustains across `Drift` and `InstrumentMeld` |
+| 5 | BS GAIN | `Gain` on a `StereoGain` in each chain |
+| 6-8 | ARP * | `On`, `TransposeSteps`, `Mode` on a `MidiArpeggiator` in each chain |
+| 9 | GATE ON/OFF | `On` on a `Gate` in each chain |
+
+Two findings came out of it:
+
+- **A macro can drive the rack's own parameters** (SCHEMA.md Q15). Macro 1's
+  binding sits on `ChainSelector`, a sibling of `BranchPresets`, where the
+  codec was not looking. That is a correctness bug, `doc/PLAN.md` 4.0.
+- **Targets need not match across chains.** Macro 3 drives a different
+  parameter of a different device in each chain. One knob, one musical idea.
+
+Also carries hand-picked macro colours, which are Q13 data points.
+
