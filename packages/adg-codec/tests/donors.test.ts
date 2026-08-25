@@ -275,3 +275,43 @@ describe('applyContract on BS.adg (doc/PLAN.md 4.3)', () => {
     expect(result.warnings[0]).toContain('no room');
   });
 });
+
+describe('BS-VST3.adg - a plugin in a chain (SCHEMA.md Q17)', () => {
+  test('the plugin is visible as a device, with no bindable parameters', () => {
+    const rack = Rack.parse(load('BS-VST3.adg'));
+    const plugin = rack.chains[2].devices.find((d) => d.type === 'Vst3Preset');
+    expect(plugin).toBeDefined();
+    // A Vst3Preset has no Device child and exposes no MidiControllerRange, so
+    // there is nothing the editor may offer as a drop target.
+    expect(plugin!.parameters).toHaveLength(0);
+  });
+
+  test('the plugin chain still round-trips, 77KB of opaque state included', () => {
+    const rack = Rack.parse(load('BS-VST3.adg'));
+    const before = rack.chains.map((c) => c.devices.map((d) => d.type));
+    expect(Rack.parse(rack.serialize()).chains.map((c) => c.devices.map((d) => d.type))).toEqual(before);
+  });
+
+  test('a contract macro reaches all THREE chains, plugin chain included', () => {
+    const rack = Rack.parse(load('BS-VST3.adg'));
+    expect(rack.chains).toHaveLength(3);
+    const result = applyContract(rack, [
+      { deviceTag: 'AutoFilter2', parameter: 'Filter_Frequency', namePattern: '{name} FILTER' },
+    ]);
+
+    expect(result.ok).toBe(true);
+    const macro = Rack.parse(rack.serialize()).macros[0];
+    expect(macro.bindings).toHaveLength(3);
+  });
+
+  test('the existing gain convention is recognised across three chains', () => {
+    const rack = Rack.parse(load('BS-VST3.adg'));
+    const result = applyContract(rack, [
+      { deviceTag: 'StereoGain', parameter: 'Gain', namePattern: '{name} GAIN' },
+    ]);
+    // Satisfied means one macro drives it on EVERY chain, so adding a chain
+    // must not quietly downgrade the match.
+    expect(result.slots).toEqual([4]);
+  });
+});
+
