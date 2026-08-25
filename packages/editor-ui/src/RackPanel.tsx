@@ -17,7 +17,8 @@ import { macroColor } from './macroColors';
 import { VariationsPanel } from './VariationsPanel';
 import { MacroBank } from './MacroBank';
 import { RackHeader } from './RackHeader';
-import { samePath, useEditor, type RackPath } from './context';
+import { resolveRackPath, samePath, useEditor, type RackPath } from './context';
+import { mapKey } from './MappingCables';
 import { useParentToggle } from './useParentToggle';
 
 export interface RackPanelProps {
@@ -57,7 +58,7 @@ export function RackPanel({ rack, rackPath, depth, collapsible, forceCollapsed }
   const [showVariations, setShowVariations] = useState(false);
   const [showChains, setShowChains] = useState(true);
   const [devicesCollapsed, setDevicesCollapsed] = useState(false);
-  const { armed, arm, apply, liveValues, history } = useEditor();
+  const { root, mapping, setMapping, armed, arm, apply, liveValues, history, startParamDrag } = useEditor();
 
   const macroColors = rack.macros.map((m) => macroColor(m.color));
   const isDrumRack = rack.deviceEl.tagName === 'DrumGroupDevice';
@@ -69,6 +70,37 @@ export function RackPanel({ rack, rackPath, depth, collapsible, forceCollapsed }
   // (SCHEMA.md Q2), so applying them at depth would show one rack's knob
   // positions on another's.
   const showLive = depth === 0 ? liveValues : undefined;
+
+  /**
+   * This rack's knobs as mapping sources, addressed from the rack ABOVE it.
+   *
+   * A macro of a nested rack is a parameter of that rack's device, so the
+   * parent's macro drives it through a `KeyMidi` on the child's own
+   * `MacroControls.N` (SCHEMA.md Q22). The path therefore has to be taken
+   * against the parent, and the root rack has no parent to be mapped from.
+   */
+  const parentRack = rackPath.length > 0 ? resolveRackPath(root, rackPath.slice(0, -1)) : null;
+  const macroElement = (index: number) =>
+    Array.from(rack.deviceEl.children).find((c) => c.tagName === `MacroControls.${index}`) ?? null;
+  // How the parent addresses each of these knobs, for the cable layer and for
+  // nothing else. Null on the root, which no rack maps.
+  const parentKeys = parentRack
+    ? rack.macros.map((m) => {
+        const el = macroElement(m.index);
+        return el ? mapKey(rackPath.slice(0, -1), parentRack.pathOf(el)) : null;
+      })
+    : undefined;
+  const dragMacroAsSource = (index: number, e: React.PointerEvent) => {
+    if (!parentRack) return;
+    const el = macroElement(index);
+    if (!el) return;
+    const macro = rack.macros[index];
+    startParamDrag(
+      { path: parentRack.pathOf(el), name: macro.name, boundToMacro: null },
+      rackPath.slice(0, -1),
+      e,
+    );
+  };
 
   const bindHere = (macroIndex: number) => {
     if (!armed) return;
@@ -119,6 +151,7 @@ export function RackPanel({ rack, rackPath, depth, collapsible, forceCollapsed }
         onToggle={() => setOpen((o) => !o)}
         onRename={(name) => apply(rackPath, (r) => renameRack(r, name))}
         history={depth === 0 ? history : undefined}
+        mapping={depth === 0 ? { on: mapping, toggle: () => setMapping(!mapping) } : undefined}
       />
 
       <div className="rack-body">
@@ -143,6 +176,9 @@ export function RackPanel({ rack, rackPath, depth, collapsible, forceCollapsed }
           macroCount={rack.macroCount}
           armed={armed !== null && samePath(armed.rackPath, rackPath)}
           rackPath={rackPath}
+          mapping={mapping}
+          onMapSource={parentRack ? dragMacroAsSource : undefined}
+          parentKeys={parentKeys}
           liveValues={showLive}
           onReorder={(from, to) => apply(rackPath, (r) => reorderMacro(r, from, to))}
           onSwap={(a, b) => apply(rackPath, (r) => swapMacros(r, a, b))}

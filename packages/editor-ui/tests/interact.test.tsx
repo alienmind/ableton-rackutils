@@ -46,6 +46,9 @@ const click = (el: Element) => act(() => el.dispatchEvent(new MouseEvent('click'
 /** Devices render collapsed to a title strip; open the first one to reach its parameters. */
 const openFirstDevice = () => click(container.querySelector('.device-panel.collapsed .device-title-strip')!);
 
+/** Binding is modal: nothing on a parameter does anything until Map is on (`context.tsx`). */
+const turnMapOn = () => click(container.querySelector('.map-button')!);
+
 /**
  * Pointer drag, the way `useMacroDrag` implements it: press on a knob's dial,
  * move, release over another knob. The drop target is resolved with
@@ -114,6 +117,7 @@ describe('clicking things', () => {
 
   test('arming a parameter then clicking a knob binds it', () => {
     // ParamB is unmapped, so it lives behind "more" until that is expanded.
+    turnMapOn();
     openFirstDevice();
     click(container.querySelector('.more-toggle')!);
     const paramB = [...container.querySelectorAll('.param')].find((p) => p.textContent === 'ParamB');
@@ -140,6 +144,7 @@ describe('dragging a parameter onto a knob', () => {
   }
 
   test('binds it, without needing the arm step', () => {
+    turnMapOn();
     openFirstDevice();
     click(container.querySelector('.more-toggle')!);
     const paramB = [...container.querySelectorAll('.param')].find((p) => p.textContent === 'ParamB')!;
@@ -150,6 +155,7 @@ describe('dragging a parameter onto a knob', () => {
   test('a drag does not also arm the parameter it started from', () => {
     // Both gestures start with a press on the same button, so the click
     // handler has to tell them apart or every drag would leave something armed.
+    turnMapOn();
     openFirstDevice();
     click(container.querySelector('.more-toggle')!);
     const paramB = [...container.querySelectorAll('.param')].find((p) => p.textContent === 'ParamB')!;
@@ -160,6 +166,7 @@ describe('dragging a parameter onto a knob', () => {
   test('refuses a drop onto another rack knob (SCHEMA.md Q2)', () => {
     // The nested rack's knobs carry a different data-rack-path. A KeyMidi
     // belongs to the nearest enclosing rack, so this mapping cannot exist.
+    turnMapOn();
     openFirstDevice();
     click(container.querySelector('.more-toggle')!);
     const paramB = [...container.querySelectorAll('.param')].find((p) => p.textContent === 'ParamB')!;
@@ -185,5 +192,54 @@ describe('chain colours (SCHEMA.md Q13)', () => {
   test('a chain with a colour index gets a stripe', () => {
     const row = container.querySelector('.chain-row') as HTMLElement;
     expect(row.style.getPropertyValue('--chain-color')).toMatch(/^#/);
+  });
+});
+
+describe('Map mode (doc/PLAN.md 4.4)', () => {
+  test('a parameter drag does nothing until Map is on', () => {
+    openFirstDevice();
+    click(container.querySelector('.more-toggle')!);
+    const paramB = [...container.querySelectorAll('.param')].find((p) => p.textContent === 'ParamB')!;
+
+    const knob = container.querySelectorAll('.macro-knob')[4];
+    const original = document.elementFromPoint;
+    document.elementFromPoint = () => knob;
+    try {
+      act(() => paramB.dispatchEvent(Object.assign(new Event('pointerdown', { bubbles: true }), { button: 0, clientX: 0, clientY: 0 })));
+      act(() => window.dispatchEvent(Object.assign(new Event('pointerup'), { clientX: 60, clientY: 0 })));
+    } finally {
+      document.elementFromPoint = original;
+    }
+    expect(rack.macros[4].bindings).toHaveLength(0);
+  });
+
+  test('a knob drag maps a nested rack macro onto the parent instead of moving it', () => {
+    turnMapOn();
+    click(container.querySelector('.rack-panel.collapsed .rack-strip')!);
+    const nestedDial = container.querySelector('.macro-bank-wrap[data-rack-path]:not([data-rack-path=""]) .macro-knob-dial')!;
+    const outerKnob = container.querySelectorAll('.macro-bank-wrap[data-rack-path=""] .macro-knob')[5];
+
+    const original = document.elementFromPoint;
+    document.elementFromPoint = () => outerKnob;
+    try {
+      act(() => nestedDial.dispatchEvent(Object.assign(new Event('pointerdown', { bubbles: true }), { button: 0, clientX: 0, clientY: 0 })));
+      act(() => window.dispatchEvent(Object.assign(new Event('pointermove'), { clientX: 60, clientY: 0 })));
+      act(() => window.dispatchEvent(Object.assign(new Event('pointerup'), { clientX: 60, clientY: 0 })));
+    } finally {
+      document.elementFromPoint = original;
+    }
+
+    // The parent now drives the child's macro 1, and the child keeps its own
+    // mapping: this is a binding on MacroControls.0, not a macro move
+    // (SCHEMA.md Q22).
+    // The target reads as the child knob's own label, not as MacroControls.0.
+    expect(rack.macros[5].bindings.map((b) => b.targetName)).toEqual(['Macro 1']);
+  });
+
+  test('leaving Map mode takes the cables away', () => {
+    turnMapOn();
+    expect(container.querySelector('.map-button')!.textContent).toBe('Unmap');
+    turnMapOn();
+    expect(container.querySelector('.map-button')!.textContent).toBe('Map');
   });
 });

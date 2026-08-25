@@ -11,6 +11,8 @@ export interface RackHeaderProps {
   onRename: (name: string) => void;
   /** Undo/redo, on the ROOT rack's bar only - the history is global (see `context.tsx`). */
   history?: { canUndo: boolean; canRedo: boolean; undo: () => void; redo: () => void };
+  /** Map mode, on the ROOT rack's bar only, where Live puts its own Map button. One mode for the whole tree. */
+  mapping?: { on: boolean; toggle: () => void };
 }
 
 /**
@@ -21,7 +23,7 @@ export interface RackHeaderProps {
  * two buttons sit in the rack's left-hand column where Live puts them, and one
  * control in two places is one too many.
  */
-export function RackHeader({ name, kind, depth, collapsible, open, onToggle, onRename, history }: RackHeaderProps) {
+export function RackHeader({ name, kind, depth, collapsible, open, onToggle, onRename, history, mapping }: RackHeaderProps) {
   const [editing, setEditing] = useState(false);
 
   return (
@@ -51,6 +53,17 @@ export function RackHeader({ name, kind, depth, collapsible, open, onToggle, onR
         </h3>
       )}
       <span className="rack-kind">{kind}</span>
+
+      {mapping && (
+        <button
+          type="button"
+          className={mapping.on ? 'map-button on' : 'map-button'}
+          onClick={mapping.toggle}
+          title={mapping.on ? 'Leave Map mode' : 'Map a parameter or a nested rack macro onto a knob'}
+        >
+          {mapping.on ? 'Unmap' : 'Map'}
+        </button>
+      )}
 
       {history && (
         <div className="history-buttons">

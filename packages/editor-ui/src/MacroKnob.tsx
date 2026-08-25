@@ -3,6 +3,7 @@ import type { Macro } from '@rackutils/adg-codec';
 import { arcPath, KNOB_MAX_DEG, KNOB_MIN_DEG, valueToDegrees } from './arc';
 import { ColorPicker } from './ColorPicker';
 import { macroColor } from './macroColors';
+import { macroLabel } from './mappings';
 
 export interface MacroKnobProps {
   macro: Macro;
@@ -16,6 +17,10 @@ export interface MacroKnobProps {
   dropSwaps: boolean;
   /** A parameter is being dragged and would bind here if dropped. */
   bindTarget: boolean;
+  /** Map mode, and this knob can be dragged onto a knob of the rack above it (SCHEMA.md Q22). */
+  mapSource?: boolean;
+  /** Where a cable can find this knob: its own address, plus the one its parent addresses it by. Space separated (see `MappingCables`). */
+  mapKeys: string;
   onDragStart: (e: React.PointerEvent) => void;
   onClick: () => void;
   onRename: (name: string) => void;
@@ -35,7 +40,7 @@ export interface MacroKnobProps {
  * below carries the full list, and the unbind control with it.
  */
 export function MacroKnob(props: MacroKnobProps) {
-  const { macro, liveValue, armed, hidden, dragging, dropTarget, dropSwaps, bindTarget } = props;
+  const { macro, liveValue, armed, hidden, dragging, dropTarget, dropSwaps, bindTarget, mapSource, mapKeys } = props;
   const { onDragStart, onClick, onRename, onRecolor } = props;
   const [editing, setEditing] = useState(false);
   const [picking, setPicking] = useState<DOMRect | null>(null);
@@ -43,8 +48,14 @@ export function MacroKnob(props: MacroKnobProps) {
   const mapped = macro.bindings.length > 0;
   const color = macroColor(macro.color);
   const angle = valueToDegrees(macro.value);
+  // Live labels a macro nobody has named after the thing it drives, which is
+  // what makes a rack of racks readable: the parent's knob reads KICK SEL
+  // because that is the child macro at the other end (SCHEMA.md Q23).
+  const label = macroLabel(macro);
+  const derived = label !== macro.name;
 
   const classes = ['macro-knob', mapped ? 'mapped' : 'unmapped'];
+  if (mapSource) classes.push('map-source');
   if (armed) classes.push('bindable');
   if (hidden) classes.push('hidden-slot');
   if (dragging) classes.push('dragging');
@@ -52,8 +63,19 @@ export function MacroKnob(props: MacroKnobProps) {
   if (bindTarget) classes.push('bind-target');
 
   return (
-    <div className={classes.join(' ')} data-macro-index={macro.index} style={{ '--macro-color': color } as React.CSSProperties}>
-      <div className="macro-knob-dial" onPointerDown={onDragStart} onClick={onClick} title={armed ? `Bind the armed parameter here` : 'Drag to move, Shift-drag to swap'}>
+    <div className={classes.join(' ')} data-macro-index={macro.index} data-map-key={mapKeys} style={{ '--macro-color': color } as React.CSSProperties}>
+      <div
+        className="macro-knob-dial"
+        onPointerDown={onDragStart}
+        onClick={onClick}
+        title={
+          armed
+            ? 'Bind the armed parameter here'
+            : mapSource
+              ? "Drag onto a knob of the rack above to have it drive this macro"
+              : 'Drag to move, Shift-drag to swap'
+        }
+      >
         <svg viewBox="0 0 64 64" aria-hidden="true">
           <circle className="knob-body" cx="32" cy="32" r="19" />
           <path className="knob-track" d={arcPath(32, 32, 25, KNOB_MIN_DEG, KNOB_MAX_DEG)} />
@@ -75,7 +97,7 @@ export function MacroKnob(props: MacroKnobProps) {
         <input
           className="macro-knob-name-input"
           autoFocus
-          defaultValue={macro.name}
+          defaultValue={label}
           onBlur={(e) => {
             onRename(e.target.value);
             setEditing(false);
@@ -86,8 +108,12 @@ export function MacroKnob(props: MacroKnobProps) {
           }}
         />
       ) : (
-        <span className="macro-knob-name" onDoubleClick={() => setEditing(true)} title={`${macro.name} - double-click to rename`}>
-          {macro.name}
+        <span
+          className={derived ? 'macro-knob-name derived' : 'macro-knob-name'}
+          onDoubleClick={() => setEditing(true)}
+          title={derived ? `${label} - named after what it drives; double-click to give it a name` : `${macro.name} - double-click to rename`}
+        >
+          {label}
         </span>
       )}
 

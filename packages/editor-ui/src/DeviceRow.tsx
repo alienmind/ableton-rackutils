@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import type { DeviceNode, ParamRef } from '@rackutils/adg-codec';
 import { samePath, useEditor, type RackPath } from './context';
+import { mapKey } from './MappingCables';
 import { useParentToggle } from './useParentToggle';
 
 export interface DeviceRowProps {
@@ -35,7 +36,7 @@ export function DeviceRow({ device, rackPath, macroColors, collapsed: collapsedF
   // collapse-all button still drives this, but only when it changes.
   const [collapsed, setCollapsed] = useParentToggle(true, collapsedFromRack);
   const [showMore, setShowMore] = useState(false);
-  const { armed, arm, startParamDrag } = useEditor();
+  const { armed, arm, mapping, startParamDrag } = useEditor();
   // Where the pointer went down on a parameter. A press that does not move is
   // a click (arm it); a press that moves is a drag onto a knob (bind it). The
   // two gestures share a starting point, so the click handler has to know
@@ -48,6 +49,8 @@ export function DeviceRow({ device, rackPath, macroColors, collapsed: collapsedF
 
   const mapped = device.parameters.filter((p) => p.boundToMacro !== null);
   const unmapped = device.parameters.filter((p) => p.boundToMacro === null);
+
+  const paramClass = (p: ParamRef) => `param${isArmed(p) ? ' armed' : ''}${mapping ? ' mappable' : ''}`;
 
   const isArmed = (p: ParamRef) => armed !== null && armed.param.path === p.path && samePath(armed.rackPath, rackPath);
   const toggleArm = (p: ParamRef) => arm(isArmed(p) ? null : { rackPath, param: p });
@@ -80,13 +83,14 @@ export function DeviceRow({ device, rackPath, macroColors, collapsed: collapsedF
               <li key={p.path} style={mappedColor(p)}>
                 <button
                   type="button"
-                  className={isArmed(p) ? 'param armed' : 'param'}
+                  className={paramClass(p)}
+                  data-map-key={mapKey(rackPath, p.path)}
                   onPointerDown={(e) => {
                     pressedAt.current = { x: e.clientX, y: e.clientY };
-                    startParamDrag(p, rackPath, e);
+                    if (mapping) startParamDrag(p, rackPath, e);
                   }}
-                  onClick={(e) => wasClick(e) && toggleArm(p)}
-                  title={`${p.name} - drag onto a macro knob to bind, or click to arm`}
+                  onClick={(e) => mapping && wasClick(e) && toggleArm(p)}
+                  title={mapTitle(p.name, mapping)}
                 >
                   {p.name}
                 </button>
@@ -107,13 +111,14 @@ export function DeviceRow({ device, rackPath, macroColors, collapsed: collapsedF
                   <li key={p.path}>
                     <button
                       type="button"
-                      className={isArmed(p) ? 'param armed' : 'param'}
+                      className={paramClass(p)}
+                      data-map-key={mapKey(rackPath, p.path)}
                       onPointerDown={(e) => {
                         pressedAt.current = { x: e.clientX, y: e.clientY };
-                        startParamDrag(p, rackPath, e);
+                        if (mapping) startParamDrag(p, rackPath, e);
                       }}
-                      onClick={(e) => wasClick(e) && toggleArm(p)}
-                      title={`${p.name} - drag onto a macro knob to bind, or click to arm`}
+                      onClick={(e) => mapping && wasClick(e) && toggleArm(p)}
+                      title={mapTitle(p.name, mapping)}
                     >
                       {p.name}
                     </button>
@@ -128,4 +133,12 @@ export function DeviceRow({ device, rackPath, macroColors, collapsed: collapsedF
       </div>
     </div>
   );
+}
+
+/**
+ * Binding is modal (`context.tsx`): outside Map mode a parameter is something
+ * to read, and saying so beats a control that looks draggable and is not.
+ */
+function mapTitle(name: string, mapping: boolean): string {
+  return mapping ? `${name} - drag onto a macro knob to bind, or click to arm` : `${name} - turn on Map to bind it`;
 }

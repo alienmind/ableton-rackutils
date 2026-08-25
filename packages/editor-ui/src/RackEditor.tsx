@@ -4,6 +4,7 @@ import { RackPanel } from './RackPanel';
 import { EditorProvider, resolveRackPath, type ArmedParam, type RackPath } from './context';
 import { MappingTable } from './MappingTable';
 import { PatchCable } from './PatchCable';
+import { MappingCables } from './MappingCables';
 import { useParamDrag } from './useParamDrag';
 
 export interface RackEditorProps {
@@ -28,6 +29,14 @@ export function RackEditor({ rack, onChange, liveValues }: RackEditorProps) {
   const [redo, setRedo] = useState<Rack[]>([]);
   const [armed, setArmed] = useState<ArmedParam | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [mapping, setMappingState] = useState(false);
+
+  // Leaving Map mode drops whatever was armed: an armed parameter waiting for
+  // a knob that can no longer take it is a mode with no way out of it.
+  const setMapping = useCallback((on: boolean) => {
+    setMappingState(on);
+    if (!on) setArmed(null);
+  }, []);
 
   const apply = useCallback(
     (rackPath: RackPath, fn: (target: Rack) => MutationResult) => {
@@ -90,8 +99,8 @@ export function RackEditor({ rack, onChange, liveValues }: RackEditorProps) {
   );
 
   const context = useMemo(
-    () => ({ armed, arm: setArmed, apply, liveValues, paramDrag, startParamDrag, history }),
-    [armed, apply, liveValues, paramDrag, startParamDrag, history],
+    () => ({ root: rack!, mapping, setMapping, armed, arm: setArmed, apply, liveValues, paramDrag, startParamDrag, history }),
+    [rack, mapping, setMapping, armed, apply, liveValues, paramDrag, startParamDrag, history],
   );
 
   if (!rack) return null;
@@ -100,6 +109,12 @@ export function RackEditor({ rack, onChange, liveValues }: RackEditorProps) {
     <EditorProvider value={context}>
       <div className="rack-editor">
         <div className="editor-toolbar">
+          {mapping && !armed && (
+            <span className="mapping-note">
+              Map mode - drag any parameter, or a nested rack's knob, onto a macro knob. Moving macros
+              around is off until you leave it.
+            </span>
+          )}
           {armed && (
             <span className="armed-note">
               <strong>{armed.param.name}</strong> armed - click a macro knob in the same rack to bind it
@@ -125,6 +140,7 @@ export function RackEditor({ rack, onChange, liveValues }: RackEditorProps) {
         </div>
         <MappingTable rack={rack} />
 
+        <MappingCables rack={rack} active={mapping} />
         <PatchCable drag={paramDrag} echo={cableEcho} onEchoDone={clearCableEcho} />
       </div>
     </EditorProvider>

@@ -1,6 +1,7 @@
 import type { Macro } from '@rackutils/adg-codec';
 import { MacroKnob } from './MacroKnob';
 import { useEditor, type RackPath } from './context';
+import { macroKey } from './MappingCables';
 import { useMacroDrag } from './useMacroDrag';
 
 export interface MacroBankProps {
@@ -11,6 +12,16 @@ export interface MacroBankProps {
   /** Identifies which rack these knobs belong to, so a parameter dragged from another rack can be refused (SCHEMA.md Q2). */
   rackPath: RackPath;
   liveValues?: Record<number, number>;
+  /** Map mode: knobs stop being draggable macros and become mapping sources. */
+  mapping: boolean;
+  /** Start a mapping drag from this rack's knob, addressed from the parent (SCHEMA.md Q22). Absent on the root rack, which has no parent to map from. */
+  onMapSource?: (index: number, e: React.PointerEvent) => void;
+  /**
+   * How the rack ABOVE addresses each of these knobs - its `MacroControls.N`
+   * path taken against the parent. That is the far end of a parent's cable, so
+   * the knob has to answer to it as well as to its own address.
+   */
+  parentKeys?: readonly (string | null)[];
   onReorder: (from: number, to: number) => void;
   onSwap: (a: number, b: number) => void;
   onBindArmed: (macroIndex: number) => void;
@@ -31,7 +42,7 @@ export interface MacroBankProps {
  * is `ceil(count / 2)` columns wide and never ragged.
  */
 export function MacroBank(props: MacroBankProps) {
-  const { macros, macroCount, armed, rackPath, liveValues, onReorder, onSwap, onBindArmed, onRename, onRecolor } = props;
+  const { macros, macroCount, armed, rackPath, liveValues, mapping, onMapSource, parentKeys, onReorder, onSwap, onBindArmed, onRename, onRecolor } = props;
   const { drag, startDrag } = useMacroDrag({ onReorder, onSwap });
   const { paramDrag } = useEditor();
 
@@ -52,7 +63,11 @@ export function MacroBank(props: MacroBankProps) {
       dropTarget={drag.from !== null && drag.over === macro.index && drag.from !== macro.index}
       dropSwaps={drag.swap}
       bindTarget={paramDrag.param !== null && paramDrag.overMacro === macro.index && !paramDrag.overForeignRack}
-      onDragStart={(e) => startDrag(macro.index, e)}
+      mapSource={mapping && onMapSource !== undefined}
+      mapKeys={[macroKey(rackPath, macro.index), parentKeys?.[macro.index]].filter(Boolean).join(' ')}
+      // In Map mode a knob is a source, not a macro to move: the two gestures
+      // start identically, so only one of them can be live at a time.
+      onDragStart={(e) => (mapping ? onMapSource?.(macro.index, e) : startDrag(macro.index, e))}
       onClick={() => onBindArmed(macro.index)}
       onRename={(name) => onRename(macro.index, name)}
       onRecolor={(colorIndex) => onRecolor(macro.index, colorIndex)}

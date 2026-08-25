@@ -38,6 +38,24 @@ export interface MacroMapping {
  * is recovered by walking the rack's own device tree and indexing parameters
  * by path.
  */
+/**
+ * What to call a macro. Live labels one nobody has renamed after the thing it
+ * drives (SCHEMA.md Q23), which is what makes a rack of racks readable: the
+ * parent's knob reads `KICK SEL` because that is the child macro at the other
+ * end of it.
+ *
+ * The default name is `Macro N`, exactly what `MacroDisplayNames.N` holds
+ * until somebody types something else.
+ */
+export function macroLabel(macro: Macro): string {
+  // Any `Macro N`, not only this slot's own number: moving a macro carries its
+  // stored name along, so an unnamed macro 1 dropped on slot 3 still reads
+  // `Macro 1` in the file and is still a macro nobody has named.
+  const named = !/^Macro \d+$/.test(macro.name);
+  if (named || macro.bindings.length === 0) return macro.name;
+  return macro.bindings[0].targetName;
+}
+
 export function collectMappings(root: Rack): MacroMapping[] {
   const rows: MacroMapping[] = [];
 
@@ -59,10 +77,13 @@ export function collectMappings(root: Rack): MacroMapping[] {
         rackName: rack.name,
         rackPath: path,
         macroIndex: macro.index,
-        macroName: macro.name,
+        macroName: macroLabel(macro),
         color: macroColor(macro.color),
         targets: macro.bindings.map((b) => ({
-          device: deviceOf.get(b.targetPath) ?? 'unknown device',
+          // Falls back to the rack itself, which is where a binding on a
+          // rack's own parameter lives - ChainSelector (SCHEMA.md Q15) has no
+          // device to belong to.
+          device: deviceOf.get(b.targetPath) ?? rack.name,
           parameter: b.targetName,
           targetPath: b.targetPath,
           rangeMin: b.rangeMin,

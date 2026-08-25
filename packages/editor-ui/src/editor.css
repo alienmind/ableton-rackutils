@@ -932,3 +932,61 @@
   color: var(--edit-dim);
   font-size: 9px;
 }
+
+/* --- Map mode (context.tsx): binding is modal, as it is in Live --- */
+
+.map-button {
+  margin-left: auto;
+  font-size: 10px;
+  padding: 1px 7px;
+  border: 1px solid var(--edit-line);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--edit-dim);
+  cursor: pointer;
+}
+
+.map-button.on {
+  background: var(--edit-accent);
+  border-color: var(--edit-accent);
+  color: #101116;
+  font-weight: 600;
+}
+
+.mapping-note {
+  font-size: 11px;
+  color: var(--edit-accent);
+}
+
+/* A parameter only invites a drag while Map is on. Outside it, it is text. */
+.param.mappable { cursor: grab; }
+.macro-knob.map-source .macro-knob-dial { cursor: grab; }
+.macro-knob.map-source .knob-body { stroke: var(--edit-accent); stroke-width: 1.5; }
+
+/* A macro nobody named, labelled after what it drives (SCHEMA.md Q23). */
+.macro-knob-name.derived { font-style: italic; }
+
+/* The cables already in the rack, drawn for as long as Map mode is on. Below
+   the drag cable's layer, so a new patch stays legible over the existing ones. */
+.mapping-cable-layer {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 40;
+  overflow: visible;
+}
+
+.mapping-cable {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: 0.55;
+}
+
+.mapping-plug {
+  stroke: #101116;
+  stroke-width: 1;
+  opacity: 0.8;
+}

@@ -36,6 +36,23 @@ export interface ArmedParam {
 }
 
 export interface EditorContextValue {
+  /**
+   * The root rack. A nested rack's macro is bound BY ITS PARENT (SCHEMA.md
+   * Q22), so a panel offering its own knobs as mapping sources has to address
+   * them from one level up, and only the root can resolve that.
+   */
+  root: Rack;
+  /**
+   * Live's Map mode. Off, a drag on a knob moves the macro and a drag on a
+   * parameter does nothing; on, every parameter and every nested rack's macro
+   * is a source to drag onto a knob.
+   *
+   * Modal on purpose, and requested as such: the two gestures start the same
+   * way, so one of them has to say which it is. Live draws the same button on
+   * the rack's title bar for the same reason.
+   */
+  mapping: boolean;
+  setMapping: (on: boolean) => void;
   armed: ArmedParam | null;
   /** Live state of a parameter being dragged onto a knob, and the way to start one. */
   paramDrag: ParamDragState;

@@ -27,6 +27,19 @@ const rootDials = (page: Page) => rootBody(page).locator('> .macro-bank-wrap .ma
 const rootChainRows = (page: Page) => rootBody(page).locator('> .chain-list .chain-row');
 const macroNames = (page: Page) => rootKnobs(page).locator('.macro-knob-name').allTextContents();
 
+/**
+ * One mapping row, by macro slot. Not by the macro's label: an unnamed macro
+ * is labelled after what it drives (SCHEMA.md Q23), so the label changes the
+ * moment the binding under test exists.
+ */
+const mappingRowForSlot = (page: Page, slot: number) =>
+  page.locator('.mapping-grid tbody tr').filter({ has: page.locator(`.mapping-slot:text-is("${slot}")`) });
+
+/** Binding is modal now: a parameter does nothing until Map mode is on (`context.tsx`). */
+async function turnMapOn(page: Page) {
+  await page.locator('.map-button').first().click();
+}
+
 /** Devices render as collapsed title strips; open the first to reach its parameters. */
 async function openFirstDevice(page: Page) {
   await page.locator('.device-panel.collapsed .device-title-strip').first().click();
@@ -108,12 +121,13 @@ test('picking a colour recolours the knob', async ({ page }) => {
 
 test('arming a parameter then clicking a knob binds it', async ({ page }) => {
   await loadRack(page);
+  await turnMapOn(page);
   await openFirstDevice(page);
   await page.locator('.more-toggle').first().click();
   await page.locator('.param', { hasText: 'ParamB' }).first().click();
   await rootDials(page).nth(3).click();
   // Confirmed in the mapping table: the knob no longer names what it drives.
-  await expect(page.locator('.mapping-grid tbody tr', { hasText: 'Macro 4' }).locator('.col-name')).toContainText('ParamB');
+  await expect(mappingRowForSlot(page, 4).locator('.col-name')).toContainText('ParamB');
 });
 
 test('macros are numbered across then down', async ({ page }) => {
@@ -173,6 +187,7 @@ test('dragging a parameter onto a knob binds it', async ({ page }) => {
   // The gesture people reach for first. Binding used to be click-to-arm then
   // click-a-knob, which is discoverable only if you read the instructions.
   await loadRack(page);
+  await turnMapOn(page);
   await openFirstDevice(page);
   await page.locator('.more-toggle').first().click();
 
@@ -180,7 +195,7 @@ test('dragging a parameter onto a knob binds it', async ({ page }) => {
   const knob = rootKnobs(page).nth(5);
   await dragBetween(page, param, knob);
 
-  await expect(page.locator('.mapping-grid tbody tr', { hasText: 'Macro 6' }).locator('.col-name')).toContainText('ParamB');
+  await expect(mappingRowForSlot(page, 6).locator('.col-name')).toContainText('ParamB');
   // The drag must not also leave the parameter armed.
   await expect(page.locator('.armed-note')).toHaveCount(0);
 });
@@ -253,6 +268,7 @@ test('the macro count control is gone from the title bar', async ({ page }) => {
 
 test('a patch cable hangs from the parameter while dragging, and lands on the knob', async ({ page }) => {
   await loadRack(page);
+  await turnMapOn(page);
   await openFirstDevice(page);
   await page.locator('.more-toggle').first().click();
   const param = page.locator('.param', { hasText: 'ParamB' }).first();
@@ -292,13 +308,14 @@ test('a patch cable hangs from the parameter while dragging, and lands on the kn
   expect(await cable.evaluate((el) => getComputedStyle(el).stroke)).toBe(knobColour);
 
   await page.mouse.up();
-  await expect(page.locator('.mapping-grid tbody tr', { hasText: 'Macro 6' }).locator('.col-name')).toContainText('ParamB');
+  await expect(mappingRowForSlot(page, 6).locator('.col-name')).toContainText('ParamB');
   // The cable settles and then takes itself off screen.
   await expect(page.locator('.patch-cable')).toHaveCount(0, { timeout: 4000 });
 });
 
 test('a cable dropped on nothing retracts and binds nothing', async ({ page }) => {
   await loadRack(page);
+  await turnMapOn(page);
   await openFirstDevice(page);
   await page.locator('.more-toggle').first().click();
   const param = page.locator('.param', { hasText: 'ParamB' }).first();
@@ -361,11 +378,12 @@ test('the mapping table lists macro, path, name and range', async ({ page }) => 
   const rows = page
     .locator('.mapping-grid tbody tr')
     .filter({ has: page.locator('.col-path', { hasText: 'Test Rack' }) })
-    .filter({ has: page.locator('.col-macro', { hasText: 'Macro 1' }) });
+    .filter({ has: page.locator('.mapping-slot:text-is("1")') });
   // The fixture's macro 1 drives two parameters, one row each, Live's layout.
   await expect(rows).toHaveCount(2);
   const row = rows.first();
-  await expect(row.locator('.col-macro')).toContainText('Macro 1');
+  // Unnamed, so it is labelled after what it drives (SCHEMA.md Q23).
+  await expect(row.locator('.col-macro')).toContainText('ParamA');
   await expect(row.locator('.col-path')).toContainText('Test Rack');
   await expect(row.locator('.col-path')).toContainText('TestSynth');
   await expect(row.locator('.col-name')).toContainText('Param');
@@ -406,4 +424,29 @@ test('the mapping table edits a range and inverts it', async ({ page }) => {
   await expect(min).toHaveValue('100');
   await expect(max).toHaveValue('20');
   await expect(row.locator('.mapping-invert')).toHaveClass(/is-inverted/);
+});
+
+test('the row scrolls sideways when it is wider than the window', async ({ page }) => {
+  // A rack wider than the window had no scrollbar and no hint that anything
+  // was off to the right, until some panel toggled and forced a re-layout.
+  await page.setViewportSize({ width: 420, height: 900 });
+  await loadRack(page, 'drum');
+
+  const scroller = page.locator('.rack-editor-scroll');
+  const overflow = await scroller.evaluate((el) => el.scrollWidth - el.clientWidth);
+  expect(overflow).toBeGreaterThan(0);
+});
+
+test('Map mode draws the existing cables, and leaving it takes them away', async ({ page }) => {
+  await loadRack(page);
+  await openFirstDevice(page);
+  await expect(page.locator('.mapping-cable')).toHaveCount(0);
+
+  await turnMapOn(page);
+  // The fixture's macro 1 drives two parameters of this device, and both ends
+  // are on screen, so both cables can be drawn.
+  await expect(page.locator('.mapping-cable').first()).toBeVisible();
+
+  await turnMapOn(page); // Unmap
+  await expect(page.locator('.mapping-cable')).toHaveCount(0);
 });
