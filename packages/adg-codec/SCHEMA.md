@@ -716,3 +716,49 @@ this file. That should show both what an exposed parameter looks like and
 whether the mapping is the usual `KeyMidi` or something plugin-specific. Until
 then the codec must not offer plugin parameters as bindable targets.
 
+---
+
+## Q18. Can a VST3 `Uid` be resolved to a plugin name, client side?
+
+Q17 established that a `Vst3Preset` carries no plugin name, only `Uid/Fields.0-3`.
+This is how to turn that back into a name without leaving the browser.
+
+**The `Uid` fields are the VST3 class id, big-endian, concatenated.**
+`donors/BS-VST3.adg` stores 1098019957, 1096173907, 1296192084, 1349676899,
+which is `41727475415649534D42525450726F63`.
+
+**The class id is embedded in the plugin binary, in COM byte order.** Confirmed
+by byte search:
+
+```
+Arturia/MiniBrute V.vst3   25,942,368 bytes   COM-ordered id at offset 23,623,120
+Arturia/MiniFreak V.vst3   30,341,016 bytes   absent
+```
+
+COM order is the usual GUID reshuffle: reverse the first four bytes, then the
+next two, then the next two, and keep the last eight as they are. The plain
+order did NOT match on Windows. The VST3 SDK is not COM-ordered on every
+platform, so an implementation has to search for BOTH forms.
+
+**What does not work here.** The documented portable route is
+`moduleinfo.json`, which the VST3 SDK can ship inside a plugin bundle's
+`Resources` folder listing every class id and its name. On this Windows machine
+there are zero of them: every `.vst3` under `Program Files/Common Files/VST3` is
+a single DLL, not a bundle. It is opt-in for vendors and none of these took it.
+Do not build on it as the primary path.
+
+**Consequence: resolution is a byte search over the user's own plugin folder.**
+`showDirectoryPicker()` gets read access once, each `.vst3` is streamed and
+searched for the 16 bytes in either order, and the FILENAME is the answer -
+`MiniBrute V.vst3`. Pure client side, no native code, no registry, no network.
+
+Two things make it cheap enough. The result is a `uid -> name` table worth
+caching, so the scan happens once rather than per rack. And a MISS is a useful
+answer in its own right: a rack naming a class id no local plugin contains is a
+rack this machine cannot fully load, which is the question the dependency view
+exists to answer.
+
+Limits worth stating in the UI: it only sees plugins installed on the machine
+doing the looking, `showDirectoryPicker` is Chromium-only today, and a plugin
+that ships several classes resolves them all to one filename.
+
