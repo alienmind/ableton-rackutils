@@ -177,8 +177,15 @@ header h1 {
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  /* Three steps, three columns. A fourth step left an orphan row of one. */
+  grid-template-columns: repeat(3, 1fr);
   gap: 1rem;
+}
+
+@media (max-width: 760px) {
+  .guide-steps {
+    grid-template-columns: 1fr;
+  }
 }
 
 .guide-steps li {
@@ -219,6 +226,21 @@ header h1 {
 }
 
 .companion-card:hover { border-color: #6ea8ff; }
+
+.companion-card-soon {
+  color: #9a9aa5;
+  cursor: default;
+}
+
+.companion-card-soon:hover { border-color: #2e313a; }
+
+.soon-badge {
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: #2e313a;
+  color: #e8e8ea;
+  font-size: 0.75rem;
+}
 
 .companion-card img {
   height: 28px;

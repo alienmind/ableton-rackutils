@@ -2,8 +2,6 @@ import step1 from './assets/guide/saving-rack-01.png';
 import step2 from './assets/guide/saving-rack-02.png';
 import step3 from './assets/guide/saving-rack-03.png';
 import maxForLive from './assets/guide/max4live.png';
-import { useEffect, useState } from 'react';
-import { FALLBACK_RELEASE_URL, latestCompanion } from './companion/download';
 
 /**
  * How to get a rack out of Live and into this page.
@@ -15,20 +13,6 @@ import { FALLBACK_RELEASE_URL, latestCompanion } from './companion/download';
  * what the tool does; a first-time user needs to be told what to do.
  */
 export function GettingStarted({ compact }: { compact: boolean }) {
-  const [companionUrl, setCompanionUrl] = useState(FALLBACK_RELEASE_URL);
-
-  useEffect(() => {
-    let cancelled = false;
-    // Renders a working fallback link immediately and upgrades to the direct
-    // .amxd once the API answers - this must never block the main flow.
-    latestCompanion().then((r) => {
-      if (!cancelled && r) setCompanionUrl(r.url);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   if (compact) return null;
 
   return (
@@ -56,23 +40,22 @@ export function GettingStarted({ compact }: { compact: boolean }) {
         </li>
         <li>
           <div className="guide-text">
-            <strong>3. Find the file.</strong> Right-click the saved <code>.adg</code> in Live's browser and
-            choose <em>Show in Explorer</em> (<em>Show in Finder</em> on a Mac).
+            <strong>3. Find the file and drag it here.</strong> Right-click the saved <code>.adg</code> in
+            Live's browser, choose <em>Show in Explorer</em> (<em>Show in Finder</em> on a Mac), and drop the
+            file onto this page. When you are done editing, save a copy and drag that back onto the rack in
+            Live.
           </div>
           <img src={step3} alt="The Show in Explorer entry in Ableton's browser context menu" />
         </li>
-        <li>
-          <div className="guide-text">
-            <strong>4. Drag it here.</strong> Drop the file from Explorer onto this page. When you are done
-            editing, save a copy and drag that back onto the rack in Live.
-          </div>
-        </li>
       </ol>
 
-      <a className="companion-card" href={companionUrl} target="_blank" rel="noreferrer">
+      {/* The device is a scaffold: it builds and loads, and does nothing useful
+          yet. No download link until it does. */}
+      <div className="companion-card companion-card-soon">
         <img src={maxForLive} alt="Max for Live" />
-        <span>Click here for an optional companion device</span>
-      </a>
+        <span>Max for Live Companion Device</span>
+        <span className="soon-badge">Soon!</span>
+      </div>
     </section>
   );
 }
