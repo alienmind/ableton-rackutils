@@ -42,7 +42,7 @@ export function RackPanel({ rack, rackPath, depth, collapsible, forceCollapsed }
   const [showVariations, setShowVariations] = useState(false);
   const [showChains, setShowChains] = useState(true);
   const [devicesCollapsed, setDevicesCollapsed] = useState(false);
-  const { armed, arm, apply, liveValues } = useEditor();
+  const { armed, arm, apply, liveValues, history } = useEditor();
 
   const isDrumRack = rack.deviceEl.tagName === 'DrumGroupDevice';
   const chains = rack.chains;
@@ -86,14 +86,13 @@ export function RackPanel({ rack, rackPath, depth, collapsible, forceCollapsed }
     <section className={`rack-panel depth-${Math.min(depth, 3)}${isDrumRack ? ' drum-rack' : ''}`}>
       <RackHeader
         name={rack.name}
-        macroCount={rack.macroCount}
         kind={isDrumRack ? 'Drum Rack' : rack.deviceEl.tagName.replace('GroupDevice', ' Rack')}
         depth={depth}
         collapsible={collapsible}
         open={open}
         onToggle={() => setOpen((o) => !o)}
         onRename={(name) => apply(rackPath, (r) => renameRack(r, name))}
-        onSetMacroCount={(count) => apply(rackPath, (r) => setMacroCount(r, count))}
+        history={depth === 0 ? history : undefined}
       />
 
       <div className="rack-body">

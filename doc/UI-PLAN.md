@@ -144,13 +144,31 @@ counts knobs.
 **The vertical button column** down a rack's left edge, as Live has it: show/
 hide macros, add two, remove two, show/hide Macro Variations, collapse/expand
 the devices in the rack, show/hide chains. Macros step in PAIRS because the
-panel is two rows.
+panel is two rows. The title bar carries only the rack's name and - on the
+root rack - **undo and redo**, which are global: one history across every rack
+level, because a mutation on a nested rack edits the same document.
+
+**A rack is exactly one device row tall, always**, and this is enforced rather
+than emergent: `height`, not `min-height`. It regressed twice, most recently
+when hiding the chain list let a panel grow to fit its content and a 16-pad
+drum rack became pages tall. Panels inside the row scroll; the row does not
+grow. A browser test asserts the height after clicking every side button,
+because the constraint is invisible until something violates it.
 
 **The Macro Variations panel** renders (read-only - the codec reads
 `rack.variations` and every slot-changing mutation permutes them, but there is
 no mutation to create or recall one).
 
-**Binding is a drag**: pull a parameter onto a macro knob. Click-to-arm still
+**Binding is a drag, drawn as a patch cable**: pull a parameter onto a macro
+knob and a cable hangs out of it, sagging under its own weight and swinging
+behind the pointer. On release it either settles onto the knob with a decaying
+wobble or snaps back to the control it came from. The physics is one number -
+the sag depth - on a damped spring, because a hanging cable IS its sag: the
+curve is a cubic with both control points pushed straight down by it. The
+cable turns green over a knob it can bind to and red over one it cannot.
+`prefers-reduced-motion` skips the animation.
+
+Pull a parameter onto a macro knob. Click-to-arm still
 works and is still the only keyboard-reachable path, but the drag is the
 gesture people try first - the arm step was tried and not found. A drop onto a
 knob belonging to a DIFFERENT rack is refused rather than silently doing

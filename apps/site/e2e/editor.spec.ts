@@ -146,13 +146,13 @@ test('a drum rack renders pads and keeps the whole rack on one row', async ({ pa
   // Pads are ordered by note; the fixture stores them 40, 36, 38 on purpose.
   await expect(rootChainRows(page).locator('.chain-row-name')).toHaveText(['Kick', 'Snare', 'Hat']);
 
-  // Nothing may overflow vertically: the layout scrolls sideways, as Live does.
-  const clipped = await page.evaluate(() =>
-    [...document.querySelectorAll('.rack-editor *')]
-      .filter((e) => e.scrollHeight > e.clientHeight + 2 && !e.className.toString().includes('sr-only'))
-      .map((e) => e.className.toString()),
-  );
-  expect(clipped).toEqual([]);
+  // The ROW may not grow. Panels inside it are allowed to scroll - a drum rack
+  // can have 128 chains and they have to go somewhere - but the rack itself
+  // stays one device row tall. The height invariant is asserted on its own
+  // below; here it is enough that the page does not scroll vertically to
+  // reach the rack.
+  const rootPanel = page.locator('.rack-editor-scroll > .rack-panel');
+  expect((await rootPanel.boundingBox())!.height).toBeLessThanOrEqual(169 + 17 + 2);
 });
 
 test('dragging a parameter onto a knob binds it', async ({ page }) => {
@@ -176,4 +176,104 @@ test('chain rows carry a colour stripe', async ({ page }) => {
     .first()
     .evaluate((el) => getComputedStyle(el).borderLeftColor);
   expect(stripe).not.toBe('rgba(0, 0, 0, 0)');
+});
+
+/**
+ * The 169px invariant. A Max for Live device view is 169px and does not
+ * scroll, so a rack taller than one device row is unreachable there - this is
+ * a hard constraint, not a preference. It has regressed twice: once from
+ * stacking every chain's devices, once from letting a panel grow to fit its
+ * content when the chain list was hidden, which made a 16-pad drum rack pages
+ * tall.
+ */
+const ROW_HEIGHT = 169 + 17; // device row + title bar
+
+test('a rack stays one device row tall, whatever the side buttons do', async ({ page }) => {
+  await loadRack(page, 'drum');
+  const rootPanel = page.locator('.rack-editor-scroll > .rack-panel');
+  const height = async () => (await rootPanel.boundingBox())!.height;
+
+  expect(await height()).toBeLessThanOrEqual(ROW_HEIGHT + 2);
+
+  // Every side button, in turn. None may grow the row.
+  for (const title of [
+    'Show/hide macro controls',
+    'Show/hide Macro Variations',
+    'Collapse the devices in this rack',
+    'Show/hide chains',
+  ]) {
+    await page.locator(`.rack-side .side-btn[title="${title}"]`).first().click();
+    expect(await height(), `after "${title}"`).toBeLessThanOrEqual(ROW_HEIGHT + 2);
+  }
+});
+
+test('undo and redo live on the root title bar and span every rack level', async ({ page }) => {
+  await loadRack(page);
+  const undo = page.locator('.history-buttons button').first();
+  const redo = page.locator('.history-buttons button').nth(1);
+  // Only the root rack has them, even though the fixture nests a rack.
+  await expect(page.locator('.history-buttons')).toHaveCount(1);
+  await expect(undo).toBeDisabled();
+  await expect(redo).toBeDisabled();
+
+  const before = await macroNames(page);
+  await dragKnob(page, 0, 2);
+  await expect(undo).toBeEnabled();
+
+  await undo.click();
+  await expect.poll(async () => (await macroNames(page))[0]).toBe(before[0]);
+  await expect(redo).toBeEnabled();
+
+  await redo.click();
+  await expect.poll(async () => (await macroNames(page))[2]).toBe(before[0]);
+});
+
+test('the macro count control is gone from the title bar', async ({ page }) => {
+  // It moved to the rack's left-hand column, where Live has it. One control in
+  // two places is one too many.
+  await loadRack(page);
+  await expect(page.locator('.macro-count')).toHaveCount(0);
+  await expect(page.locator('.rack-side .side-btn[title="Add two macros"]').first()).toBeVisible();
+});
+
+test('a patch cable hangs from the parameter while dragging, and lands on the knob', async ({ page }) => {
+  await loadRack(page);
+  await page.locator('.more-toggle').first().click();
+  const param = page.locator('.param', { hasText: 'ParamB' }).first();
+  const knob = rootKnobs(page).nth(5);
+
+  await expect(page.locator('.patch-cable')).toHaveCount(0);
+
+  await param.hover();
+  await page.mouse.down();
+  await knob.hover();
+  // Mid-drag: a cable exists, it sags (the path's control points sit below its
+  // ends), and it reads as a valid target.
+  const cable = page.locator('.patch-cable');
+  await expect(cable).toHaveCount(1);
+  const d = (await cable.getAttribute('d'))!;
+  const [, y0, cy1] = d.match(/M [\d.-]+ ([\d.-]+) C [\d.-]+ ([\d.-]+)/)!.map(Number);
+  expect(cy1).toBeGreaterThan(y0); // hanging, not a straight line
+  await expect(cable).toHaveClass(/will-connect/);
+
+  await page.mouse.up();
+  await expect(knob.locator('.target-name')).toContainText('ParamB');
+  // The cable settles and then takes itself off screen.
+  await expect(page.locator('.patch-cable')).toHaveCount(0, { timeout: 4000 });
+});
+
+test('a cable dropped on nothing retracts and binds nothing', async ({ page }) => {
+  await loadRack(page);
+  await page.locator('.more-toggle').first().click();
+  const param = page.locator('.param', { hasText: 'ParamB' }).first();
+  const before = await rootKnobs(page).locator('.target-name').allTextContents();
+
+  await param.hover();
+  await page.mouse.down();
+  await page.locator('.rack-kind').first().hover(); // not a knob
+  await expect(page.locator('.patch-cable')).toHaveCount(1);
+  await page.mouse.up();
+
+  await expect(page.locator('.patch-cable')).toHaveCount(0, { timeout: 4000 });
+  expect(await rootKnobs(page).locator('.target-name').allTextContents()).toEqual(before);
 });

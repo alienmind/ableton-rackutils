@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Rack, bindParameter, type MutationResult } from '@rackutils/adg-codec';
 import { RackPanel } from './RackPanel';
 import { EditorProvider, resolveRackPath, type ArmedParam, type RackPath } from './context';
+import { PatchCable } from './PatchCable';
 import { useParamDrag } from './useParamDrag';
 
 export interface RackEditorProps {
@@ -23,6 +24,7 @@ export interface RackEditorProps {
  */
 export function RackEditor({ rack, onChange, liveValues }: RackEditorProps) {
   const [undo, setUndo] = useState<Rack[]>([]);
+  const [redo, setRedo] = useState<Rack[]>([]);
   const [armed, setArmed] = useState<ArmedParam | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
 
@@ -48,6 +50,9 @@ export function RackEditor({ rack, onChange, liveValues }: RackEditorProps) {
       setWarnings(result.warnings);
       if (!result.ok) return;
       setUndo((u) => [...u.slice(-49), previous]);
+      // A new edit invalidates anything that was undone: the branch it would
+      // redo onto no longer exists.
+      setRedo([]);
       // `target` mutated the document `rack` owns; clone so React sees a new
       // reference and every derived read recomputes.
       onChange(rack.clone());
@@ -55,13 +60,37 @@ export function RackEditor({ rack, onChange, liveValues }: RackEditorProps) {
     [rack, onChange],
   );
 
-  const { paramDrag, startParamDrag } = useParamDrag({
+  const { paramDrag, startParamDrag, cableEcho, clearCableEcho } = useParamDrag({
     onBind: (rackPath, macroIndex, param) => apply(rackPath, (r) => bindParameter(r, macroIndex, param)),
   });
 
+  const history = useMemo(
+    () => ({
+      canUndo: undo.length > 0,
+      canRedo: redo.length > 0,
+      undo: () => {
+        const previous = undo.at(-1);
+        if (!previous || !rack) return;
+        setUndo((u) => u.slice(0, -1));
+        setRedo((r) => [...r.slice(-49), rack.clone()]);
+        setWarnings([]);
+        onChange(previous);
+      },
+      redo: () => {
+        const next = redo.at(-1);
+        if (!next || !rack) return;
+        setRedo((r) => r.slice(0, -1));
+        setUndo((u) => [...u.slice(-49), rack.clone()]);
+        setWarnings([]);
+        onChange(next);
+      },
+    }),
+    [undo, redo, rack, onChange],
+  );
+
   const context = useMemo(
-    () => ({ armed, arm: setArmed, apply, liveValues, paramDrag, startParamDrag }),
-    [armed, apply, liveValues, paramDrag, startParamDrag],
+    () => ({ armed, arm: setArmed, apply, liveValues, paramDrag, startParamDrag, history }),
+    [armed, apply, liveValues, paramDrag, startParamDrag, history],
   );
 
   if (!rack) return null;
@@ -70,19 +99,6 @@ export function RackEditor({ rack, onChange, liveValues }: RackEditorProps) {
     <EditorProvider value={context}>
       <div className="rack-editor">
         <div className="editor-toolbar">
-          <button
-            type="button"
-            disabled={undo.length === 0}
-            onClick={() => {
-              const previous = undo.at(-1);
-              if (!previous) return;
-              setUndo((u) => u.slice(0, -1));
-              setWarnings([]);
-              onChange(previous);
-            }}
-          >
-            Undo{undo.length > 0 ? ` (${undo.length})` : ''}
-          </button>
           {armed && (
             <span className="armed-note">
               <strong>{armed.param.name}</strong> armed - click a macro knob in the same rack to bind it
@@ -104,6 +120,7 @@ export function RackEditor({ rack, onChange, liveValues }: RackEditorProps) {
         <div className="rack-editor-scroll">
           <RackPanel rack={rack} rackPath={[]} depth={0} />
         </div>
+        <PatchCable drag={paramDrag} echo={cableEcho} onEchoDone={clearCableEcho} />
       </div>
     </EditorProvider>
   );

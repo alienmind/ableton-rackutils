@@ -45,6 +45,17 @@ export interface EditorContextValue {
   apply: (rackPath: RackPath, fn: (rack: Rack) => MutationResult) => void;
   /** Live macro values from the M4L device, keyed by macro index. Root rack only, display only. */
   liveValues?: Record<number, number>;
+  /**
+   * Undo/redo is global: one history across every rack level, because a
+   * mutation on a nested rack edits the same document as one on the root.
+   * Only the root rack's title bar shows the buttons.
+   */
+  history: {
+    canUndo: boolean;
+    canRedo: boolean;
+    undo: () => void;
+    redo: () => void;
+  };
 }
 
 const EditorContext = createContext<EditorContextValue | null>(null);
