@@ -133,9 +133,12 @@ export function insertMacroSlots(rack: Rack, count: number): MutationResult {
 
   for (let i = 0; i < count; i++) reorderMacro(rack, MACRO_SLOTS - 1, 0);
 
-  // Widen the visible bank so the new slots are reachable, without shrinking a
-  // rack that already showed more than it needed.
-  const visible = Math.min(MACRO_SLOTS, rack.macroCount + count);
+  // Widen the visible bank so the new slots are reachable, rounded UP to an
+  // even number. Live's own +/- steps by two and every rack it wrote in
+  // donors/ has an even count (10, 10, 16); an odd one renders the macro grid
+  // wrong - a rack taller than a rack is allowed to be - while still loading.
+  const wanted = rack.macroCount + count;
+  const visible = Math.min(MACRO_SLOTS, wanted + (wanted % 2));
   setMacroCount(rack, visible);
   return ok();
 }

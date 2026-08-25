@@ -762,3 +762,36 @@ Limits worth stating in the UI: it only sees plugins installed on the machine
 doing the looking, `showDirectoryPicker` is Chromium-only today, and a plugin
 that ships several classes resolves them all to one filename.
 
+---
+
+## Q19. What visible macro counts does Live accept, and what makes a rack render tall?
+
+Found by loading a rack this codec wrote into Live: it worked, and it drew
+noticeably taller than any hand-built rack beside it.
+
+**Two causes, both ours.**
+
+**1. `NumVisibleMacroControls` should be EVEN.** The generated rack carried 11.
+Every rack Live wrote carries an even number - `BS.adg` and `BS-VST3.adg` 10,
+`PD.adg` 16 - and Live's own +/- buttons step by two, which is already recorded
+in `doc/PLAN.md` D3 as a UI rule without anyone noticing it was also a file
+rule. An odd count loads without complaint and draws the macro grid wrong.
+
+`insertMacroSlots` now rounds the new count up to even.
+
+**2. A long macro name wraps onto a second line**, and the taller cell takes
+the whole rack with it. The generated names were 21 characters
+(`AlienMind Bass FILTER`) because the contract expanded `{name}` from the
+rack's own name. Hand-built racks here top out at 12 (`Pluck / Long`,
+`GATE ON/OFF`) and sit on one line.
+
+The exact wrap threshold is not established - it is a rendered text width, not
+a character count, and no diff can measure it. What is established is that 12
+fits and 21 does not. `applyContract` takes the label name explicitly now, so
+the short track code the convention is built on (`BS GAIN`) is the path of
+least resistance rather than an override.
+
+Neither is a corruption: the file is valid and the mappings work. It is a
+reminder that "loads in Live" is not the same as "looks like a rack", and only
+opening it answers the second one.
+

@@ -32,6 +32,18 @@ export interface ContractDevice {
   colorIndex?: number;
 }
 
+export interface ContractOptions {
+  /**
+   * What `{name}` expands to. The rack's own name by default, which is usually
+   * WRONG for a macro label: a rack called "AlienMind Bass" produces
+   * "AlienMind Bass GAIN", 21 characters, and Live wraps a label that long onto
+   * a second line, making every macro cell taller and the rack taller with it.
+   * Pass the short track code the convention is built on - "BS" - which is what
+   * the UI's rack name field is for (doc/PLAN.md 4.3.1).
+   */
+  name?: string;
+}
+
 export interface ContractResult extends MutationResult {
   /** Macro slot each option ended up on, in the order given. */
   slots: number[];
@@ -52,9 +64,17 @@ export function macroNameFor(pattern: string, rackName: string): string {
  * Safe to re-run. An option whose macro already drives the right parameter on
  * every chain is left where it is and only renamed and recoloured, so ticking
  * an option that is already satisfied does not shift the bank again.
+ *
+ * Pass `options.name` unless the rack is already named the short way. Macro
+ * labels are read at a glance on a small knob, and a long one wraps.
  */
-export function applyContract(rack: Rack, devices: readonly ContractDevice[]): ContractResult {
+export function applyContract(
+  rack: Rack,
+  devices: readonly ContractDevice[],
+  options: ContractOptions = {},
+): ContractResult {
   const warnings: string[] = [];
+  const name = options.name ?? rack.name;
   const slots: number[] = [];
 
   // Split into what is already on the rack and what has to be made room for,
@@ -94,7 +114,7 @@ export function applyContract(rack: Rack, devices: readonly ContractDevice[]): C
       }
     }
 
-    renameMacro(rack, slot, macroNameFor(device.namePattern, rack.name));
+    renameMacro(rack, slot, macroNameFor(device.namePattern, name));
     if (device.colorIndex !== undefined) setMacroColor(rack, slot, device.colorIndex);
   }
 

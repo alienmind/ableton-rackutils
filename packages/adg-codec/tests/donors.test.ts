@@ -315,3 +315,30 @@ describe('BS-VST3.adg - a plugin in a chain (SCHEMA.md Q17)', () => {
   });
 });
 
+describe('the shape Live actually renders', () => {
+  test('the visible macro count stays even', () => {
+    const rack = Rack.parse(load('BS.adg'));
+    expect(rack.macroCount).toBe(10);
+    insertMacroSlots(rack, 1);
+
+    // Live's +/- steps by two and every donor here is even (10, 10, 16). An
+    // odd count still loads and draws the macro grid wrong: the rack renders
+    // taller than a rack is allowed to be. Seen in Live on a rack this wrote.
+    expect(Rack.parse(rack.serialize()).macroCount).toBe(12);
+  });
+
+  test('two options added at once also land on an even count', () => {
+    const rack = Rack.parse(load('BS.adg'));
+    insertMacroSlots(rack, 2);
+    expect(Rack.parse(rack.serialize()).macroCount).toBe(12);
+  });
+
+  test('the name for a macro label comes from options, not the rack name', () => {
+    const rack = Rack.parse(load('BS.adg'));
+    // Defaulting to the rack name gives "AlienMind Bass GAIN", which Live wraps
+    // onto a second line and grows every macro cell to fit.
+    applyContract(rack, [{ deviceTag: 'StereoGain', parameter: 'Gain', namePattern: '{name} GAIN' }], { name: 'BS' });
+    expect(Rack.parse(rack.serialize()).macros[4].name).toBe('BS GAIN');
+  });
+});
+

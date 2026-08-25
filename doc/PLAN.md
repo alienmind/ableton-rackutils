@@ -843,7 +843,9 @@ rearranges that knowledge costs them more than it gains. Concretely:
 - **A collapsed device or rack becomes a vertical title strip**, not a hidden
   thing.
 - **Macros sit in two rows numbered across then down** (`1 2 3 4 / 5 6 7 8`),
-  the grid being `ceil(count / 2)` wide, and the +/- buttons step by TWO.
+  the grid being `ceil(count / 2)` wide, and the +/- buttons step by TWO. That
+  is a file rule as well as a UI one: an odd `NumVisibleMacroControls` loads and
+  draws the grid wrong (SCHEMA.md Q19).
 - **Only the selected chain's devices are drawn.** Live shows one chain at a
   time, and doing the same is what keeps the row a row: rendering every chain's
   devices turned a four-pad drum rack into a page-height wall.
