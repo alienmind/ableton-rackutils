@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { Rack } from '../src/model';
-import { moveMapping, reorderMacro, unbindMacro } from '../src/mutate';
+import { insertMacroSlots, moveMapping, reorderMacro, unbindMacro } from '../src/mutate';
 
 const load = (name: string) => new Uint8Array(readFileSync(join(__dirname, '..', 'donors', name)));
 
@@ -98,5 +98,30 @@ describe('PD.adg - a full rack with no room to shift (doc/PLAN.md 4.3.1)', () =>
     const rack = Rack.parse(load('PD.adg'));
     // PD GAIN drives the Utility's Gain and Drift's stereo depth at once.
     expect(bindingNames(rack, 15)).toEqual(['Gain', 'Global_StereoVoiceDepth']);
+  });
+});
+
+describe('making room for contract macros on real racks (doc/PLAN.md 4.3.1)', () => {
+  test('BS.adg has free slots, so the shift lands', () => {
+    const rack = Rack.parse(load('BS.adg'));
+    const before = rack.macros.map((m) => m.bindings.map((b) => b.targetName).sort());
+    expect(insertMacroSlots(rack, 2).ok).toBe(true);
+
+    const after = Rack.parse(rack.serialize());
+    expect(after.macros[0].bindings).toHaveLength(0);
+    expect(after.macros[1].bindings).toHaveLength(0);
+    // The ChainSelector binding travels with its macro like any other.
+    expect(after.macros[2].bindings.map((b) => b.targetName)).toEqual(['ChainSelector']);
+    for (let i = 0; i + 2 < 16; i++) {
+      expect(after.macros[i + 2].bindings.map((b) => b.targetName).sort()).toEqual(before[i]);
+    }
+  });
+
+  test('PD.adg is full, so the shift refuses instead of losing a macro', () => {
+    const rack = Rack.parse(load('PD.adg'));
+    const result = insertMacroSlots(rack, 1);
+    expect(result.ok).toBe(false);
+    // This is the case doc/PLAN.md 4.3.3 hands to a parent rack.
+    expect(Rack.parse(rack.serialize()).macros[15].bindings.length).toBeGreaterThan(0);
   });
 });

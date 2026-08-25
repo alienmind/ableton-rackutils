@@ -98,6 +98,48 @@ export function reorderMacro(rack: Rack, from: number, to: number): MutationResu
 }
 
 /**
+ * Make room at the FRONT of the macro bank by shifting every macro right by
+ * `count`, leaving slots 0..count-1 empty.
+ *
+ * The contract puts its own macros in the leading slots so they are in the
+ * same place on every rack (doc/PLAN.md 4.3.1), which means the rack's
+ * existing macros have to move out of the way first.
+ *
+ * Implemented as repeated `reorderMacro(15, 0)`, which rotates the whole bank
+ * right by one and brings the top slot round to the front. That keeps the
+ * variation handling on the single already-tested path (Constraint 4) instead
+ * of adding a second bulk permutation, and it is lossless precisely because
+ * the slots being rotated out are checked to be empty first.
+ *
+ * Fails rather than silently dropping anything when the top `count` slots
+ * carry bindings, which is what a full rack looks like.
+ */
+export function insertMacroSlots(rack: Rack, count: number): MutationResult {
+  if (!Number.isInteger(count) || count < 1 || count >= MACRO_SLOTS) {
+    throw new RangeError(`slot count ${count} out of range 1..${MACRO_SLOTS - 1}`);
+  }
+
+  const bindings = rack.collectMacroBindings();
+  const occupied: number[] = [];
+  for (let i = MACRO_SLOTS - count; i < MACRO_SLOTS; i++) {
+    if ((bindings.get(i) ?? []).length > 0) occupied.push(i + 1);
+  }
+  if (occupied.length > 0) {
+    return fail(
+      `no room to shift: macro${occupied.length > 1 ? 's' : ''} ${occupied.join(', ')} would be pushed off the end`,
+    );
+  }
+
+  for (let i = 0; i < count; i++) reorderMacro(rack, MACRO_SLOTS - 1, 0);
+
+  // Widen the visible bank so the new slots are reachable, without shrinking a
+  // rack that already showed more than it needed.
+  const visible = Math.min(MACRO_SLOTS, rack.macroCount + count);
+  setMacroCount(rack, visible);
+  return ok();
+}
+
+/**
  * Set how many macro knobs the rack shows. All 16 slots exist in the file
  * regardless (SCHEMA.md Q7), so shrinking hides macros, it never deletes
  * their bindings - a slot above the new count keeps driving whatever it drove.

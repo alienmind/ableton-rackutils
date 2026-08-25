@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'vitest';
 import { childValue } from '../src/dom';
-import { Rack } from '../src/model';
+import { MACRO_SLOTS, Rack } from '../src/model';
 import {
   bindParameter,
+  insertMacroSlots,
   invertBindingRange,
   moveMapping,
   renameMacro,
@@ -433,5 +434,60 @@ describe('binding ranges (SCHEMA.md Q4)', () => {
     expect(setBindingRange(rack, 5, path, { min: 0, max: 1 }).ok).toBe(false);
     expect(invertBindingRange(rack, 5, path).ok).toBe(false);
     expect(setBindingRange(rack, 0, '99/99', { min: 0, max: 1 }).ok).toBe(false);
+  });
+});
+
+describe('insertMacroSlots', () => {
+  test('shifts every macro right and leaves the front slots empty', () => {
+    const rack = Rack.parse(buildFixtureBytes());
+    const before = rack.macros.map((m) => ({ name: m.name, targets: m.bindings.map((b) => b.targetName).sort() }));
+    expect(insertMacroSlots(rack, 2).ok).toBe(true);
+
+    const after = Rack.parse(rack.serialize()).macros;
+    expect(after[0].bindings).toHaveLength(0);
+    expect(after[1].bindings).toHaveLength(0);
+    for (let i = 0; i + 2 < MACRO_SLOTS; i++) {
+      expect(after[i + 2].name).toBe(before[i].name);
+      expect(after[i + 2].bindings.map((b) => b.targetName).sort()).toEqual(before[i].targets);
+    }
+  });
+
+  test('permutes variation values in lockstep (Constraint 4)', () => {
+    const rack = Rack.parse(buildFixtureBytes());
+    const before = rack.variations.map((v) => [...v.values]);
+    expect(insertMacroSlots(rack, 1).ok).toBe(true);
+
+    const after = Rack.parse(rack.serialize()).variations;
+    after.forEach((v, i) => {
+      for (let slot = 0; slot + 1 < MACRO_SLOTS; slot++) {
+        expect(v.values[slot + 1]).toBe(before[i][slot]);
+      }
+    });
+  });
+
+  test('widens the visible bank to expose the new slots', () => {
+    const rack = Rack.parse(buildFixtureBytes());
+    const before = rack.macroCount;
+    insertMacroSlots(rack, 2);
+    expect(Rack.parse(rack.serialize()).macroCount).toBe(before + 2);
+  });
+
+  test('refuses rather than pushing a binding off the end', () => {
+    const rack = Rack.parse(buildFixtureBytes());
+    // Occupy the last slot, so shifting by one would lose it.
+    const target = rack.macros.find((m) => m.bindings.length > 0)!;
+    moveMapping(rack, target.index, MACRO_SLOTS - 1);
+
+    const result = insertMacroSlots(rack, 1);
+    expect(result.ok).toBe(false);
+    expect(result.warnings[0]).toContain('16');
+    // And nothing moved.
+    expect(Rack.parse(rack.serialize()).macros[MACRO_SLOTS - 1].bindings.length).toBeGreaterThan(0);
+  });
+
+  test('rejects a count outside 1..15', () => {
+    const rack = Rack.parse(buildFixtureBytes());
+    expect(() => insertMacroSlots(rack, 0)).toThrow(RangeError);
+    expect(() => insertMacroSlots(rack, MACRO_SLOTS)).toThrow(RangeError);
   });
 });

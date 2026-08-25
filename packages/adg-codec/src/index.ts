@@ -14,6 +14,7 @@ export {
   renameMacro,
   renameRack,
   setMacroCount,
+  insertMacroSlots,
   setMacroColor,
   setChainColor,
 } from './mutate';
