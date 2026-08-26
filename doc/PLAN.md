@@ -1105,11 +1105,9 @@ CI.
 - **The getting-started steps are three columns.** A fourth step left an orphan
   row on its own, so finding the file and dragging it in are one step.
 - **The companion device is a real download** (D7), pointing at the newest
-  versioned release and showing which version that is. The card states what it
+  versioned release and showing which version that is. Its panel states what it
   adds (the same editor, offline, inside Live), what it requires (Live 12, Max
-  for Live), and that the zip has to be unpacked whole. An `.amxd` is
-  executable content and installing one is a real trust decision, so the source
-  and the workflow that built it are linked from the card.
+  for Live), and that the zip has to be unpacked whole.
 
 ### D5. Shipping the device from the site - DONE
 

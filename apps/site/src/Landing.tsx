@@ -21,7 +21,7 @@ export function Landing({ compact }: { compact: boolean }) {
         <h1>
           ableton-rackutils <span className="badge">v0.2.0 beta</span>
         </h1>
-        <p className="tagline">Rearrange the macro knobs on an Ableton rack, in your browser.</p>
+        <p className="tagline">Advanced macro utilities for your Ableton racks.</p>
       </header>
     </>
   );

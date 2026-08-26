@@ -24,7 +24,7 @@ export function GettingStarted({ compact }: { compact: boolean }) {
   return (
     <section className="getting-started">
       <p className="lead">
-        Save the rack in Live first, then drop the <code>.adg</code> above. Nothing is uploaded.
+        How do I get a rack in here
         <HelpButton label="How do I get a rack out of Live?" onClick={() => setShowing('rack')} />
       </p>
 
@@ -78,13 +78,6 @@ export function GettingStarted({ compact }: { compact: boolean }) {
             Unpack the zip whole. The device reads the folder that ships next to it and opens an empty window
             without it; the installer scripts put both into your User Library. On a Mac, macOS quarantines
             anything downloaded, and the installer clears that flag.
-          </p>
-          <p>
-            An <code>.amxd</code> is executable content and installing one is a real trust decision, so:{' '}
-            <a href="https://github.com/alienmind/ableton-rackutils/blob/main/.github/workflows/release-device.yml">
-              the workflow that builds it
-            </a>
-            , and <a href="https://github.com/alienmind/ableton-rackutils">the source it is built from</a>.
           </p>
         </Modal>
       )}
