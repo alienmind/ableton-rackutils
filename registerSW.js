@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/ableton-rackutils/sw.js', { scope: '/ableton-rackutils/' })})}
