@@ -47,6 +47,9 @@ const VST3_PRESET = 'Vst3Preset';
 /** `Uid/Fields.0-3`, the four ints of a VST3 class id (SCHEMA.md Q18). */
 const UID_FIELDS = [0, 1, 2, 3];
 
+/** A macro driving a plugin's own on/off, rather than one of its parameters (SCHEMA.md Q20). */
+const POWER_MACRO_INDEX = 'PowerMacroControlIndex';
+
 /** The chain element at or above `el`: `InstrumentBranchPreset`, `AudioBranchPreset`, `DrumBranchPreset`. */
 function nearestBranchPreset(el: Element | null): Element | null {
   let node = el;
@@ -89,6 +92,30 @@ export interface Binding {
   rangeMax: number;
   /** Min > Max on MidiControllerRange. Live honours it (SCHEMA.md Q4). */
   inverted: boolean;
+  /**
+   * Set when the target is a PLUGIN parameter rather than an Ableton one
+   * (SCHEMA.md Q20). Absent on every other binding, so nothing that already
+   * reads a `Binding` has to change.
+   */
+  plugin?: PluginBinding;
+}
+
+/**
+ * A macro driving something on a plugin. Not a `KeyMidi`: the plugin's exposed
+ * parameter carries an integer `MacroControlIndex`, and the plugin's own on/off
+ * a `PowerMacroControlIndex` of the same shape (SCHEMA.md Q20).
+ *
+ * The file names neither the plugin nor the parameter - only a class id and
+ * the plugin's own parameter id - so a readable label has to be built from
+ * those, or from a resolved plugin name (Q18).
+ */
+export interface PluginBinding {
+  /** Class id of the plugin the parameter belongs to (SCHEMA.md Q18). */
+  uid: string;
+  /** The plugin's own parameter id. Null on a power binding, which is not one of them. */
+  parameterId: number | null;
+  /** The plugin's on/off switch rather than one of its parameters. */
+  power: boolean;
 }
 
 export interface ParamRef {
@@ -254,6 +281,7 @@ export class Rack {
   get macros(): Macro[] {
     const device = this.deviceEl;
     const bindings = this.collectMacroBindings();
+    const pluginRefs = this.collectPluginMacroRefs();
     const macros: Macro[] = [];
     for (let i = 0; i < MACRO_SLOTS; i++) {
       const mc = child(device, `MacroControls.${i}`);
@@ -261,7 +289,17 @@ export class Rack {
       const color = Number(childValue(device, `MacroColor.${i}`) ?? 0);
       const value = Number(childValue(mc, 'Manual') ?? 0);
       const keyMidis = bindings.get(i) ?? [];
-      macros.push({ index: i, name, color, value, bindings: keyMidis.map((km) => this.describeBinding(km)) });
+      // Plugin bindings are a separate collection because they are a separate
+      // element (SCHEMA.md Q20). Leaving them out of `bindings` is what made a
+      // macro driving only a plugin parameter read as unmapped.
+      const pluginEls = pluginRefs.get(i) ?? [];
+      macros.push({
+        index: i,
+        name,
+        color,
+        value,
+        bindings: [...keyMidis.map((km) => this.describeBinding(km)), ...pluginEls.map((el) => this.describePluginBinding(el))],
+      });
     }
     return macros;
   }
@@ -418,6 +456,50 @@ export class Rack {
   targetParameterOf(keyMidi: Element): Element {
     const parent = keyMidi.parentElement!;
     return parent.tagName === 'Timeable' ? parent.parentElement! : parent;
+  }
+
+  /**
+   * One plugin binding, from the `MacroControlIndex` (or
+   * `PowerMacroControlIndex`) element that holds the macro index.
+   *
+   * Two shapes, and they are not the same as an Ableton parameter's:
+   *
+   * - an exposed parameter's range is a `MidiControllerRange` nested inside
+   *   another one, and reads 0..1 - the plugin's normalized value, not the
+   *   0..127 of a macro or the parameter's own units (SCHEMA.md Q4, Q20);
+   * - the power switch's range is a flat `PowerMacroMappingRange` on the
+   *   preset, `64..127` in every donor. What Live writes there once the switch
+   *   is actually mapped has not been seen; the element is present and
+   *   readable either way, so it is reported rather than guessed at.
+   *
+   * `targetPath` addresses the element carrying the index, which resolves
+   * back like any other path. It is NOT a parameter element, so the mutations
+   * that expect a `KeyMidi` under it refuse it by name (`mutate.ts`).
+   */
+  private describePluginBinding(el: Element): Binding {
+    const power = el.tagName === POWER_MACRO_INDEX;
+    const container = el.parentElement!;
+    // An exposed parameter sits in ParameterSettings on the preset; the power
+    // switch sits on the preset itself.
+    const preset = power ? container : (container.parentElement?.parentElement ?? container);
+    const uidEl = child(preset, 'Uid');
+    const parameterId = power ? null : Number(childValue(container, 'ParameterId'));
+    const outer = power ? child(preset, 'PowerMacroMappingRange') : child(container, 'MidiControllerRange');
+    const range = power ? outer : child(outer, 'MidiControllerRange');
+    const min = Number(childValue(range, 'Min') ?? 0);
+    const max = Number(childValue(range, 'Max') ?? 1);
+    return {
+      targetPath: this.pathOf(el),
+      targetName: power ? 'Device On' : `Parameter ${parameterId}`,
+      rangeMin: min,
+      rangeMax: max,
+      inverted: min > max,
+      plugin: {
+        uid: uidEl ? uidFromFields(UID_FIELDS.map((i) => Number(childValue(uidEl, `Fields.${i}`)))) : '',
+        parameterId,
+        power,
+      },
+    };
   }
 
   private describeBinding(keyMidi: Element): Binding {

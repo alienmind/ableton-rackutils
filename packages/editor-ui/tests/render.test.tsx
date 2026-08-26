@@ -12,6 +12,7 @@ import { describe, expect, test } from 'vitest';
 import { Rack } from '@rackutils/adg-codec';
 import { RackEditor } from '../src/RackEditor';
 import { MACRO_PALETTE, macroColor } from '../src/macroColors';
+import { macroLabel } from '../src/mappings';
 import { buildDrumFixtureBytes, buildFixtureBytes } from '../../adg-codec/tests/fixture';
 
 const FIXTURES = join(__dirname, '..', '..', 'adg-codec', 'tests', 'fixtures');
@@ -170,5 +171,32 @@ describe('the plugin strip (doc/PLAN.md 4.1)', () => {
 
   test('a rack with no plugins draws no strip at all', () => {
     expect(render(donor('BS.adg'))).not.toContain('plugin-strip');
+  });
+});
+
+describe('a macro driving a plugin parameter (SCHEMA.md Q20)', () => {
+  const DONORS = join(__dirname, '..', '..', 'adg-codec', 'donors');
+  const donor = (name: string) => Rack.parse(new Uint8Array(readFileSync(join(DONORS, name))));
+
+  test('the mapping table shows it, where it used to show nothing', () => {
+    const html = render(donor('BS-VST3-mapped.adg'));
+    // The file names neither the plugin nor the parameter, so the row is the
+    // parameter id and, without a folder scan to resolve the class id, the
+    // word Plugin where a device name goes.
+    expect(html).toContain('Parameter 70');
+    expect(html).toContain('Plugin');
+  });
+
+  test('an unnamed macro is labelled after it rather than as an empty slot (SCHEMA.md Q23)', () => {
+    // Slot 13 here, past this rack's ten visible macros, so the knob is not
+    // drawn - the label is what a knob WOULD read, and what the table reads.
+    const macro = donor('BS-VST3-mapped.adg').macros[12];
+    expect(macroLabel(macro)).toBe('Parameter 70');
+  });
+
+  test('its range is shown and not offered for editing', () => {
+    const html = render(donor('BS-VST3-mapped.adg'));
+    // 0..1, the plugin's own normalized range, in a cell with no input in it.
+    expect(html).toContain('mapping-fixed');
   });
 });

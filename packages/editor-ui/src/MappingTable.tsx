@@ -136,37 +136,56 @@ export function MappingTable({ rack }: MappingTableProps) {
                   <td className="col-name" title={t.parameter}>
                     {t.parameter}
                   </td>
+                  {/* A plugin's range is its own normalized 0..1 and is stored
+                      in a differently shaped element (SCHEMA.md Q20), so it is
+                      shown and not offered for editing - writing an
+                      Ableton-shaped range there makes a file that loads and
+                      behaves wrong. */}
                   <td className="col-num">
-                    <RangeCell
-                      value={t.rangeMin}
-                      label={`Minimum of ${t.parameter}`}
-                      onCommit={(min) =>
-                        apply(row.rackPath, (r) =>
-                          setBindingRange(r, row.macroIndex, t.targetPath, { min, max: t.rangeMax }),
-                        )
-                      }
-                    />
+                    {t.plugin ? (
+                      <span className="mapping-fixed" title="the plugin's own range">
+                        {t.rangeMin}
+                      </span>
+                    ) : (
+                      <RangeCell
+                        value={t.rangeMin}
+                        label={`Minimum of ${t.parameter}`}
+                        onCommit={(min) =>
+                          apply(row.rackPath, (r) =>
+                            setBindingRange(r, row.macroIndex, t.targetPath, { min, max: t.rangeMax }),
+                          )
+                        }
+                      />
+                    )}
                   </td>
                   <td className="col-num">
-                    <RangeCell
-                      value={t.rangeMax}
-                      label={`Maximum of ${t.parameter}`}
-                      onCommit={(max) =>
-                        apply(row.rackPath, (r) =>
-                          setBindingRange(r, row.macroIndex, t.targetPath, { min: t.rangeMin, max }),
-                        )
-                      }
-                    />
+                    {t.plugin ? (
+                      <span className="mapping-fixed" title="the plugin's own range">
+                        {t.rangeMax}
+                      </span>
+                    ) : (
+                      <RangeCell
+                        value={t.rangeMax}
+                        label={`Maximum of ${t.parameter}`}
+                        onCommit={(max) =>
+                          apply(row.rackPath, (r) =>
+                            setBindingRange(r, row.macroIndex, t.targetPath, { min: t.rangeMin, max }),
+                          )
+                        }
+                      />
+                    )}
                   </td>
                   <td className="col-actions">
-                    <button
-                      type="button"
-                      className={`mapping-invert${t.inverted ? ' is-inverted' : ''}`}
-                      title={`Invert the range on ${t.parameter}`}
-                      onClick={() => apply(row.rackPath, (r) => invertBindingRange(r, row.macroIndex, t.targetPath))}
-                    >
-                      &#8646;
-                    </button>
+                    {!t.plugin && (
+                      <button
+                        type="button"
+                        className={`mapping-invert${t.inverted ? ' is-inverted' : ''}`}
+                        title={`Invert the range on ${t.parameter}`}
+                        onClick={() => apply(row.rackPath, (r) => invertBindingRange(r, row.macroIndex, t.targetPath))}
+                      >
+                        &#8646;
+                      </button>
+                    )}
                     {/* Unbinds THIS parameter only. A macro often drives several
                         and the others must survive (SCHEMA.md, the multi-target
                         bugfix) - `unbindMacro` would clear the lot. */}

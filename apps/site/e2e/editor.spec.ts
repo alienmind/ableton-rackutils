@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { writeRackFile } from './rack-file';
 
-async function loadRack(page: Page, kind: 'instrument' | 'drum' | 'plugin' = 'instrument') {
+async function loadRack(page: Page, kind: 'instrument' | 'drum' | 'plugin' | 'plugin-mapped' = 'instrument') {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
@@ -773,4 +773,15 @@ test.describe('the plugin strip (doc/PLAN.md 4.1)', () => {
     await loadRack(page);
     await expect(page.locator('.plugin-strip')).toHaveCount(0);
   });
+});
+
+test('a macro driving a plugin parameter is listed, with a range it does not offer to edit', async ({ page }) => {
+  await loadRack(page, 'plugin-mapped');
+  // Slot 13, driven by MacroControlIndex and by no KeyMidi at all (SCHEMA.md
+  // Q20). It used to be missing from this table entirely.
+  const row = mappingRowForSlot(page, 13);
+  await expect(row).toHaveCount(1);
+  await expect(row.locator('.col-name')).toHaveText('Parameter 70');
+  await expect(row.locator('.mapping-fixed')).toHaveCount(2);
+  await expect(row.locator('.mapping-invert')).toHaveCount(0);
 });

@@ -1,7 +1,7 @@
 export { compress, decompress, isGzip } from './gzip';
 export { normalize, maxId, VOLATILE_ATTRS } from './normalize';
 export { Rack, MACRO_SLOTS, UNSET_MACRO_VALUE } from './model';
-export type { Macro, Binding, ParamRef, DeviceNode, Chain, PluginRef, Variation } from './model';
+export type { Macro, Binding, PluginBinding, ParamRef, DeviceNode, Chain, PluginRef, Variation } from './model';
 export { uidFromFields, uidToBytes, toComOrder, uidAscii } from './vst3';
 export {
   moveMapping,

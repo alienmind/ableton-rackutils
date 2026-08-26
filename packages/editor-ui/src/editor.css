@@ -1765,3 +1765,9 @@
 .plugin-error {
   color: #e0736a;
 }
+
+/* A range the tool shows and does not edit: a plugin's own (SCHEMA.md Q20). */
+.mapping-fixed {
+  color: var(--edit-dim);
+  font-variant-numeric: tabular-nums;
+}

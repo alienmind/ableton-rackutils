@@ -224,6 +224,17 @@ export function unbindOne(rack: Rack, macroIndex: number, targetPath: string): M
   const targetEl = rack.resolveTarget(targetPath);
   if (!targetEl) return fail(`no parameter at "${targetPath}" - it may belong to a stale snapshot`);
 
+  // A plugin binding is cleared by writing -1 rather than by removing an
+  // element: the parameter stays exposed on the device, it just stops being
+  // driven (SCHEMA.md Q20).
+  if (PLUGIN_INDEX_TAGS.includes(targetEl.tagName)) {
+    if (Number(targetEl.getAttribute('Value')) !== macroIndex) {
+      return fail(`that plugin parameter is driven by macro ${Number(targetEl.getAttribute('Value')) + 1}, not macro ${macroIndex + 1}`);
+    }
+    targetEl.setAttribute('Value', '-1');
+    return clearVariationsIfLastBinding(rack, macroIndex);
+  }
+
   const container = child(targetEl, 'Timeable') ?? targetEl;
   const keyMidi = child(container, 'KeyMidi');
   if (!keyMidi || childValue(keyMidi, 'Channel') !== '16') return fail('that parameter is not driven by a macro');
@@ -231,12 +242,21 @@ export function unbindOne(rack: Rack, macroIndex: number, targetPath: string): M
   if (owner !== macroIndex) return fail(`that parameter is driven by macro ${owner + 1}, not macro ${macroIndex + 1}`);
 
   removeKeyMidi(keyMidi);
+  return clearVariationsIfLastBinding(rack, macroIndex);
+}
 
-  // The macro's variation values only become meaningless once it drives
-  // nothing at all. While it still has other targets, its stored per-variation
-  // positions are live and clearing them would break every variation.
-  const remaining = rack.collectMacroBindings().get(macroIndex) ?? [];
-  if (remaining.length === 0) {
+/**
+ * The macro's variation values only become meaningless once it drives nothing
+ * at all. While it still has other targets, its stored per-variation positions
+ * are live and clearing them would break every variation (Constraint 4).
+ *
+ * Both kinds of binding count: a macro left driving only a plugin parameter is
+ * still driving something.
+ */
+function clearVariationsIfLastBinding(rack: Rack, macroIndex: number): MutationResult {
+  const keyMidis = rack.collectMacroBindings().get(macroIndex) ?? [];
+  const plugins = rack.collectPluginMacroRefs().get(macroIndex) ?? [];
+  if (keyMidis.length === 0 && plugins.length === 0) {
     permuteVariations(rack, (values) => {
       values[macroIndex] = UNSET_MACRO_VALUE;
     });
@@ -336,10 +356,22 @@ export function invertBindingRange(rack: Rack, macroIndex: number, targetPath: s
   return ok();
 }
 
+/**
+ * A plugin binding's `targetPath` addresses the element holding the macro
+ * index, not a parameter (SCHEMA.md Q20). Nothing here can edit one: the range
+ * lives in a differently shaped element and reads 0..1 rather than the
+ * parameter's own units, so writing an Ableton-shaped range into it would
+ * produce a file that loads and behaves wrong.
+ */
+const PLUGIN_INDEX_TAGS = ['MacroControlIndex', 'PowerMacroControlIndex'];
+
 /** The KeyMidi for one macro-to-parameter binding, or the reason there is none. */
 function findBinding(rack: Rack, macroIndex: number, targetPath: string): Element | string {
   const targetEl = rack.resolveTarget(targetPath);
   if (!targetEl) return `no parameter at "${targetPath}" - it may belong to a stale snapshot`;
+  if (PLUGIN_INDEX_TAGS.includes(targetEl.tagName)) {
+    return 'that is a plugin parameter - its range belongs to the plugin, and this tool cannot edit it yet';
+  }
 
   const container = child(targetEl, 'Timeable') ?? targetEl;
   const keyMidi = child(container, 'KeyMidi');

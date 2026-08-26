@@ -23,8 +23,10 @@ import {
   removeDevice,
   reorderMacro,
   resetMacro,
+  setBindingRange,
   swapMacros,
   unbindMacro,
+  unbindOne,
 } from '../src/mutate';
 
 const load = (name: string) => new Uint8Array(readFileSync(join(__dirname, '..', 'donors', name)));
@@ -500,8 +502,42 @@ describe('a macro driving a plugin parameter (SCHEMA.md Q20)', () => {
   test('BS-VST3-mapped.adg binds its plugin parameter by index', () => {
     const rack = Rack.parse(load('BS-VST3-mapped.adg'));
     expect(pluginMacro(rack)).toBe(12);
-    // And it is invisible to the KeyMidi machinery, which is the whole problem.
-    expect(rack.macros[12].bindings).toHaveLength(0);
+  });
+
+  test('the macro reports the binding, rather than reading as unmapped', () => {
+    const rack = Rack.parse(load('BS-VST3-mapped.adg'));
+    const [binding] = rack.macros[12].bindings;
+    // No KeyMidi anywhere near it: this comes from MacroControlIndex on the
+    // exposed parameter (SCHEMA.md Q20). Its range is the plugin normalized
+    // 0..1, not the 0..127 an Ableton parameter carries.
+    expect(binding.plugin).toEqual({ uid: '41727475415649534d42525450726f63', parameterId: 70, power: false });
+    expect(binding.targetName).toBe('Parameter 70');
+    expect([binding.rangeMin, binding.rangeMax]).toEqual([0, 1]);
+  });
+
+  test('an empty slot still reads as unmapped', () => {
+    const rack = Rack.parse(load('BS-VST3-mapped.adg'));
+    expect(rack.macros[13].bindings).toHaveLength(0);
+  });
+
+  test('editing that binding range is refused rather than written in the wrong shape', () => {
+    const rack = Rack.parse(load('BS-VST3-mapped.adg'));
+    const [binding] = rack.macros[12].bindings;
+    const result = setBindingRange(rack, 12, binding.targetPath, { min: 0, max: 64 });
+    expect(result.ok).toBe(false);
+    expect(result.warnings.join(' ')).toContain('plugin parameter');
+  });
+
+  test('unbinding it writes -1 and leaves the parameter exposed', () => {
+    const rack = Rack.parse(load('BS-VST3-mapped.adg'));
+    const [binding] = rack.macros[12].bindings;
+    expect(unbindOne(rack, 12, binding.targetPath).ok).toBe(true);
+    const after = Rack.parse(rack.serialize());
+    expect(pluginMacro(after)).toBe(-1);
+    expect(after.macros[12].bindings).toHaveLength(0);
+    // The PluginParameterSettings element stays: the parameter is still
+    // exposed on the device, it just stops being driven (SCHEMA.md Q20).
+    expect(after.document.getElementsByTagName('PluginParameterSettings')).toHaveLength(1);
   });
 
   test('moving that macro carries the plugin binding with it', () => {
