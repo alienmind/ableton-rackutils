@@ -11,7 +11,7 @@ import { GettingStarted } from './GettingStarted';
  * logo alone is 2.4MB inside an `.amxd` that ships offline. `vite.config.ts`
  * aliases this module to `Landing.embedded.tsx` when `VITE_EMBED=1`, which is
  * what keeps the assets out of the bundle rather than merely unrendered
- * (doc/PLAN.md 4.7).
+ * (doc/PLAN.md).
  */
 export function Landing({ compact }: { compact: boolean }) {
   return (

@@ -1,5 +1,5 @@
 /*
- * Live's layout, not an invented one (doc/PLAN.md Part 5).
+ * Live's layout, not an invented one (doc/DEVELOPERS.md).
  *
  * The whole rack is ONE ROW. A rack panel is a thin title bar over a body of
  * fixed height; the body holds the macro panel, the chain list, and the
@@ -10,7 +10,7 @@
  * Live device view gets (169px). Everything is sized against it so a rack
  * cannot grow vertically: the page scrolls sideways, as Live's chain does.
  *
- * The knob shape is still a PLACEHOLDER (doc/PLAN.md Part 5).
+ * The knob shape is still a PLACEHOLDER (doc/DEVELOPERS.md).
  */
 .rack-editor {
   --device-height: 169px;
@@ -476,7 +476,7 @@
 }
 
 /* The live value is the LOM's current position, not what the file stores.
-   Different thing, deliberately different look (doc/PLAN.md Phase 3.3). */
+   Different thing, deliberately different look (doc/DEVELOPERS.md). */
 .knob-live {
   fill: none;
   stroke: #ffd166;
@@ -1117,7 +1117,7 @@
 }
 
 
-/* --- Rack features: the contract strip (doc/PLAN.md 4.3.1) --- */
+/* --- Rack features: the contract strip (doc/DEVELOPERS.md, the contract) --- */
 
 .contract-strip {
   flex: 1 1 460px;
@@ -1369,7 +1369,7 @@
 
 .contract-note.warn { color: #d8c07a; }
 
-/* --- templates, arrows, reordering (doc/PLAN.md 4.3.7) --- */
+/* --- templates, arrows, reordering (doc/DEVELOPERS.md, the contract) --- */
 
 .contract-templates {
   display: flex;
@@ -1567,7 +1567,7 @@
 /* --- touch, and the small screens that come with it --- */
 
 /*
- * Every drag in this UI is a pointer gesture (doc/PLAN.md D3), and on a touch
+ * Every drag in this UI is a pointer gesture (doc/DEVELOPERS.md), and on a touch
  * screen the browser claims the same gesture for scrolling unless the element
  * says otherwise.
  *
@@ -1658,7 +1658,7 @@
 }
 
 
-/* --- Plugins the rack needs (doc/PLAN.md 4.1) --- */
+/* --- Plugins the rack needs (doc/PLAN.md) --- */
 
 .plugin-strip {
   margin-bottom: 6px;
@@ -1785,7 +1785,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Sortable headers, as Live's own mapping list has (doc/PLAN.md 4.4). */
+/* Sortable headers, as Live's own mapping list has (doc/PLAN.md). */
 .mapping-grid th .mapping-sort {
   display: flex;
   align-items: center;

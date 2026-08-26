@@ -1,7 +1,7 @@
 /**
  * surface.ts - the device's Live parameters and its window.
  *
- * rack-editor has no parameters. It is a tool (doc/PLAN.md 4.7), not an
+ * rack-editor has no parameters. It is a tool (doc/PLAN.md), not an
  * instrument or effect with a sound to automate - nothing here belongs on Push
  * or in an automation lane.
  *

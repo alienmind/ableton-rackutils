@@ -2,7 +2,7 @@ import { toComOrder, uidToBytes } from '@rackutils/adg-codec';
 
 /**
  * Turning a VST3 class id back into a plugin name, in the browser
- * (doc/PLAN.md 4.1, SCHEMA.md Q18).
+ * (SCHEMA.md Q18).
  *
  * A `.adg` names no plugin: it stores a class id and Live resolves that
  * against what is installed. So does this, the only way a web page can - the

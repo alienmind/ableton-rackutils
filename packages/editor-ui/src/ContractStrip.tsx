@@ -32,7 +32,7 @@ import {
 
 /**
  * Rack features: the contract, as two lists and a settings column above the
- * rack (doc/PLAN.md 4.3.1).
+ * rack (doc/DEVELOPERS.md, the contract).
  *
  * **A feature is MOUNTED or not; where its devices physically land is a
  * separate question.** Mounting Utility Gain on a drum rack puts a Utility at
@@ -611,7 +611,7 @@ export function ContractStrip({ rack }: ContractStripProps) {
  * Drag a feature up or down the list to change the order its knobs land in.
  *
  * Pointer events, not HTML5 drag-and-drop, for the reason the rest of this UI
- * uses them (doc/PLAN.md D3): DnD does nothing in a real browser here and
+ * uses them (doc/DEVELOPERS.md): DnD does nothing in a real browser here and
  * cannot be relied on inside the Max `jweb` webview. Listeners attach in the
  * pointerdown handler, so a fast drag cannot finish before they exist.
  */
@@ -729,7 +729,7 @@ function summarise(statuses: readonly ContractStatus[]): ContractStatus {
 /**
  * What the rack already does about this feature. Partial is worth its own
  * word: it is the state where the tool is about to ADD something to some
- * chains and reuse what is in the others (doc/PLAN.md 4.3.3).
+ * chains and reuse what is in the others (doc/DEVELOPERS.md, the contract).
  */
 function stateTitle(status: ContractStatus | undefined): string {
   if (!status) return '';

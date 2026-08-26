@@ -160,7 +160,7 @@ export interface Chain {
 }
 
 /**
- * One plugin instance a rack needs in order to load (doc/PLAN.md 4.1).
+ * One plugin instance a rack needs in order to load (doc/PLAN.md).
  *
  * `Vst3Preset` is the only plugin wrapper any evidence here shows (SCHEMA.md
  * Q17). VST2 and Audio Unit presets are certainly other tags; nothing has
@@ -235,7 +235,7 @@ export class Rack {
   }
 
   /**
-   * A deep, independent copy for undo stacks (doc/PLAN.md Phase 2.1). Goes
+   * A deep, independent copy for undo stacks (doc/DEVELOPERS.md). Goes
    * through serialize+reparse rather than `cloneNode` + cross-document
    * adoption - a full reparse of a several-thousand-element rack is a few
    * milliseconds, cheap enough to trade for not having to reason about

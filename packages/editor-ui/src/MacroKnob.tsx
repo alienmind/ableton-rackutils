@@ -7,7 +7,7 @@ import { macroLabel } from './mappings';
 
 export interface MacroKnobProps {
   macro: Macro;
-  /** M4L device only. Drawn distinctly from the stored value: they are different things (doc/PLAN.md Constraint 1) and must never look alike. */
+  /** M4L device only. Drawn distinctly from the stored value: they are different things (doc/DEVELOPERS.md, Constraint 1) and must never look alike. */
   liveValue?: number;
   /** Something is armed, so clicking this knob binds it here. */
   armed: boolean;

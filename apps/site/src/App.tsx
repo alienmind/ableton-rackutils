@@ -9,7 +9,7 @@ import { canOpenWithHandle, handleFromDrop, openRackFile, saveInPlace, type Writ
  * The Max for Live bundle goes straight to the work: load a rack, author it.
  * The device window is small and its user installed the thing on purpose, so
  * the landing chrome is dropped at BUILD time - see `Landing.tsx` - rather
- * than merely hidden (doc/PLAN.md 4.7).
+ * than merely hidden (doc/PLAN.md).
  */
 const EMBEDDED = import.meta.env.VITE_EMBED === '1';
 
@@ -19,7 +19,7 @@ interface Loaded {
   /**
    * Set when the rack came in through a picker or a drop the browser gave a
    * handle for - the one way the edited file can go back over the original
-   * (doc/PLAN.md 4.6). Null means Export, and only Export.
+   * (doc/PLAN.md). Null means Export, and only Export.
    */
   handle: WritableFile['handle'];
 }
@@ -171,7 +171,7 @@ export default function App() {
           {/* Over the original, and only when the rack came in through a
               handle. Two clicks, the second naming the file, because this is
               the one control in the tool that can destroy a rack rather than
-              produce another copy of one (doc/PLAN.md 4.6). */}
+              produce another copy of one (doc/PLAN.md). */}
           {loaded?.handle &&
             (confirmingOverwrite ? (
               <p className="overwrite-confirm">
@@ -222,7 +222,7 @@ export default function App() {
 /**
  * What the saved file is called: the rack's name, which the features strip
  * also writes - one name on the rack, on its macros, on the devices the
- * contract added, and on the file (doc/PLAN.md 4.3.1). Falls back to the file
+ * contract added, and on the file (doc/DEVELOPERS.md, the contract). Falls back to the file
  * it came from.
  */
 function downloadName(loaded: Loaded): string {

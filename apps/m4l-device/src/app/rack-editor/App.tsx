@@ -1,5 +1,5 @@
 /**
- * rack-editor - the companion device (doc/PLAN.md 4.7). An audio effect with a
+ * rack-editor - the companion device (doc/PLAN.md). An audio effect with a
  * passthrough chain: it can sit on any track without changing what plays,
  * because it targets a rack, it does not process audio.
  *

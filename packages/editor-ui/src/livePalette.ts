@@ -9,7 +9,7 @@
  * ORDER IS GRID ORDER, left to right then top to bottom - which is NOT
  * confirmed to be the index Live stores in `MacroColor.N` or
  * `DocumentColorIndex`. Grid position and stored index are two different
- * numbers until a diff proves otherwise (SCHEMA.md Q13, doc/PLAN.md Part 5):
+ * numbers until a diff proves otherwise (SCHEMA.md Q13, doc/DEVELOPERS.md):
  * colour three or four macros distinctly by hand, save, and check which index
  * lands where before trusting this as a lookup.
  */

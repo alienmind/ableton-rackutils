@@ -24,7 +24,7 @@ export interface RackEditorProps {
  * Every mutation goes through `apply` so undo and warnings can never be
  * forgotten by a new interaction, and every read (`macros`, `chains`) is
  * derived from the current handle on each render rather than mirrored into
- * React state (doc/PLAN.md Part 5).
+ * React state (doc/DEVELOPERS.md).
  */
 export function RackEditor({ rack, onChange, liveValues }: RackEditorProps) {
   const [undo, setUndo] = useState<Rack[]>([]);
