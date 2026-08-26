@@ -88,7 +88,6 @@ interface RackTarget {
 export function ContractStrip({ rack }: ContractStripProps) {
   const { apply } = useEditor();
   const [library, setLibrary] = useState<Library>(() => loadLibrary());
-  const [rackName, setRackName] = useState(rack.name);
   const [pickedOption, setPickedOption] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   /** A feature waiting on the reuse question, with the knob it would take over. */
@@ -102,7 +101,15 @@ export function ContractStrip({ rack }: ContractStripProps) {
   const available = availableOptions(template);
   const feature = template.features.find((f) => f.key === selected) ?? null;
   const spec = feature ? optionSpec(feature.option) : null;
-  const name = rackName || rack.name;
+  const featureIndex = feature ? template.features.indexOf(feature) : -1;
+  /**
+   * The rack's name is the RACK's, not a field of this strip's own.
+   *
+   * It used to be state initialised from `rack.name` and never updated again,
+   * so renaming from the title bar left this box showing the old name and the
+   * two read as different things. They are one thing with two ways in.
+   */
+  const name = rack.name;
 
   /**
    * One status per FEATURE, not per knob. A feature can carry several - EQ
@@ -117,6 +124,8 @@ export function ContractStrip({ rack }: ContractStripProps) {
     let at = 0;
     return template.features.map((f) => summarise(perDevice.slice(at, (at += devicesFor(f).length))));
   }, [rack, template, name]);
+
+  const featureStatus = featureIndex >= 0 ? statuses[featureIndex] : null;
 
   const targets = useMemo(() => nestedRackTargets(rack), [rack]);
   const isDrumRack = rack.deviceEl.tagName === 'DrumGroupDevice';
@@ -149,18 +158,18 @@ export function ContractStrip({ rack }: ContractStripProps) {
         // (a KeyMidi lives inside the parameter it drives, SCHEMA.md Q1), and
         // the slots those knobs were on are left behind as empty macros.
         for (const device of gone) {
-          const result = removeContractOption(r, device, { name: rackName || r.name, keepDevices: true });
+          const result = removeContractOption(r, device, { name: r.name, keepDevices: true });
           if (!result.ok) return result;
         }
         for (const device of gone) {
           if (device.deviceTag === undefined || tagsKept.has(device.deviceTag)) continue;
-          const result = removeContractOption(r, device, { name: rackName || r.name });
+          const result = removeContractOption(r, device, { name: r.name });
           if (!result.ok) return result;
         }
         // An empty template still has to leave the bank even: removals get
         // there one slot at a time (SCHEMA.md Q19).
         if (after.length === 0) return evenMacroCount(r);
-        return applyContract(r, after, { name: rackName || undefined });
+        return applyContract(r, after, { name: r.name });
       });
       // A refusal - no room for another macro, a drum rack asked for a chain
       // selector of its own - leaves the feature MOUNTED and unapplied rather
@@ -169,7 +178,7 @@ export function ContractStrip({ rack }: ContractStripProps) {
       // not something to do behind them.
       void applied;
     },
-    [apply, template, rackName],
+    [apply, template],
   );
 
   const patch = (key: string, changes: Partial<Feature>) =>
@@ -240,10 +249,26 @@ export function ContractStrip({ rack }: ContractStripProps) {
 
   const drag = useListDrag(move);
 
+  /**
+   * A rename from the title bar reaches the features too.
+   *
+   * `{name}` is in every feature's label, in the devices the contract inserts
+   * and in the saved file, so a rack renamed anywhere has to relabel
+   * everywhere - which is what makes the two boxes one name rather than two.
+   * Re-applying is safe (`applyContract` is idempotent) and cheap enough: it
+   * only runs when the name actually changed and the template has features.
+   */
+  const relabelled = useRef(rack.name);
+  useEffect(() => {
+    if (rack.name === relabelled.current) return;
+    relabelled.current = rack.name;
+    if (template.features.length === 0) return;
+    apply([], (r) => applyContract(r, devicesOf(template), { name: r.name }));
+  }, [rack.name, template, apply]);
+
   const commitRackName = (next: string) => {
-    if (next === rackName) return;
-    setRackName(next);
-    apply([], (r) => applyContract(r, devicesOf(template), { name: next || undefined }));
+    if (!next || next === rack.name) return;
+    apply([], (r) => applyContract(r, devicesOf(template), { name: next }));
   };
 
   // --- templates ---
@@ -292,7 +317,7 @@ export function ContractStrip({ rack }: ContractStripProps) {
           <input
             className="contract-code"
             key={rack.name}
-            defaultValue={rackName}
+            defaultValue={rack.name}
             placeholder={rack.name}
             title="Names the rack, fills {name} in every feature's label, names the devices the contract adds, and names the saved file."
             onBlur={(e) => commitRackName(e.target.value.trim())}
@@ -470,6 +495,20 @@ export function ContractStrip({ rack }: ContractStripProps) {
                   />
                 </span>
               </label>
+
+              {/* The same question the arrow asks, for a feature that is
+                  already in the list - a template carried over from the last
+                  rack arrives mounted, so the offer has to be reachable
+                  without taking it out and putting it back. */}
+              {!feature.adopt && featureStatus?.adoptable && (
+                <p className="contract-adopt inline">
+                  <strong>{featureStatus.adoptable.macroName}</strong> on macro {featureStatus.adoptable.slot + 1} already
+                  does this.
+                  <button type="button" className="adopt-yes" onClick={() => patch(feature.key, { adopt: true })}>
+                    Reuse it
+                  </button>
+                </p>
+              )}
 
               {spec.bands && (
                 <div className="contract-bands">

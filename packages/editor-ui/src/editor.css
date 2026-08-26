@@ -1837,3 +1837,14 @@
   border: 0;
   cursor: pointer;
 }
+
+/* The same offer, inside the settings column rather than across the strip. */
+.contract-adopt.inline {
+  display: block;
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+.contract-adopt.inline .adopt-yes {
+  margin-left: 6px;
+}

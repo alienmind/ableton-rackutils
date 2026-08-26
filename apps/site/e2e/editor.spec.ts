@@ -909,3 +909,22 @@ test('a knob the user already made is reused rather than emptied', async ({ page
   await expect(page.locator('.macro-knob-name', { hasText: 'KICK GAIN' })).toHaveCount(0);
   await expect(page.locator('.macro-knob').first().locator('.macro-knob-name')).toHaveText(/GAIN/);
 });
+
+test('the rack name is one name: renaming it anywhere renames it everywhere', async ({ page }) => {
+  await loadRack(page);
+  const strip = page.locator('.contract-code');
+  const title = page.locator('.rack-name').first();
+
+  // From the title bar. The strip's box used to keep the name the rack had
+  // when it mounted, so the two read as separate things.
+  await title.dblclick();
+  await page.locator('.rack-name-input').first().fill('KD');
+  await page.locator('.rack-name-input').first().blur();
+  await expect(title).toHaveText('KD');
+  await expect(strip).toHaveValue('KD');
+
+  // And back the other way.
+  await strip.fill('ZZ');
+  await strip.blur();
+  await expect(title).toHaveText('ZZ');
+});

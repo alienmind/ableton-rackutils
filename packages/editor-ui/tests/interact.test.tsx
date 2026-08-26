@@ -569,6 +569,31 @@ describe('a knob the user already made for the job (doc/PLAN.md 4.3.1)', () => {
     expect(rack.chains[0].devices.length).toBeGreaterThanOrEqual(before);
   }, REAL_RACK_TIMEOUT);
 
+  test('a feature already in the list still offers to reuse it', () => {
+    // The maintainer's case: a template carried over from the last rack
+    // arrives mounted, so the arrow - and its question - is never pressed.
+    act(() => root.unmount());
+    container.remove();
+    window.localStorage.setItem(
+      'rackutils.templates.v1',
+      JSON.stringify({
+        format: 1,
+        activeId: 't1',
+        templates: [{ id: 't1', name: 'Mine', features: [{ key: 'f1', option: 'utility', namePattern: '{name} GAIN', settings: {} }] }],
+      }),
+    );
+    mount(KD);
+
+    // The right-hand list: what the rack has mounted.
+    click(container.querySelectorAll('.contract-column')[1].querySelector('.contract-entry')!);
+    const offer = container.querySelector('.contract-settings .contract-adopt');
+    expect(offer?.textContent).toContain('KICK GAIN');
+
+    click(offer!.querySelector('.adopt-yes')!);
+    expect(rack.macros.some((m) => m.name === 'KICK GAIN')).toBe(false);
+    expect(rack.macros.find((m) => m.name.endsWith('GAIN'))?.bindings).toHaveLength(rack.chains.length);
+  }, REAL_RACK_TIMEOUT);
+
   test('cancelling adds nothing at all', () => {
     remount();
     const before = rack.macros.map((m) => m.name);
@@ -579,4 +604,36 @@ describe('a knob the user already made for the job (doc/PLAN.md 4.3.1)', () => {
     expect(container.querySelector('.contract-adopt')).toBeNull();
     expect(rack.macros.map((m) => m.name)).toEqual(before);
   }, REAL_RACK_TIMEOUT);
+});
+
+describe('the rack name is one name, with two ways in', () => {
+  const nameInput = () => container.querySelector('.contract-code') as HTMLInputElement;
+  const titleBar = () => container.querySelector('.rack-name') as HTMLElement;
+
+  const renameFromTitleBar = (next: string) => {
+    act(() => titleBar().dispatchEvent(new MouseEvent('dblclick', { bubbles: true })));
+    const input = container.querySelector('.rack-name-input') as HTMLInputElement;
+    act(() => {
+      input.value = next;
+      // React delegates onBlur through focusout (see the template tests above).
+      input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    });
+  };
+
+  test('renaming from the title bar moves the features strip with it', () => {
+    renameFromTitleBar('KD');
+    expect(rack.name).toBe('KD');
+    // The box used to keep the name the rack had when the strip mounted.
+    expect(nameInput().value).toBe('KD');
+  });
+
+  test('renaming from the strip renames the rack', () => {
+    const input = nameInput();
+    act(() => {
+      input.value = 'ZZ';
+      input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    });
+    expect(rack.name).toBe('ZZ');
+    expect(titleBar().textContent).toBe('ZZ');
+  });
 });
