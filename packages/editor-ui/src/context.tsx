@@ -68,6 +68,16 @@ export interface EditorContextValue {
   /** Live macro values from the M4L device, keyed by macro index. Root rack only, display only. */
   liveValues?: Record<number, number>;
   /**
+   * How many devices may be open at once before the row stops fitting.
+   *
+   * A rack is one row that scrolls sideways, and on a narrow window every open
+   * device pushes the rest off screen. Devices past this many fold into their
+   * title strips, from the right, and unfold again left to right as the window
+   * grows - so the ones nearest the rack, which are the ones being worked on,
+   * are the last to go and the first to come back.
+   */
+  openBudget: number;
+  /**
    * Undo/redo is global: one history across every rack level, because a
    * mutation on a nested rack edits the same document as one on the root.
    * Only the root rack's title bar shows the buttons.

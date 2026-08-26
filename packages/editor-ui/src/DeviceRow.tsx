@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import type { DeviceNode, ParamRef } from '@rackutils/adg-codec';
 import { samePath, useEditor, type RackPath } from './context';
 import { mapKey } from './MappingCables';
-import { useParentToggle } from './useParentToggle';
+import { useBudgetedCollapse, useParentToggle } from './useParentToggle';
 
 export interface DeviceRowProps {
   device: DeviceNode;
@@ -16,6 +16,8 @@ export interface DeviceRowProps {
   macroColors: readonly string[];
   /** The rack's collapse-devices toggle. Sets this device's state without owning it, so it can still be opened on its own afterwards. */
   collapsed?: boolean;
+  /** The row has no width for this one right now (`RackEditor`'s budget). Drawn as a strip, not closed. */
+  overBudget?: boolean;
 }
 
 /**
@@ -29,12 +31,15 @@ export interface DeviceRowProps {
  * what makes a parameter jump from "more" up into the mapped list the instant
  * it is bound, with no list surgery anywhere (Part 2.5).
  */
-export function DeviceRow({ device, rackPath, macroColors, collapsed: collapsedFromRack }: DeviceRowProps) {
+export function DeviceRow({ device, rackPath, macroColors, collapsed: collapsedFromRack, overBudget = false }: DeviceRowProps) {
   // Devices start collapsed: a chain of six devices opened flat is a wall of
   // parameter lists, and the mapping table already says what each one
   // contributes. Click a strip to open the one you want. The rack's
   // collapse-all button still drives this, but only when it changes.
-  const [collapsed, setCollapsed] = useParentToggle(true, collapsedFromRack);
+  const [closed, setClosed] = useParentToggle(true, collapsedFromRack);
+  // Two reasons to be a strip, and only one of them is a decision: the user
+  // closed it, or the row has no room for it right now.
+  const [collapsed, setCollapsed] = useBudgetedCollapse(closed, overBudget);
   const [showMore, setShowMore] = useState(false);
   const { armed, arm, mapping, startParamDrag } = useEditor();
   // Where the pointer went down on a parameter. A press that does not move is
@@ -57,10 +62,21 @@ export function DeviceRow({ device, rackPath, macroColors, collapsed: collapsedF
   const mappedColor = (p: ParamRef) =>
     p.boundToMacro === null ? undefined : ({ '--mapped-color': macroColors[p.boundToMacro] } as React.CSSProperties);
 
+  // The device answers to its own path as well as its parameters', so a cable
+  // to a parameter inside it can end HERE while it is shut (`MappingCables`).
+  const anchor = mapKey(rackPath, device.path);
+
   if (collapsed) {
     return (
-      <div className="panel device-panel collapsed" title={device.name}>
-        <button type="button" className="device-title-strip" onClick={() => setCollapsed(false)}>
+      <div className="panel device-panel collapsed" data-map-key={anchor} title={device.name}>
+        <button
+          type="button"
+          className="device-title-strip"
+          onClick={() => {
+            setClosed(false);
+            setCollapsed(false);
+          }}
+        >
           {device.name}
         </button>
       </div>
@@ -68,9 +84,9 @@ export function DeviceRow({ device, rackPath, macroColors, collapsed: collapsedF
   }
 
   return (
-    <div className="panel device-panel">
+    <div className="panel device-panel" data-map-key={anchor}>
       <header className="device-title">
-        <button type="button" className="device-collapse" onClick={() => setCollapsed(true)} title="Collapse">
+        <button type="button" className="device-collapse" onClick={() => setClosed(true)} title="Collapse">
           -
         </button>
         <span className="device-name">{device.name}</span>

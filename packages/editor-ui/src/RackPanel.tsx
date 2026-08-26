@@ -21,7 +21,7 @@ import { MacroBank } from './MacroBank';
 import { RackHeader } from './RackHeader';
 import { resolveRackPath, samePath, useEditor, type RackPath } from './context';
 import { mapKey } from './MappingCables';
-import { useParentToggle } from './useParentToggle';
+import { useBudgetedCollapse, useParentToggle } from './useParentToggle';
 
 export interface RackPanelProps {
   rack: Rack;
@@ -31,6 +31,8 @@ export interface RackPanelProps {
   collapsible?: boolean;
   /** The parent rack's collapse-devices toggle. Drives this panel's state without taking it over. */
   forceCollapsed?: boolean;
+  /** The row has no width for this one right now (`RackEditor`'s budget). Drawn as a strip, not closed. */
+  overBudget?: boolean;
 }
 
 /**
@@ -45,22 +47,28 @@ export interface RackPanelProps {
  * The root rack is not a special case, it is the outermost call: a nested rack
  * is this same component, rendered inline in its parent's device strip.
  */
-export function RackPanel({ rack, rackPath, depth, collapsible, forceCollapsed }: RackPanelProps) {
+export function RackPanel({ rack, rackPath, depth, collapsible, forceCollapsed, overBudget }: RackPanelProps) {
   // Nested racks start COLLAPSED, as vertical title strips. A rack's contents
   // are worth a click; opening every level by default filled the row with
   // panels nobody asked for and pushed the rack you came to look at off the
   // screen. The parent's collapse-all button still drives this when it moves.
-  const [collapsedByParent, setCollapsedByParent] = useParentToggle(Boolean(collapsible), forceCollapsed);
+  const [closedByParent, setClosedByParent] = useParentToggle(Boolean(collapsible), forceCollapsed);
+  // A rack too far along a tight row is drawn as a strip without being closed
+  // (`useBudgetedCollapse`), so it comes back when the window does.
+  const [collapsedByParent, setCollapsedByParent] = useBudgetedCollapse(closedByParent, Boolean(overBudget));
   const open = !collapsedByParent;
-  const setOpen = (next: boolean | ((o: boolean) => boolean)) =>
-    setCollapsedByParent(!(typeof next === 'function' ? next(open) : next));
+  const setOpen = (next: boolean | ((o: boolean) => boolean)) => {
+    const value = typeof next === 'function' ? next(open) : next;
+    setClosedByParent(!value);
+    setCollapsedByParent(!value);
+  };
   const [selectedChain, setSelectedChain] = useState(0);
   // The six toggles Live puts down the rack's left edge.
   const [showMacros, setShowMacros] = useState(true);
   const [showVariations, setShowVariations] = useState(false);
   const [showChains, setShowChains] = useState(true);
   const [devicesCollapsed, setDevicesCollapsed] = useState(false);
-  const { root, mapping, setMapping, armed, arm, apply, liveValues, history, startParamDrag } = useEditor();
+  const { root, mapping, setMapping, armed, arm, apply, liveValues, openBudget, history, startParamDrag } = useEditor();
 
   const macroColors = rack.macros.map((m) => macroColor(m.color));
   const isDrumRack = rack.deviceEl.tagName === 'DrumGroupDevice';
@@ -115,7 +123,14 @@ export function RackPanel({ rack, rackPath, depth, collapsible, forceCollapsed }
     arm(null);
   };
 
-  const renderDevice = (device: DeviceNode) =>
+  /**
+   * Devices past the row's budget are folded, from the right (`openBudget`).
+   * Only the root rack does this: a nested rack's devices sit inside the same
+   * row, and folding them by their own index would fold the wrong ones.
+   */
+  const budget = depth === 0 ? openBudget : Number.POSITIVE_INFINITY;
+
+  const renderDevice = (device: DeviceNode, index: number) =>
     device.isRack ? (
       <NestedRack
         key={device.path}
@@ -124,15 +139,23 @@ export function RackPanel({ rack, rackPath, depth, collapsible, forceCollapsed }
         rackPath={rackPath}
         depth={depth}
         collapsed={devicesCollapsed}
+        overBudget={index >= budget}
         macroColors={macroColors}
       />
     ) : (
-      <DeviceRow key={device.path} device={device} rackPath={rackPath} macroColors={macroColors} collapsed={devicesCollapsed} />
+      <DeviceRow
+        key={device.path}
+        device={device}
+        rackPath={rackPath}
+        macroColors={macroColors}
+        collapsed={devicesCollapsed}
+        overBudget={index >= budget}
+      />
     );
 
   if (collapsible && !open) {
     return (
-      <div className="panel rack-panel collapsed" title={rack.name}>
+      <div className="panel rack-panel collapsed" data-map-key={mapKey(rackPath.slice(0, -1), rackPath[rackPath.length - 1])} title={rack.name}>
         <button type="button" className="device-title-strip rack-strip" onClick={() => setOpen(true)}>
           {rack.name}
         </button>
@@ -229,6 +252,7 @@ function NestedRack({
   rackPath,
   depth,
   collapsed,
+  overBudget,
   macroColors,
 }: {
   parent: Rack;
@@ -236,9 +260,21 @@ function NestedRack({
   rackPath: RackPath;
   depth: number;
   collapsed: boolean;
+  overBudget: boolean;
   macroColors: readonly string[];
 }) {
   const nested = parent.subRack(device.path);
-  if (!nested) return <DeviceRow device={device} rackPath={rackPath} macroColors={macroColors} collapsed={collapsed} />;
-  return <RackPanel rack={nested} rackPath={[...rackPath, device.path]} depth={depth + 1} collapsible forceCollapsed={collapsed} />;
+  if (!nested) {
+    return <DeviceRow device={device} rackPath={rackPath} macroColors={macroColors} collapsed={collapsed} overBudget={overBudget} />;
+  }
+  return (
+    <RackPanel
+      rack={nested}
+      rackPath={[...rackPath, device.path]}
+      depth={depth + 1}
+      collapsible
+      forceCollapsed={collapsed}
+      overBudget={overBudget}
+    />
+  );
 }
