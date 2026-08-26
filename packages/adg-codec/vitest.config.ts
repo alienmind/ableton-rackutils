@@ -16,5 +16,14 @@ export default defineConfig({
     fileParallelism: false,
     // A drum rack of racks through the contract is seconds, not milliseconds.
     testTimeout: 30_000,
+    // Threads, not the default forks pool. These suites run for minutes of
+    // solid jsdom work, and over a forked process's IPC vitest's own
+    // worker->main RPC hit its 60s deadline and threw - a red build in which
+    // every test had passed. A worker thread answers over a MessagePort and
+    // does not.
+    pool: 'threads',
+    // No TTY on CI, so the default reporter prints a line per test rather
+    // than redrawing one. There are a few hundred.
+    reporters: process.env.CI ? ['dot'] : ['default'],
   },
 });
