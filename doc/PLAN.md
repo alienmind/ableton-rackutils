@@ -96,38 +96,32 @@ The maintainer walked the browser UI on `donors/KD.adg` and confirmed steps 1
 to 10 of the test script - the rack-of-racks fix, the scrollbar, Map mode,
 mapping a nested rack's knob, the per-knob reset, the collapsed mapping rows,
 adding and removing features, the pad-targeted chain selector, reordering,
-templates. Everything after that is unconfirmed, and specifically:
+templates. The rest was walked in Live on 2026-08-26, and stands as:
 
-- **Nothing has been opened in Live on this branch.** Two racks are authored
-  and waiting at `tmp/BS-features.adg` and `tmp/KD-features.adg`. The chain
-  selector's range splitting (Q24) is the newest and least proven of it: if
-  `BS SEL` sweeps without changing which chain sounds, that is the bug.
-- **The device has not been installed.** It builds, the payload is guarded, the
-  window is declared - nobody has pressed Open in Live.
-- **The PWA has not been installed on a phone.** The manifest and icons are
-  right in a desktop browser; the install prompt needs HTTPS, so it needs
-  Pages.
-- **The knob drag has not been tried with a finger.** If it is fiddly the fix
-  is a bigger hit area under `@media (pointer: coarse)`, sized from a real
-  report rather than guessed.
-- **The animations have not been seen by anyone but the code.** Panels animate
-  their width, the cables follow and swing, devices fold as the row narrows.
-  Tests assert the states, not that it looks right.
-- **Nothing has been saved over a real file.** The overwrite path is driven in
-  the browser suite against a stubbed picker, which proves the flow and the
-  bytes and cannot prove the one thing that matters: that Chrome's permission
-  prompt behaves as expected and that the file on disk is the rack afterwards.
-  Do it on a COPY first.
-- **The version badge reads whatever `package.json` says**, which is `0.2.0`
-  until a release bumps it. That is the mechanism working, not a stale literal;
-  cutting 0.4.0 moves it on its own.
-- **The plugin scan has never met a real plugin folder.** The byte search is
-  tested against synthetic binaries and against `donors/BS-VST3.adg`'s class
-  id, which is the id of a plugin that IS installed on the maintainer's
-  machine (SCHEMA.md Q18) - so pointing it at `Program Files/Common Files/VST3`
-  should resolve that rack to `MiniBrute V`, and anything else is the test
-  failing. Unknown until someone runs it: how long a full folder takes, and
-  whether the picker's one-off permission is as one-off as it looks.
+- **`BS-features.adg` passes in Live.** The chain selector sweeps and the
+  chains change, which confirms Q24's range splitting on an ordinary rack.
+- **`KD-features.adg` renders correctly and its KICK SEL does not work**, which
+  is the same feature on a DRUM rack, where the selector reaches its chains
+  through a pad rack (Q24's two links). Unresolved: the generated file's wiring
+  is identical to the maintainer's working rack on that path - same
+  `BranchSelectorRange` partition, same `ChainSelector` KeyMidi, same range -
+  and differs only in which root slot drives it (0 rather than 3). Two bisect
+  racks are waiting: `tmp/KD-selector-only.adg` (the selector and nothing else)
+  and `tmp/KD-no-selector.adg` (everything else). Which of them fails says
+  whether the fault is the selector feature or an interaction with the devices
+  the contract inserts.
+- **The device is installed and its window opens.**
+- **The PWA has not been installed on a phone**, and the knob drag has not been
+  tried with a finger. Both wait on Pages: the install prompt needs HTTPS. If
+  the drag is fiddly the fix is a bigger hit area under
+  `@media (pointer: coarse)`, sized from a real report rather than guessed.
+- **The animations are confirmed by eye.**
+- **Saving over the original is confirmed on a real file.**
+- The version badge reads whatever `package.json` says, which the workspace
+  bump put at `0.3.0`. Cutting 0.4.0 moves it on its own, and a browser spec
+  fails if the page and `package.json` ever disagree again.
+- **The plugin scan resolves a real plugin from a real folder**, confirmed
+  against `donors/BS-VST3.adg` and the maintainer's own VST3 directory.
 
 Use it on real racks throughout. Every bug this project has hit came from that,
 not from tests - including a UI whose every interaction was broken while its
@@ -257,6 +251,12 @@ unrelated stored value.
 Consequence: every mutation that changes macro slots must permute variation
 value arrays identically. This is the single easiest way to corrupt a rack, and
 the codec tests it explicitly.
+
+The same rule the other way round: a macro's stored values only become
+meaningless once it drives NOTHING. `bindParameter` used to clear them whenever
+it took a parameter off another macro (Constraint 5), which broke every
+variation of a macro that still drove three other chains - exactly what
+applying the contract's gain option to a rack does.
 
 ### Constraint 5: A parameter can only be driven by one macro
 
