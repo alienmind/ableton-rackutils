@@ -8,7 +8,7 @@ page, or from the command line.
 
 **Live site:** https://alienmind.github.io/ableton-rackutils/
 
-> **v0.3.0, beta.** The editor works end to end: open a rack, rearrange and
+> **v0.4.0, beta.** The editor works end to end: open a rack, rearrange and
 > rebind its macros, add the features you want every rack of yours to have,
 > save, and load the result back into Live. Racks the contract authored have
 > made that round trip and been played. See

@@ -1,6 +1,6 @@
 # ableton-rackutils: Implementation Plan (v6)
 
-**Product status: v0.2.0 released, 0.3.0 on the branch.** The editor works end
+**Product status: 0.4.0 on the branch, v0.2.0 the last tagged release.** The editor works end
 to end, racks the contract authored have been loaded back into Live, and the
 device now carries the same editor offline. Version numbers are the
 maintainer's to cut; nothing here bumps one. Still young: keep backups.
@@ -129,8 +129,8 @@ templates. The rest was walked in Live on 2026-08-26, and stands as:
 - **The animations are confirmed by eye.**
 - **Saving over the original is confirmed on a real file.**
 - The version badge reads whatever `package.json` says, which the workspace
-  bump put at `0.3.0`. Cutting 0.4.0 moves it on its own, and a browser spec
-  fails if the page and `package.json` ever disagree again.
+  bump put at `0.4.0`. A browser spec fails if the page and `package.json` ever
+  disagree again, which is what the stale `v0.2.0` on the deployed site was.
 - **The plugin scan resolves a real plugin from a real folder**, confirmed
   against `donors/BS-VST3.adg` and the maintainer's own VST3 directory.
 
