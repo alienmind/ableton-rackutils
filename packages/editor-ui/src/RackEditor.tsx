@@ -6,6 +6,7 @@ import { MappingTable } from './MappingTable';
 import { PatchCable } from './PatchCable';
 import { MappingCables, mapKey } from './MappingCables';
 import { ContractStrip } from './ContractStrip';
+import { PluginStrip } from './PluginStrip';
 import { useParamDrag } from './useParamDrag';
 
 export interface RackEditorProps {
@@ -144,6 +145,12 @@ export function RackEditor({ rack, onChange, liveValues }: RackEditorProps) {
             </span>
           ) : null}
         </div>
+
+        {/* What the rack needs to load at all, before what it does: a rack
+            whose synth is missing is not a rack this machine can play, and
+            that is worth knowing before reading its macros. Draws nothing on
+            a rack with no plugins, which is most of them. */}
+        <PluginStrip rack={rack} />
 
         {/* The rack first and as wide as the window allows, then the two
             panels that read it, side by side under it - and stacked instead
