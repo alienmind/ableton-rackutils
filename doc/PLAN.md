@@ -57,10 +57,10 @@ editing, batch library operations - is out. See Parked.
   tests, 81 of them against the committed donor racks.
 - **`packages/editor-ui`** - built. Reproduces Live's layout, plus the rack
   features strip, the plugin strip, feature templates, Map mode and the cable
-  layer. 51 tests.
+  layer. 53 tests.
 - **`apps/site`** - the editor under a landing page that is two controls and
   two question marks, deployed to Pages. Installable, offline, and laid out for
-  a phone as well as an ultra-wide. 42 Playwright specs against real Chromium
+  a phone as well as an ultra-wide. 47 Playwright specs against real Chromium
   in CI.
 - **`tools/adg-tool`** - `unpack`/`diff`/`mappings`/`move`/`move-mapping`, plus
   `adg-palette` and `adg-harvest`.
@@ -79,8 +79,10 @@ by hand, is in "Confirmed, and not" at the end of this section.
 
 ## Next steps, in order
 
-1. **Editor open items** (4.4), the mapping table's units and sorting.
-2. **Save in place** (4.6).
+1. **Mapping table units** (4.4). The last open editor item, and the only one
+   that needs something the file does not carry: the target parameter's native
+   range, which patchbay's donor index knows and this repo would have to
+   import.
 
 None of these is what the next session should do first. **Open the racks in
 Live** (Open risk 2): the Gate, the Compressor, EQ Three, the chain selector
@@ -111,6 +113,14 @@ templates. Everything after that is unconfirmed, and specifically:
 - **The animations have not been seen by anyone but the code.** Panels animate
   their width, the cables follow and swing, devices fold as the row narrows.
   Tests assert the states, not that it looks right.
+- **Nothing has been saved over a real file.** The overwrite path is driven in
+  the browser suite against a stubbed picker, which proves the flow and the
+  bytes and cannot prove the one thing that matters: that Chrome's permission
+  prompt behaves as expected and that the file on disk is the rack afterwards.
+  Do it on a COPY first.
+- **The version badge reads whatever `package.json` says**, which is `0.2.0`
+  until a release bumps it. That is the mechanism working, not a stale literal;
+  cutting 0.4.0 moves it on its own.
 - **The plugin scan has never met a real plugin folder.** The byte search is
   tested against synthetic binaries and against `donors/BS-VST3.adg`'s class
   id, which is the id of a plugin that IS installed on the maintainer's
@@ -674,7 +684,12 @@ codec and through a browser; "loads in Live" is a different claim (Open risk
   target parameter's own units (`20.0 Hz`, `-inf dB`), which are not
   recoverable from the file for every parameter type. patchbay's donor index
   knows the native range per parameter, so importing it would supply this.
-- **Sorting the mapping table** by column header, as Live's own list does.
+- **Sorting the mapping table - BUILT.** Macro, Path and Name each sort on
+  their header, and a third click gives back the order the rack is written in,
+  which is the only order that says where a macro physically sits. Sorting is
+  by GROUP: a macro's targets stay together under it, and a collapsed group
+  sorts by its first target rather than by the "2 parameters" summary the cell
+  shows.
 
 ### 4.5 Offline, installable, and usable on a phone - DONE
 
@@ -719,32 +734,9 @@ Two things worth keeping:
   stale UI after a device update. `release-device.yml` carries a note to guard
   on `sw.js` when embedding lands.
 
-### 4.6 Save in place
+### 4.6 Save in place - DONE
 
-`showOpenFilePicker()` returns a handle writable through `createWritable()`, so
-the site can save the modified `.adg` over the original instead of downloading
-a copy the user then has to find.
-
-```typescript
-const [handle] = await window.showOpenFilePicker({
-  types: [{ description: 'Ableton Device Group', accept: { 'application/gzip': ['.adg'] } }],
-});
-const rack = Rack.parse(new Uint8Array(await (await handle.getFile()).arrayBuffer()));
-
-// ...edit...
-
-const writable = await handle.createWritable();
-await writable.write(rack.serialize());
-await writable.close();
-```
-
-- Reuse trackster's `src/types/file-system-access.d.ts`.
-- Firefox and Safari support is weaker than Chromium's, so keep the `<input
-  type="file">` plus download path as an automatic fallback, and detect rather
-  than assume.
-- Writing over the user's original file raises the stakes on Constraint 4.
-  Default to read-only, and require an explicit opt-in before any destructive
-  write.
+See D13.
 
 ### 4.7 The Max for Live device, as a bundle - DONE
 
@@ -756,8 +748,7 @@ See D7.
 
 | Order | Work | Risk if skipped |
 |---|---|---|
-| 1 | 4.4 editor open items | Feature gaps only |
-| 2 | 4.6 save in place | Current download flow works |
+| 1 | 4.4 mapping table units | Numbers without units, as now |
 
 ### Open risks
 
@@ -1096,6 +1087,34 @@ so it is shown and not offered for editing: `setBindingRange` and
 `invertBindingRange` refuse a plugin path by name rather than writing an
 Ableton-shaped range into it. `unbindOne` writes -1 and leaves the parameter
 exposed.
+
+### D14. The version on the page is the repo's - DONE
+
+The site went out reading `v0.2.0` while the repo had moved on: the badge was a
+literal in the masthead, and a literal is a fact nobody remembers to update.
+`vite.config.ts` substitutes `__APP_VERSION__` from the repo's own
+`package.json` at build time, and a browser spec asserts the two agree - so the
+drift is a failing test rather than a thing somebody notices on the deployed
+page. A release bump moves the badge on its own.
+
+### D13. Save in place - DONE
+
+The edited rack goes back over the file it came from, rather than into the
+downloads folder for the user to find and drag.
+
+- **Opening is what makes it possible.** `showOpenFilePicker()` returns a
+  handle; `<input type="file">` returns bytes and no way back. One button uses
+  the picker where the browser has one and the input everywhere else, and a
+  dropped rack gets a handle too where `getAsFileSystemHandle` offers one.
+- **Read-only until asked.** Opening requests read only. Write permission is
+  requested at the moment of saving, so a user who only wanted to look at a
+  rack is never prompted about writing to it.
+- **Two clicks, the second naming the file.** Everything else this tool does
+  produces another copy; this is the one control that can destroy a rack, and
+  Constraint 4 is why. Export stays, unconditionally, as the way out that
+  cannot.
+- **Firefox and Safari lose nothing they had.** No picker means no handle,
+  which means the overwrite control is simply not rendered.
 
 ### D4. The site - DONE
 
