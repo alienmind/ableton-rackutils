@@ -472,3 +472,35 @@ describe('dropping a parameter back where it already is', () => {
     expect(container.querySelector('.patch-cable')).toBeNull();
   });
 });
+
+describe('sorting the mapping table (doc/PLAN.md 4.4)', () => {
+  const nameCells = () => [...container.querySelectorAll('.mapping-grid tbody .col-name')].map((c) => c.textContent);
+  const header = (label: string) =>
+    [...container.querySelectorAll('.mapping-grid th .mapping-sort')].find((b) => b.textContent?.startsWith(label))!;
+
+  test('a click sorts by the column, a second reverses, a third gives the file back', () => {
+    const asWritten = nameCells();
+
+    click(header('Name'));
+    const ascending = nameCells();
+    // By the FIRST target's name, not by the cell's text: a collapsed group
+    // reads "2 parameters", which is a summary and not a sort key.
+    expect(ascending).toEqual(['InnerParam', '2 parametersx2']);
+    expect(ascending).not.toEqual(asWritten);
+
+    click(header('Name'));
+    expect(nameCells()).toEqual([...ascending].reverse());
+
+    // The order the rack is written in is the only one that says where a
+    // macro physically sits, so it is reachable again rather than a reload.
+    click(header('Name'));
+    expect(nameCells()).toEqual(asWritten);
+  });
+
+  test('the sorted header says so, for a reader who is not looking at the arrow', () => {
+    click(header('Macro'));
+    expect(container.querySelector('.mapping-grid th.col-macro')?.getAttribute('aria-sort')).toBe('ascending');
+    click(header('Macro'));
+    expect(container.querySelector('.mapping-grid th.col-macro')?.getAttribute('aria-sort')).toBe('descending');
+  });
+});

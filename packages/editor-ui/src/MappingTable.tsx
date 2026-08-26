@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { invertBindingRange, setBindingRange, unbindOne } from '@rackutils/adg-codec';
 import type { Rack } from '@rackutils/adg-codec';
-import { collectMappings } from './mappings';
+import { collectMappings, type MacroMapping } from './mappings';
 import { useEditor } from './context';
 
 export interface MappingTableProps {
@@ -30,10 +30,81 @@ export interface MappingTableProps {
  * identical rows say nothing four times. Double-click the row to open it, or
  * use Expand all.
  */
+/**
+ * Which column the list is sorted by, as Live's own list can be. Null is the
+ * order the rack is written in - root macros in slot order, then each nested
+ * rack's - which is the only order that says where a macro physically is, so
+ * it stays the default and a second click on a sorted header returns to it.
+ */
+type SortColumn = 'macro' | 'path' | 'name';
+interface Sort {
+  column: SortColumn;
+  descending: boolean;
+}
+
+/**
+ * A sortable column header. Declared out here rather than inside the table:
+ * a component defined in a render body is a new type on every render, so
+ * React would remount the button and the click that sorted the list would
+ * take the focus with it.
+ */
+function SortHeader({
+  column,
+  className,
+  sort,
+  onSort,
+  children,
+}: {
+  column: SortColumn;
+  className: string;
+  sort: Sort | null;
+  onSort: (column: SortColumn) => void;
+  children: React.ReactNode;
+}) {
+  const active = sort?.column === column;
+  return (
+    <th
+      className={`${className}${active ? ' is-sorted' : ''}`}
+      aria-sort={active ? (sort.descending ? 'descending' : 'ascending') : 'none'}
+    >
+      <button type="button" className="mapping-sort" onClick={() => onSort(column)}>
+        {children}
+        <span className="mapping-sort-arrow" aria-hidden="true">
+          {active ? (sort.descending ? '▾' : '▴') : ''}
+        </span>
+      </button>
+    </th>
+  );
+}
+
+/** Sorting is by GROUP, never inside one: an opened macro's targets stay together under it. */
+function sortKey(row: MacroMapping, column: SortColumn): string | number {
+  if (column === 'macro') return row.macroIndex;
+  if (column === 'path') return `${row.rackName} ${row.targets[0]?.device ?? ''}`.toLowerCase();
+  return (row.targets[0]?.parameter ?? '').toLowerCase();
+}
+
 export function MappingTable({ rack }: MappingTableProps) {
   const { apply } = useEditor();
-  const rows = collectMappings(rack);
+  const collected = collectMappings(rack);
   const [opened, setOpened] = useState<Set<string>>(new Set());
+  const [sort, setSort] = useState<Sort | null>(null);
+
+  const rows = sort
+    ? [...collected].sort((a, b) => {
+        const left = sortKey(a, sort.column);
+        const right = sortKey(b, sort.column);
+        const order = left < right ? -1 : left > right ? 1 : 0;
+        return sort.descending ? -order : order;
+      })
+    : collected;
+
+  // Three states per column: up, down, and back to the order of the file.
+  const clickSort = (column: SortColumn) =>
+    setSort((current) => {
+      if (current?.column !== column) return { column, descending: false };
+      return current.descending ? null : { column, descending: true };
+    });
 
   const groupKey = (row: (typeof rows)[number]) => `${row.rackPath.join('|')}:${row.macroIndex}`;
   const toggle = (key: string) =>
@@ -73,9 +144,15 @@ export function MappingTable({ rack }: MappingTableProps) {
         <table className="mapping-grid">
         <thead>
           <tr>
-            <th className="col-macro">Macro</th>
-            <th className="col-path">Path</th>
-            <th className="col-name">Name</th>
+            <SortHeader column="macro" className="col-macro" sort={sort} onSort={clickSort}>
+              Macro
+            </SortHeader>
+            <SortHeader column="path" className="col-path" sort={sort} onSort={clickSort}>
+              Path
+            </SortHeader>
+            <SortHeader column="name" className="col-name" sort={sort} onSort={clickSort}>
+              Name
+            </SortHeader>
             <th className="col-num">Min</th>
             <th className="col-num">Max</th>
             <th className="col-actions" />

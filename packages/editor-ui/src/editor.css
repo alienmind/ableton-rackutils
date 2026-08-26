@@ -1771,3 +1771,27 @@
   color: var(--edit-dim);
   font-variant-numeric: tabular-nums;
 }
+
+/* Sortable headers, as Live's own mapping list has (doc/PLAN.md 4.4). */
+.mapping-grid th .mapping-sort {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  width: 100%;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.mapping-grid th.is-sorted .mapping-sort {
+  color: var(--edit-text);
+}
+
+.mapping-sort-arrow {
+  font-size: 8px;
+  color: var(--edit-accent);
+}

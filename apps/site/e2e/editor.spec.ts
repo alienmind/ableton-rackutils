@@ -798,3 +798,21 @@ test('the version badge is the repo version, not a literal somebody has to remem
   ).version as string;
   await expect(page.locator('.masthead .badge')).toHaveText(`v${version} beta`);
 });
+
+test('the mapping table sorts by a column header, and gives the file order back', async ({ page }) => {
+  await loadRack(page);
+  const names = () => page.locator('.mapping-grid tbody .col-name').allTextContents();
+  const header = (label: string) => page.locator('.mapping-grid th .mapping-sort', { hasText: label });
+
+  const asWritten = await names();
+  await header('Name').click();
+  const ascending = await names();
+  expect(ascending).not.toEqual(asWritten);
+  await expect(page.locator('.mapping-grid th.col-name')).toHaveAttribute('aria-sort', 'ascending');
+
+  await header('Name').click();
+  expect(await names()).toEqual([...ascending].reverse());
+
+  await header('Name').click();
+  expect(await names()).toEqual(asWritten);
+});
