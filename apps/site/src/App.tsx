@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { Rack, isGzip } from '@rackutils/adg-codec';
 import { RackEditor } from '@rackutils/editor-ui';
 import '@rackutils/editor-ui/src/editor.css';
-import { Landing } from './Landing';
+import { Landing, LandingGuide } from './Landing';
 
 /**
  * The Max for Live bundle goes straight to the work: load a rack, author it.
@@ -60,11 +60,7 @@ export default function App() {
     const url = URL.createObjectURL(new Blob([loaded.rack.serialize() as BlobPart], { type: 'application/gzip' }));
     const a = document.createElement('a');
     a.href = url;
-    // Named after the rack, which the features strip's rack name field also
-    // sets: one name on the rack, on its macros, on the devices it added, and
-    // on the file (doc/PLAN.md 4.3.1). Falls back to the file it came from.
-    const code = loaded.rack.name.replace(/[\\/:*?"<>|]/g, '').trim();
-    a.download = code ? code + '.adg' : loaded.fileName.replace(/\.adg$/i, '') + '-edited.adg';
+    a.download = downloadName(loaded);
     a.click();
     URL.revokeObjectURL(url);
   }, [loaded]);
@@ -73,35 +69,72 @@ export default function App() {
     <div className={`app${EMBEDDED ? ' app-embedded' : ''}`}>
       <Landing compact={loaded !== null} />
 
-      <div
-        className={`dropzone${dragOver ? ' dropzone-active' : ''}`}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={onDrop}
-      >
-        {loaded ? (
-          <p>
-            <strong>{loaded.fileName}</strong> loaded. Drop another file to replace it.
+      {/*
+        * In and out, side by side and the same size.
+        *
+        * Saving used to be one small icon inside the features strip, which is
+        * the wrong place for the thing the whole tool is for: the rack has to
+        * get back to Live. It is half the row now, opposite the way in.
+        */}
+      <div className="transfer">
+        <div
+          className={`dropzone${dragOver ? ' dropzone-active' : ''}`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={onDrop}
+        >
+          <p className="transfer-title">
+            {loaded ? (
+              <>
+                <strong>{loaded.fileName}</strong> loaded
+              </>
+            ) : (
+              EMBEDDED ? 'Save the rack from Live first' : 'Drop a rack here'
+            )}
           </p>
-        ) : (
-          <p>{EMBEDDED ? 'Save the rack from Live, then drop the .adg here, or' : 'Drop a .adg file here, or'}</p>
-        )}
-        <label className="file-input-label">
-          choose a file
-          <input type="file" accept=".adg" onChange={onFileInput} />
-        </label>
+          <label className="transfer-button">
+            {loaded ? 'Open another rack' : 'Open a rack'}
+            <input type="file" accept=".adg" onChange={onFileInput} />
+          </label>
+          <p className="transfer-note">.adg, read in this tab. Nothing is uploaded.</p>
+        </div>
+
+        <div className="exportzone">
+          <p className="transfer-title">{loaded ? <>Save it back to Live</> : 'Nothing to save yet'}</p>
+          <button type="button" className="transfer-button" onClick={save} disabled={!loaded}>
+            Export .adg
+          </button>
+          <p className="transfer-note">
+            {loaded ? `Downloads as ${downloadName(loaded)}. Drag it onto the rack in Live to load it.` : 'Open a rack to edit it.'}
+          </p>
+        </div>
       </div>
 
       {error && <p className="error">{error}</p>}
 
+      {/* Under the two controls, not above them: one line each, with the
+          walkthrough and the device's small print behind a question mark. */}
+      <LandingGuide compact={loaded !== null} />
+
       {loaded && (
         <section className="rack-view">
-          <RackEditor rack={loaded.rack} onChange={(rack) => setLoaded({ ...loaded, rack })} onSave={save} />
+          <RackEditor rack={loaded.rack} onChange={(rack) => setLoaded({ ...loaded, rack })} />
         </section>
       )}
     </div>
   );
+}
+
+/**
+ * What the saved file is called: the rack's name, which the features strip
+ * also writes - one name on the rack, on its macros, on the devices the
+ * contract added, and on the file (doc/PLAN.md 4.3.1). Falls back to the file
+ * it came from.
+ */
+function downloadName(loaded: Loaded): string {
+  const code = loaded.rack.name.replace(/[\\/:*?"<>|]/g, '').trim();
+  return code ? `${code}.adg` : `${loaded.fileName.replace(/\.adg$/i, '')}-edited.adg`;
 }

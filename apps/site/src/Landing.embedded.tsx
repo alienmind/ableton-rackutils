@@ -6,3 +6,7 @@
 export function Landing(_props: { compact: boolean }) {
   return null;
 }
+
+export function LandingGuide(_props: { compact: boolean }) {
+  return null;
+}
