@@ -1,6 +1,6 @@
 # ableton-rackutils: Implementation Plan (v6)
 
-**Product status: 0.4.0 on the branch, v0.2.0 the last tagged release.** The editor works end
+**Product status: v0.4.1 released.** The editor works end
 to end, racks the contract authored have been loaded back into Live, and the
 device now carries the same editor offline. Version numbers are the
 maintainer's to cut; nothing here bumps one. Still young: keep backups.
@@ -70,12 +70,12 @@ editing, batch library operations - is out. See Parked.
 - **`.github/workflows/`** - CI (both jobs), Pages deploy, device release
   (rolling and versioned). Green.
 
-## Where this branch is
+## Where this repo is
 
-`feat/vst-dependency-view`. `feature/options-strip-and-m4l-device` is merged
-(PR #5). Everything below is built, tested headless and in a real browser, and
-NOT yet confirmed in Live. The full state, and what still has to be confirmed
-by hand, is in "Confirmed, and not" at the end of this section.
+Everything below is on `main` and released as v0.4.1. The site deploys from the
+`gh-pages` branch, and a tagged branch can be published as a beta preview
+underneath it (`doc/DEVELOPERS.md`, Beta previews). What has and has not been
+confirmed BY HAND is the list that matters, and it is next.
 
 ## Next steps, in order
 
@@ -139,10 +139,18 @@ templates. The rest was walked in Live on 2026-08-26, and stands as:
     from a swipe. Once the hold has fired, `touchmove` is cancelled for the
     length of the drag.
 
-  Still to confirm on the phone: the PWA install prompt (it needs HTTPS, so it
-  needs Pages) and whether the knob drag is workable with a finger at all. If
-  it is fiddly the fix is a bigger hit area under `@media (pointer: coarse)`,
-  sized from a real report rather than guessed.
+  Still to confirm on the phone, now that a rack can be opened and the row
+  scrolls: the PWA install prompt, and whether the knob drag is workable with a
+  finger at all - it takes a 350ms hold first, and the hold is a number, not a
+  law. If the drag is fiddly the fix is a bigger hit area under
+  `@media (pointer: coarse)`, sized from a real report rather than guessed.
+
+  One trap worth knowing before testing anything on a phone that has been to
+  the site before: the service worker. It is scoped to the whole site and its
+  navigation fallback answered a preview URL with the main site's cached page,
+  so a preview that had never been deployed looked deployed and reported the
+  old version. Fixed with a `navigateFallbackDenylist`, and the lesson is
+  general: on that phone, what you are looking at may be the worker's copy.
 - **The animations are confirmed by eye.**
 - **Saving over the original is confirmed on a real file.**
 - The version badge reads whatever `package.json` says, which the workspace
