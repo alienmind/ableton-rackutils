@@ -1,8 +1,18 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 const base = process.env.VITE_BASE || '/';
+
+// The version the page shows, taken from the repo's own package.json rather
+// than typed into the markup. The site went out reading v0.2.0 while the repo
+// had moved on, because a literal in a header is a fact nobody remembers to
+// update; a release bump moves this on its own.
+const version = JSON.parse(
+  readFileSync(fileURLToPath(new URL('../../package.json', import.meta.url)), 'utf8'),
+).version as string;
 
 // The device bundle ships the same dist/ from disk. Two things follow: a
 // service worker there solves nothing bundling has not already solved and can
@@ -22,6 +32,7 @@ export default defineConfig({
   },
   define: {
     'import.meta.env.VITE_EMBED': JSON.stringify(process.env.VITE_EMBED ?? ''),
+    __APP_VERSION__: JSON.stringify(version),
   },
   plugins: [
     react(),

@@ -1,5 +1,7 @@
 import { gunzipSync } from 'node:zlib';
 import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { writeRackFile } from './rack-file';
 
@@ -784,4 +786,15 @@ test('a macro driving a plugin parameter is listed, with a range it does not off
   await expect(row.locator('.col-name')).toHaveText('Parameter 70');
   await expect(row.locator('.mapping-fixed')).toHaveCount(2);
   await expect(row.locator('.mapping-invert')).toHaveCount(0);
+});
+
+test('the version badge is the repo version, not a literal somebody has to remember', async ({ page }) => {
+  await page.goto('/');
+  // The site shipped reading v0.2.0 while the repo had moved on. The badge is
+  // substituted from package.json at build time (`vite.config.ts`), and this
+  // is what stops it drifting again.
+  const version = JSON.parse(
+    readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'package.json'), 'utf8'),
+  ).version as string;
+  await expect(page.locator('.masthead .badge')).toHaveText(`v${version} beta`);
 });
