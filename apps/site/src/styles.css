@@ -10,32 +10,35 @@ body {
 }
 
 .app {
-  max-width: 900px;
+  /* Wide enough for a rack, and everything inside it starts on the same left
+     edge. The prose blocks keep a readable measure of their own. */
+  max-width: 1500px;
   margin: 0 auto;
   padding: 2rem 1rem 4rem;
 }
 
 /*
- * The rack is as wide as the window allows, whatever the text column is.
- *
- * Prose reads badly past ~900px and a rack of racks runs to several thousand:
- * capping both at the same width wasted an ultra-wide monitor and left the
- * user scrolling a row that had room to be shown. This is the full-bleed
- * trick - pull the section out to the viewport edges from inside a centred
- * parent - so only the rack breaks out.
- *
- * The panels UNDER the rack do not want that width: `editor-panels` caps
- * itself, so a feature list and a mapping table stay readable while the row
- * above them uses the whole monitor.
+ * Text is unreadable at 1500px, so the parts of the page that ARE text keep a
+ * measure of their own. Centred, like the editor block under them: one column
+ * down the middle of the page, whatever its width. The editor was full-bleed
+ * while the panels under it were capped and centred, which put three different
+ * left edges on one screen.
  */
-.rack-view {
-  width: auto;
-  margin-inline: calc(50% - 50vw + 1rem);
+header,
+.dropzone,
+.getting-started,
+.error {
+  max-width: 900px;
+  margin-inline: auto;
 }
 
-.rack-view .editor-panels {
-  max-width: 1500px;
-  margin-inline: auto;
+/*
+ * The rack and the two panels that read it are one block, one width, one left
+ * edge. The rack was full-bleed while the panels were capped and centred,
+ * which put three different left edges on one screen.
+ */
+.rack-view {
+  width: 100%;
 }
 
 header {
@@ -297,12 +300,6 @@ header h1 {
 @media (max-width: 640px) {
   .app {
     padding: 1rem 0.6rem 2rem;
-  }
-
-  /* The full-bleed rack pulls out by the app's own padding, so that has to
-     match it or the rack sits off centre. */
-  .rack-view {
-    margin-inline: calc(50% - 50vw + 0.6rem);
   }
 
   header img {

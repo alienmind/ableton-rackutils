@@ -148,12 +148,10 @@
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 4px;
-  /* Centred while it fits, so a narrow rack does not hug the left edge of a
-     wide monitor while the panels under it are centred. `safe` is what keeps
-     a rack WIDER than the window reachable: centring it would push its left
-     end off the scrollable area. */
+  /* Left aligned, like everything under it: the rack, the features and the
+     mappings all start on the same line. A rack narrower than the box is
+     padded out by `.rack-filler` rather than centred. */
   display: flex;
-  justify-content: safe center;
 }
 
 /*
@@ -170,8 +168,11 @@
   /* Sized by its contents, not by the scroll box. Without this the row is as
      wide as the viewport, panels overhang it, and the scroll container decides
      it has nothing to scroll - so a rack wider than the window had no
-     scrollbar at all until some panel toggled and forced a re-layout. */
+     scrollbar at all until some panel toggled and forced a re-layout.
+     `width: 100%` on top of it is what gives the empty slots at the end
+     something to fill when the rack is NARROWER than the box. */
   min-width: max-content;
+  width: 100%;
 }
 
 .panel {
@@ -795,6 +796,8 @@
 
 .patch-cable.will-connect { stroke: #9ad49a; }
 .patch-cable.refused { stroke: #ff6b6b; }
+/* Already driven by the knob under the pointer: dropping changes nothing. */
+.patch-cable.already-bound { stroke: var(--edit-dim); opacity: 0.5; }
 .patch-cable.connected { stroke: #9ad49a; }
 
 .patch-plug {
@@ -817,6 +820,33 @@
 }
 
 /*
+ * The empty slots to the right of a rack that does not fill its width.
+ *
+ * Drawn as the collapsed device strips Live shows: a rack with room in it
+ * looks like a rack with room in it, where a bare gap looked like the panel
+ * had failed to size itself. It takes no pointer events - devices come from
+ * Live, not from here.
+ */
+.rack-filler {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  margin-left: 2px;
+  pointer-events: none;
+  border-radius: 2px;
+  /* One 15px strip with a 2px gap, repeated: the same rhythm as a row of
+     collapsed devices beside it. */
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--edit-panel, #1f2129) 0,
+    var(--edit-panel, #1f2129) 15px,
+    transparent 15px,
+    transparent 17px
+  );
+  opacity: 0.5;
+}
+
+/*
  * The two panels that read the rack, under it. They sit side by side while
  * there is room for both and stack when there is not, which is what makes the
  * same layout work on an ultra-wide monitor and in the device's window.
@@ -829,11 +859,22 @@
   margin-top: 8px;
 }
 
-.mapping-table h4 {
-  margin: 0 0 4px;
-  font-size: 11px;
-  color: var(--edit-dim);
-  font-weight: 500;
+/* The two panels under the rack are the same kind of thing, so their titles
+   are the same title. */
+.contract-head h3,
+.mapping-table h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--edit-text);
+}
+
+.mapping-table h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
 }
 
 .mapping-count {

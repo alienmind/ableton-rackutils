@@ -46,7 +46,7 @@ export function MappingTable({ rack }: MappingTableProps) {
   if (rows.length === 0) {
     return (
       <section className="mapping-table">
-        <h4>Macro Mappings</h4>
+        <h3>Macro Mappings</h3>
         <p className="mapping-empty">Nothing is mapped yet. Drag a parameter onto a macro knob to start.</p>
       </section>
     );
@@ -54,7 +54,7 @@ export function MappingTable({ rack }: MappingTableProps) {
 
   return (
     <section className="mapping-table">
-      <h4>
+      <h3>
         Macro Mappings <span className="mapping-count">{rows.reduce((n, r) => n + r.targets.length, 0)}</span>
         {rows.some((r) => r.targets.length > 1) && (
           <button
@@ -65,7 +65,7 @@ export function MappingTable({ rack }: MappingTableProps) {
             {opened.size === 0 ? 'Expand all' : 'Collapse all'}
           </button>
         )}
-      </h4>
+      </h3>
       {/* The table has six columns and a phone has none to spare, so it
           scrolls inside its own box rather than squeezing Min and Max down to
           two characters or pushing the unbind control off the screen. */}
