@@ -93,6 +93,28 @@ Then drag `out.adg` from your file manager onto the rack in Live to load it.
 If you want to move only what a knob drives and leave its name and colour
 behind, `move-mapping` takes the same arguments and does that instead.
 
+## What it looks like
+
+[![The editor, with three rack features applied](doc/shots/editor.png)](doc/shots/editor.png)
+
+The rack drawn the way Live draws it, the features that were applied to it on
+the left, and every mapping it has underneath.
+
+[![Map mode, with the rack's mappings drawn as cables](doc/shots/map-mode.png)](doc/shots/map-mode.png)
+
+Map mode: every mapping in the rack as a cable, including the ones that reach
+into a nested rack. A cable to a parameter inside a closed device ends at the
+device until you open it.
+
+[![The rack features strip](doc/shots/features.png)](doc/shots/features.png)
+
+Features go in from the left and come back out from the right. The order of the
+list is the order the knobs land in, and a set of them is a template you can
+apply to the next rack.
+
+There is a [screen recording](doc/shots/demo.webm) of it in use, and the rest
+of the pictures are in [`doc/shots/`](doc/shots).
+
 ## The website
 
 Open https://alienmind.github.io/ableton-rackutils/ and drag a `.adg` onto the
