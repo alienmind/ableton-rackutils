@@ -14,6 +14,7 @@ import { describe, expect, test } from 'vitest';
 import { MACRO_SLOTS, Rack, UNSET_MACRO_VALUE } from '../src/model';
 import { applyContract, inspectContract, removeContractOption, macroNameFor } from '../src/contract';
 import {
+  bindParameter,
   colorChainMacros,
   distributeChainSelector,
   evenMacroCount,
@@ -489,6 +490,41 @@ describe('EQ Three, the three-macro option (doc/PLAN.md 4.3.2)', () => {
     expect(bindingNames(rack, 9)).toEqual(['GainLo']);
     expect(bindingNames(rack, 10)).toEqual(['GainMid']);
     expect(bindingNames(rack, 11)).toEqual(['GainHi']);
+  });
+});
+
+describe('taking a parameter off a macro that drives several (Constraint 4)', () => {
+  test('the macro keeps its variation values while it still drives something else', () => {
+    // PD.adg is the donor with a variation in it, and two of its macros drive
+    // two parameters each. The contract taking ONE of those used to wipe the
+    // macro's stored variation values as if it had been emptied, which breaks
+    // every variation in the rack.
+    const rack = Rack.parse(load('PD.adg'));
+    const donor = rack.macros.find((m) => m.bindings.length > 1);
+    expect(donor).toBeDefined();
+    const before = rack.variations.map((v) => v.values[donor!.index]);
+    expect(rack.variations.length).toBeGreaterThan(0);
+
+    const stolen = donor!.bindings[0];
+    const param = { path: stolen.targetPath, name: stolen.targetName, boundToMacro: donor!.index };
+    const result = bindParameter(rack, 15, param);
+
+    expect(result.ok).toBe(true);
+    expect(result.warnings.join(' ')).toContain(`cleared macro ${donor!.index + 1}`);
+    const after = Rack.parse(rack.serialize());
+    expect(after.variations.map((v) => v.values[donor!.index])).toEqual(before);
+    expect(after.macros[donor!.index].bindings.length).toBe(donor!.bindings.length - 1);
+  });
+
+  test('a macro left driving nothing says so, and its variation values go', () => {
+    const rack = Rack.parse(load('PD.adg'));
+    const single = rack.macros.find((m) => m.bindings.length === 1)!;
+    const stolen = single.bindings[0];
+    const result = bindParameter(rack, 15, { path: stolen.targetPath, name: stolen.targetName, boundToMacro: single.index });
+
+    expect(result.warnings.join(' ')).toContain('now drives nothing');
+    const after = Rack.parse(rack.serialize());
+    for (const variation of after.variations) expect(variation.values[single.index]).toBe(UNSET_MACRO_VALUE);
   });
 });
 

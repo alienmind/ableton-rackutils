@@ -289,11 +289,20 @@ export function bindParameter(
   if (existingOnTarget) {
     const previousMacro = Number(childValue(existingOnTarget, 'NoteOrController'));
     if (previousMacro === macroIndex) return ok(); // already bound to this exact macro, nothing to do
-    warnings.push(`cleared macro ${previousMacro + 1}'s binding on this parameter`);
     removeKeyMidi(existingOnTarget);
-    permuteVariations(rack, (values) => {
-      values[previousMacro] = UNSET_MACRO_VALUE;
-    });
+    // Only once that macro drives NOTHING are its stored variation values
+    // meaningless (Constraint 4). Clearing them unconditionally broke every
+    // variation of a macro that still drove three other chains - which is
+    // exactly what taking one chain's Gain into the contract does.
+    const stillDrives =
+      (rack.collectMacroBindings().get(previousMacro)?.length ?? 0) +
+      (rack.collectPluginMacroRefs().get(previousMacro)?.length ?? 0);
+    clearVariationsIfLastBinding(rack, previousMacro);
+    warnings.push(
+      stillDrives === 0
+        ? `macro ${previousMacro + 1} drove this parameter and now drives nothing`
+        : `cleared macro ${previousMacro + 1}'s binding on this parameter`,
+    );
   }
 
   const keyMidi = createKeyMidi(rack.document, macroIndex);
