@@ -180,9 +180,61 @@ body {
   cursor: default;
 }
 
-/* The file input is the label; it must not also be a control of its own. */
-.transfer-button input[type='file'] {
+/*
+ * The file input is driven by the button beside it - the picker where the
+ * browser has one, this everywhere else - so it is never a control of its own.
+ * Kept in the DOM rather than conditional: it is the fallback path, and a
+ * browser without `showOpenFilePicker` has to have something to click.
+ */
+.file-input {
   display: none;
+}
+
+/* Over the original, which is the one control here that can destroy a rack. */
+.transfer-secondary {
+  margin-top: 0.4rem;
+  padding: 0.35rem 0.8rem;
+  font: inherit;
+  font-size: 0.78rem;
+  color: #c9ccd6;
+  background: transparent;
+  border: 1px solid #3a3d47;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.transfer-secondary:hover {
+  border-color: #6ea8ff;
+  color: #e8e8ea;
+}
+
+.overwrite-confirm {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 0.4rem 0 0;
+}
+
+.overwrite-yes {
+  padding: 0.35rem 0.8rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #101116;
+  background: #d0954a;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.overwrite-no {
+  font: inherit;
+  font-size: 0.78rem;
+  color: #9a9aa5;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
 }
 
 @media (max-width: 640px) {

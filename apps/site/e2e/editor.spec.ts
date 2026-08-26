@@ -816,3 +816,79 @@ test('the mapping table sorts by a column header, and gives the file order back'
   await header('Name').click();
   expect(await names()).toEqual(asWritten);
 });
+
+/**
+ * Saving over the original (doc/PLAN.md 4.6).
+ *
+ * The picker cannot be driven from a test - it is a browser dialog - so the
+ * page is given one that returns a handle over bytes the test controls. What
+ * that leaves real is everything this project can actually get wrong: that
+ * opening through a handle enables the control, that overwriting takes two
+ * clicks, and that what lands in the file is a rack Live could open.
+ */
+async function stubPicker(page: Page, bytes: Buffer, fileName = 'BS.adg') {
+  await page.addInitScript(
+    ([base64, name]) => {
+      const raw = atob(base64 as string);
+      const data = Uint8Array.from(raw, (c) => c.charCodeAt(0));
+      const written: number[][] = [];
+      (window as unknown as { __written: number[][] }).__written = written;
+      const handle = {
+        name,
+        getFile: async () => new File([data as BlobPart], name as string),
+        queryPermission: async () => 'granted',
+        requestPermission: async () => 'granted',
+        createWritable: async () => ({
+          write: async (chunk: BufferSource) => {
+            written.push([...new Uint8Array(chunk as ArrayBufferLike)]);
+          },
+          close: async () => {},
+        }),
+      };
+      (window as unknown as { showOpenFilePicker: unknown }).showOpenFilePicker = async () => [handle];
+    },
+    [bytes.toString('base64'), fileName] as const,
+  );
+}
+
+test('a rack opened through the picker can be saved back over itself, in two clicks', async ({ page }) => {
+  await stubPicker(page, readFileSync(writeRackFile()));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Open a rack' }).click();
+  await page.waitForSelector('.macro-knob');
+
+  // Read-only until asked: the destructive control is a second button, and the
+  // first click on it only names the file.
+  await expect(page.locator('.overwrite-yes')).toHaveCount(0);
+  await page.locator('.transfer-secondary').click();
+  await expect(page.locator('.overwrite-yes')).toHaveText('Overwrite BS.adg');
+
+  await page.locator('.overwrite-yes').click();
+  await expect(page.locator('.transfer-note').last()).toContainText('Saved over BS.adg');
+
+  const written = await page.evaluate(() => (window as unknown as { __written: number[][] }).__written);
+  expect(written).toHaveLength(1);
+  // A gzip that unpacks to a rack, not a blob of whatever was in memory.
+  const bytes = Buffer.from(written[0]);
+  expect(bytes[0]).toBe(0x1f);
+  expect(gunzipSync(bytes).toString()).toContain('<GroupDevicePreset');
+});
+
+test('cancelling leaves the file alone', async ({ page }) => {
+  await stubPicker(page, readFileSync(writeRackFile()));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Open a rack' }).click();
+  await page.waitForSelector('.macro-knob');
+
+  await page.locator('.transfer-secondary').click();
+  await page.locator('.overwrite-no').click();
+  await expect(page.locator('.overwrite-yes')).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as { __written: number[][] }).__written)).toHaveLength(0);
+});
+
+test('a rack opened through the file input offers Export and nothing destructive', async ({ page }) => {
+  // No handle, so no way back to the original - and the control that would
+  // need one is simply not there.
+  await loadRack(page);
+  await expect(page.locator('.transfer-secondary')).toHaveCount(0);
+});
