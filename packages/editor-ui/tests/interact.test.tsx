@@ -4,6 +4,8 @@
  * Every interaction in the first cut of this UI was broken and every render
  * test still passed.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
@@ -15,8 +17,8 @@ let container: HTMLDivElement;
 let root: Root;
 let rack: Rack;
 
-function mount() {
-  rack = Rack.parse(buildFixtureBytes());
+function mount(bytes: Uint8Array = buildFixtureBytes()) {
+  rack = Rack.parse(bytes);
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -502,5 +504,71 @@ describe('sorting the mapping table (doc/PLAN.md 4.4)', () => {
     expect(container.querySelector('.mapping-grid th.col-macro')?.getAttribute('aria-sort')).toBe('ascending');
     click(header('Macro'));
     expect(container.querySelector('.mapping-grid th.col-macro')?.getAttribute('aria-sort')).toBe('descending');
+  });
+});
+
+describe('a knob the user already made for the job (doc/PLAN.md 4.3.1)', () => {
+  const KD = new Uint8Array(readFileSync(join(__dirname, '..', '..', 'adg-codec', 'donors', 'KD.adg')));
+
+  const remount = () => {
+    act(() => root.unmount());
+    container.remove();
+    window.localStorage.clear();
+    // KD.adg has KICK GAIN on one pad's Utility and nothing on the other
+    // three, which is the case that used to empty that knob silently.
+    mount(KD);
+  };
+
+  const featureNamed = (label: string) =>
+    [...container.querySelectorAll('.contract-entry-name')].find((el) => el.textContent === label)!;
+  const addArrow = () => container.querySelectorAll('.contract-arrows button')[0];
+  const macroNames = () => [...container.querySelectorAll('.macro-knob .macro-knob-name')].map((el) => el.textContent);
+
+  test('adding the gain feature asks before taking it over', () => {
+    remount();
+    click(featureNamed('Utility Gain'));
+    click(addArrow());
+
+    const question = container.querySelector('.contract-adopt');
+    expect(question?.textContent).toContain('KICK GAIN');
+    // Nothing has happened to the rack yet: the question comes first.
+    expect(macroNames()).toContain('KICK GAIN');
+  });
+
+  test('reusing it makes that knob the feature, and leaves nothing behind', () => {
+    remount();
+    click(featureNamed('Utility Gain'));
+    click(addArrow());
+    click(container.querySelector('.adopt-yes')!);
+
+    expect(container.querySelector('.contract-adopt')).toBeNull();
+    const gain = rack.macros.find((m) => m.name.endsWith('GAIN'))!;
+    expect(gain.bindings).toHaveLength(rack.chains.length);
+    expect(rack.macros.some((m) => m.name === 'KICK GAIN')).toBe(false);
+  });
+
+  test('adding another leaves their knob alone and builds a second device', () => {
+    remount();
+    const before = rack.chains[0].devices.length;
+    click(featureNamed('Utility Gain'));
+    click(addArrow());
+    click(container.querySelector('.adopt-no')!);
+
+    expect(container.querySelector('.contract-adopt')).toBeNull();
+    // Their knob keeps its name. It is the parameter that moves, which is
+    // Constraint 5 and is what the question was about.
+    expect(rack.macros.some((m) => m.name === 'KICK GAIN')).toBe(true);
+    expect(rack.chains[0].devices.length).toBeGreaterThanOrEqual(before);
+  });
+
+  test('cancelling adds nothing at all', () => {
+    remount();
+    const before = rack.macros.map((m) => m.name);
+    click(featureNamed('Utility Gain'));
+    click(addArrow());
+    click(container.querySelector('.adopt-cancel')!);
+
+    expect(container.querySelector('.contract-adopt')).toBeNull();
+    expect(rack.macros.map((m) => m.name)).toEqual(before);
   });
 });

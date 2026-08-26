@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { writeRackFile } from './rack-file';
 
-async function loadRack(page: Page, kind: 'instrument' | 'drum' | 'plugin' | 'plugin-mapped' = 'instrument') {
+async function loadRack(page: Page, kind: 'instrument' | 'drum' | 'plugin' | 'plugin-mapped' | 'handmade' = 'instrument') {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
@@ -891,4 +891,21 @@ test('a rack opened through the file input offers Export and nothing destructive
   // need one is simply not there.
   await loadRack(page);
   await expect(page.locator('.transfer-secondary')).toHaveCount(0);
+});
+
+test('a knob the user already made is reused rather than emptied', async ({ page }) => {
+  await loadRack(page, 'handmade');
+  await page.locator('.contract-entry-name', { hasText: 'Utility Gain' }).click();
+  await page.locator('.contract-arrows button').first().click();
+
+  // The question comes before anything happens to the rack.
+  await expect(page.locator('.contract-adopt')).toContainText('KICK GAIN');
+  await expect(page.locator('.macro-knob-name', { hasText: 'KICK GAIN' })).toHaveCount(1);
+
+  await page.locator('.adopt-yes').click();
+  await expect(page.locator('.contract-adopt')).toHaveCount(0);
+  // That knob IS the feature now: renamed, in the leading slot, and no knob
+  // called KICK GAIN left driving nothing.
+  await expect(page.locator('.macro-knob-name', { hasText: 'KICK GAIN' })).toHaveCount(0);
+  await expect(page.locator('.macro-knob').first().locator('.macro-knob-name')).toHaveText(/GAIN/);
 });

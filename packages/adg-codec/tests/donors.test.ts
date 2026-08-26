@@ -493,6 +493,62 @@ describe('EQ Three, the three-macro option (doc/PLAN.md 4.3.2)', () => {
   });
 });
 
+describe('adopting a macro the user already made (doc/PLAN.md 4.3.1)', () => {
+  const gain = { deviceTag: 'StereoGain', parameter: 'Gain', namePattern: '{name} GAIN', colorIndex: 69 };
+
+  test('KD.adg KICK GAIN is reported as adoptable, not as the contract own', () => {
+    const rack = Rack.parse(load('KD.adg'));
+    // One pad of four has a Utility with a macro on it, called by hand.
+    expect(inspectContract(rack, [gain], { name: 'KD' })[0]).toMatchObject({
+      state: 'partial',
+      chainsCovered: 1,
+      adoptable: { slot: 9, macroName: 'KICK GAIN' },
+    });
+  });
+
+  test('a macro the contract itself would have written is not a question', () => {
+    // BS.adg already has BS GAIN across both chains, which is satisfied and
+    // nobody needs asking about.
+    expect(inspectContract(Rack.parse(load('BS.adg')), [gain], { name: 'BS' })[0]).toMatchObject({
+      state: 'satisfied',
+      adoptable: null,
+    });
+  });
+
+  test('without adopting, their knob is left driving nothing', () => {
+    const rack = Rack.parse(load('KD.adg'));
+    const result = applyContract(rack, [gain], { name: 'KD' });
+    expect(result.warnings.join(' ')).toContain('now drives nothing');
+    const after = Rack.parse(rack.serialize());
+    expect(after.macros.find((m) => m.name === 'KICK GAIN')?.bindings).toEqual([]);
+  });
+
+  test('adopting keeps that knob, finishes its job and makes it the feature', () => {
+    const rack = Rack.parse(load('KD.adg'));
+    const result = applyContract(rack, [{ ...gain, adopt: true }], { name: 'KD' });
+
+    expect(result.ok).toBe(true);
+    expect(result.warnings).toEqual([]);
+    const after = Rack.parse(rack.serialize());
+    // One macro, in the contract's leading slot, driving the Utility on every
+    // pad - the one it already drove included.
+    expect(result.slots).toEqual([0]);
+    expect(after.macros[0].name).toBe('KD GAIN');
+    expect(after.macros[0].color).toBe(69);
+    expect(after.macros[0].bindings).toHaveLength(after.chains.length);
+    // And no leftover: the name is gone because that knob IS the feature now.
+    expect(after.macros.some((m) => m.name === 'KICK GAIN')).toBe(false);
+    expect(after.macros.filter((m) => m.bindings.length === 0 && m.name !== `Macro ${m.index + 1}`)).toEqual([]);
+  });
+
+  test('adopting spends no macro slot, so the bank does not grow', () => {
+    const before = Rack.parse(load('KD.adg')).macroCount;
+    const rack = Rack.parse(load('KD.adg'));
+    applyContract(rack, [{ ...gain, adopt: true }], { name: 'KD' });
+    expect(Rack.parse(rack.serialize()).macroCount).toBe(before);
+  });
+});
+
 describe('taking a parameter off a macro that drives several (Constraint 4)', () => {
   test('the macro keeps its variation values while it still drives something else', () => {
     // PD.adg is the donor with a variation in it, and two of its macros drive

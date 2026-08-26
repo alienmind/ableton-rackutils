@@ -31,6 +31,12 @@ export interface Feature {
   bands?: Record<string, boolean>;
   /** Per-band label patterns, by `ContractBand.id`, where they differ from the band's default. */
   bandNames?: Record<string, string>;
+  /**
+   * Take over a macro the user already made for this job rather than building
+   * a second one beside it. Answered once, when the feature is added, and kept
+   * so re-applying the template does not ask again.
+   */
+  adopt?: boolean;
   /** Device path of the nested rack this instance applies inside of - a drum pad's rack (SCHEMA.md Q24). */
   targetRack?: string;
   /** The pad or chain that rack sits in, which fills `{target}` in the label. */
@@ -141,6 +147,7 @@ function readTemplate(value: unknown): Template | null {
       settings: typeof f.settings === 'object' && f.settings !== null ? { ...f.settings } : {},
       ...(typeof f.bands === 'object' && f.bands !== null ? { bands: { ...f.bands } } : {}),
       ...(typeof f.bandNames === 'object' && f.bandNames !== null ? { bandNames: { ...f.bandNames } } : {}),
+      ...(f.adopt === true ? { adopt: true } : {}),
       ...(typeof f.targetRack === 'string' ? { targetRack: f.targetRack } : {}),
       ...(typeof f.targetName === 'string' ? { targetName: f.targetName } : {}),
     }));
@@ -166,6 +173,7 @@ export function devicesFor(feature: Feature): ContractDevice[] {
   const common = {
     ...spec.device,
     colorIndex: feature.colorIndex ?? spec.device.colorIndex,
+    ...(feature.adopt ? { adopt: true } : {}),
     ...(feature.targetRack ? { targetRack: feature.targetRack, targetName: feature.targetName } : {}),
     ...(values.length > 0 ? { values } : {}),
   };

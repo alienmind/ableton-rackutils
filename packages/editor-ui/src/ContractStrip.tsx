@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   applyContract,
+  macroNameFor,
   evenMacroCount,
   inspectContract,
   removeContractOption,
@@ -90,6 +91,8 @@ export function ContractStrip({ rack }: ContractStripProps) {
   const [rackName, setRackName] = useState(rack.name);
   const [pickedOption, setPickedOption] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  /** A feature waiting on the reuse question, with the knob it would take over. */
+  const [asking, setAsking] = useState<{ feature: Feature; macroName: string; slot: number } | null>(null);
   const [picking, setPicking] = useState<DOMRect | null>(null);
   const importer = useRef<HTMLInputElement>(null);
 
@@ -110,10 +113,10 @@ export function ContractStrip({ rack }: ContractStripProps) {
    * reads the whole document.
    */
   const statuses = useMemo(() => {
-    const perDevice = inspectContract(rack, template.features.flatMap(devicesFor));
+    const perDevice = inspectContract(rack, template.features.flatMap(devicesFor), { name });
     let at = 0;
     return template.features.map((f) => summarise(perDevice.slice(at, (at += devicesFor(f).length))));
-  }, [rack, template]);
+  }, [rack, template, name]);
 
   const targets = useMemo(() => nestedRackTargets(rack), [rack]);
   const isDrumRack = rack.deviceEl.tagName === 'DrumGroupDevice';
@@ -183,15 +186,39 @@ export function ContractStrip({ rack }: ContractStripProps) {
       ? 'No pad here holds a rack, and a drum rack cannot select its own pads - they answer to notes'
       : null;
 
-  /** Left to right: put the picked option into the rack. */
+  /**
+   * Left to right: put the picked option into the rack - unless the rack
+   * already has a knob of the user's own doing that job.
+   *
+   * That knob would otherwise be quietly emptied: a parameter has ONE macro
+   * (Constraint 5), so binding the feature's macro to it takes it off theirs
+   * and leaves a knob called `KICK GAIN` driving nothing. So the strip asks,
+   * and the answer is kept on the feature.
+   */
   const addPicked = () => {
     if (!pickedOption || !picked || blocked) return;
     const target = picked.targetsNestedRack && isDrumRack ? firstFreeTarget(targets, template.features) : undefined;
     const created = newFeature(pickedOption, target ? { targetRack: target.path, targetName: target.name, namePattern: '{target} SEL' } : {});
     if (!created) return;
 
+    const theirs = inspectContract(rack, devicesFor(created), { name }).find((s) => s.adoptable)?.adoptable;
+    if (theirs) {
+      setPickedOption(null);
+      setAsking({ feature: created, macroName: theirs.macroName, slot: theirs.slot });
+      return;
+    }
+
     setSelected(created.key);
     setPickedOption(null);
+    materialise({ ...template, features: [...template.features, created] });
+  };
+
+  /** The answer: reuse their knob, or leave it alone and build another. */
+  const answerAdopt = (adopt: boolean) => {
+    if (!asking) return;
+    const created = { ...asking.feature, adopt };
+    setAsking(null);
+    setSelected(created.key);
     materialise({ ...template, features: [...template.features, created] });
   };
 
@@ -323,6 +350,25 @@ export function ContractStrip({ rack }: ContractStripProps) {
           />
         </div>
       </header>
+
+      {/* The one question this strip asks. Everything else it does is
+          reversible from the list; taking over somebody's knob is a decision
+          about their rack, so it is put to them before it happens. */}
+      {asking && (
+        <p className="contract-adopt" role="status">
+          <strong>{asking.macroName}</strong> on macro {asking.slot + 1} already does this. Reuse it as{' '}
+          <strong>{macroNameFor(asking.feature.namePattern, name, asking.feature.targetName)}</strong>?
+          <button type="button" className="adopt-yes" onClick={() => answerAdopt(true)}>
+            Reuse it
+          </button>
+          <button type="button" className="adopt-no" onClick={() => answerAdopt(false)}>
+            Add another
+          </button>
+          <button type="button" className="adopt-cancel" onClick={() => setAsking(null)}>
+            cancel
+          </button>
+        </p>
+      )}
 
       <div className="contract-columns">
         <div className="contract-column">
@@ -635,7 +681,7 @@ function longestLabel(spec: ContractOptionSpec, feature: Feature, name: string):
  * only when every one of them is, absent only when none of them is anywhere.
  */
 function summarise(statuses: readonly ContractStatus[]): ContractStatus {
-  const first = statuses[0] ?? { slot: null, state: 'absent' as const, chainsCovered: 0, chainCount: 0 };
+  const first = statuses[0] ?? { slot: null, state: 'absent' as const, chainsCovered: 0, chainCount: 0, adoptable: null };
   if (statuses.every((s) => s.state === 'satisfied')) return first;
   if (statuses.every((s) => s.state === 'absent')) return { ...first, state: 'absent' };
   return { ...first, state: 'partial' };
