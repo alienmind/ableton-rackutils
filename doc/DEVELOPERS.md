@@ -256,10 +256,18 @@ that is the whole of the protection.
 
 Three things a preview does differently:
 
-- **It carries no service worker** (`VITE_NO_SW=1`). The deployed site's worker
-  is scoped to `/ableton-rackutils/`, which INCLUDES every preview path under
-  it, so an installed PWA would serve its own cached shell over the preview and
-  the tester would be reviewing the wrong build.
+- **It carries no service worker** (`VITE_NO_SW=1`), and **the deployed site's
+  worker is told to keep off preview paths** (`navigateFallbackDenylist` in
+  `apps/site/vite.config.ts`). Both halves are needed, and the second is the
+  one that bites: that worker's scope is the whole site, so a preview under it
+  is in scope, and its navigation fallback answered those URLs with the main
+  site's cached page. A preview that had never been deployed looked deployed -
+  the old site, wearing the preview's URL, reporting the old version number.
+  That is how this was found.
+
+  A device that already has the old worker picks the new one up on its next
+  visit to the main site (`registerType: 'autoUpdate'`). Visit the site once
+  before opening a preview on a phone that has been there before.
 - **Its version badge is the tag**, not `package.json`, so two previews of the
   same version are told apart at a glance.
 - **It publishes main to the site root too.** One extra build per beta tag, and

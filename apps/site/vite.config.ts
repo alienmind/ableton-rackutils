@@ -32,6 +32,11 @@ const embedded = process.env.VITE_EMBED === '1';
 // browser for every file.
 const noServiceWorker = process.env.VITE_NO_SW === '1';
 
+/** `base` is a path, and a path may hold characters a RegExp reads as syntax. */
+function escapeForRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // base comes from an env var, not from GITHUB_ACTIONS sniffing or a hardcoded
 // path, so the same config serves local dev ('/'), GitHub Pages
 // ('/ableton-rackutils/'), and the device bundle ('./').
@@ -84,7 +89,14 @@ export default defineConfig({
               maximumFileSizeToCacheInBytes: 5_000_000,
               // Racks are dragged in from disk, but keep the SPA fallback off
               // anything that is not a page regardless.
-              navigateFallbackDenylist: [/.*\.(adg|als|md|zip)$/i],
+              //
+              // And off the BETA PREVIEWS, which is not a nicety: this worker's
+              // scope is the whole site, so a preview at `<base>preview/<tag>/`
+              // sits inside it, and the fallback answered those navigations
+              // with this build's cached page. The preview looked like it had
+              // deployed and was the old site wearing its URL - which is
+              // exactly how it was found.
+              navigateFallbackDenylist: [/.*\.(adg|als|md|zip)$/i, new RegExp(`^${escapeForRegExp(base)}preview/`)],
             },
           }),
         ]),
