@@ -53,13 +53,14 @@ editing, batch library operations - is out. See Parked.
 
 ## Current state
 
-- **`packages/adg-codec`** - built. Twenty-one mutations plus the contract, 167
-  tests, 42 of them against the committed donor racks.
+- **`packages/adg-codec`** - built. Twenty-one mutations plus the contract, 182
+  tests, 81 of them against the committed donor racks.
 - **`packages/editor-ui`** - built. Reproduces Live's layout, plus the rack
-  features strip, feature templates, Map mode and the cable layer. 39 tests.
+  features strip, the plugin strip, feature templates, Map mode and the cable
+  layer. 51 tests.
 - **`apps/site`** - the editor under a landing page that is two controls and
   two question marks, deployed to Pages. Installable, offline, and laid out for
-  a phone as well as an ultra-wide. 39 Playwright specs against real Chromium
+  a phone as well as an ultra-wide. 42 Playwright specs against real Chromium
   in CI.
 - **`tools/adg-tool`** - `unpack`/`diff`/`mappings`/`move`/`move-mapping`, plus
   `adg-palette` and `adg-harvest`.
@@ -71,21 +72,15 @@ editing, batch library operations - is out. See Parked.
 
 ## Where this branch is
 
-`feature/options-strip-and-m4l-device`, unmerged, no PR opened. Everything
-below is built, tested headless and in a real browser, and NOT yet confirmed in
-Live. The full state, and what still has to be confirmed by hand, is in
-"Confirmed, and not" at the end of this section.
+`feat/vst-dependency-view`. `feature/options-strip-and-m4l-device` is merged
+(PR #5). Everything below is built, tested headless and in a real browser, and
+NOT yet confirmed in Live. The full state, and what still has to be confirmed
+by hand, is in "Confirmed, and not" at the end of this section.
 
 ## Next steps, in order
 
-1. **VST dependency view** (4.1). The resolution route is settled (SCHEMA.md
-   Q18): pick the plugin folder once, byte-search each `.vst3` for the class
-   id, cache the answer.
-2. **Show a plugin binding in the editor** (Open risk 1). Moves are correct;
-   the mapping table still cannot draw one, because a plugin binding has no
-   `targetPath`.
-3. **Editor open items** (4.4), the mapping table's units and sorting.
-4. **Save in place** (4.6).
+1. **Editor open items** (4.4), the mapping table's units and sorting.
+2. **Save in place** (4.6).
 
 None of these is what the next session should do first. **Open the racks in
 Live** (Open risk 2): the Gate, the Compressor, EQ Three, the chain selector
@@ -116,6 +111,13 @@ templates. Everything after that is unconfirmed, and specifically:
 - **The animations have not been seen by anyone but the code.** Panels animate
   their width, the cables follow and swing, devices fold as the row narrows.
   Tests assert the states, not that it looks right.
+- **The plugin scan has never met a real plugin folder.** The byte search is
+  tested against synthetic binaries and against `donors/BS-VST3.adg`'s class
+  id, which is the id of a plugin that IS installed on the maintainer's
+  machine (SCHEMA.md Q18) - so pointing it at `Program Files/Common Files/VST3`
+  should resolve that rack to `MiniBrute V`, and anything else is the test
+  failing. Unknown until someone runs it: how long a full folder takes, and
+  whether the picker's one-off permission is as one-off as it looks.
 
 Use it on real racks throughout. Every bug this project has hit came from that,
 not from tests - including a UI whose every interaction was broken while its
@@ -345,37 +347,9 @@ The fix has three parts:
 Test against `BS.adg`: 19 `KeyMidi` elements, `NoteOrController` 0 through 8,
 and the codec must report bindings for all nine macros rather than eight.
 
-### 4.1 VST dependency view
+### 4.1 VST dependency view - DONE
 
-**Build this first.** Read-only, no donors, no insertion, no ambiguity, useful
-on its own.
-
-Walk the rack for plugin devices and list the unique plugins it needs:
-`PluginDevice`, `Vst3PluginInfo`, `VstPluginInfo` and the Audio Unit
-equivalents, each carrying a plugin name and a unique id. Show them as a strip
-above the rack.
-
-It answers a question nothing else answers: will this rack load on this
-machine, and what does it drag in. Useful for a rack downloaded from elsewhere,
-and for an old rack of your own built on a plugin you have since removed.
-
-The schema is settled (SCHEMA.md Q17, Q18). A plugin is a `Vst3Preset`, a
-sibling wrapper of `AbletonDevicePreset` with no `Device` child, and it carries
-a `Uid` of four big-endian ints and NO plugin name.
-
-Resolving that to a name is a byte search, not a lookup:
-`showDirectoryPicker()` on the user's VST3 folder once, then stream each
-`.vst3` looking for the 16 bytes in both COM and plain order - Windows embeds
-the COM form, and the SDK is not COM-ordered everywhere. The filename is the
-answer, and the result is a `uid -> name` table worth caching in IndexedDB so
-the scan happens once rather than per rack.
-
-`moduleinfo.json` is the documented route and is not usable as the primary
-one: it is opt-in for vendors and there are zero of them on the maintainer's
-machine, where every `.vst3` is a bare DLL.
-
-A MISS is a useful answer. A class id no local plugin contains is a rack this
-machine cannot fully load, which is the question the view exists to answer.
+See D11.
 
 ### 4.2 Colour index mapping - CLOSED
 
@@ -782,18 +756,17 @@ See D7.
 
 | Order | Work | Risk if skipped |
 |---|---|---|
-| 1 | 4.1 VST dependency view | None, but the route is settled and cheap |
-| 2 | Show a plugin binding (Open risk 1) | A macro reads as unmapped when it is not |
-| 3 | 4.4 editor open items | Feature gaps only |
-| 4 | 4.6 save in place | Current download flow works |
+| 1 | 4.4 editor open items | Feature gaps only |
+| 2 | 4.6 save in place | Current download flow works |
 
 ### Open risks
 
-1. **A plugin binding is invisible in the editor** (SCHEMA.md Q20). Macro
-   moves carry it correctly now, tested against `BS-VST3-mapped.adg`, but
-   `Macro.bindings` is built from `KeyMidi` so the mapping table shows nothing
-   for a macro driving a plugin parameter. Showing it means widening the
-   `Binding` model, since a plugin binding has no `targetPath`.
+1. **A plugin that is not a VST3 is invisible** (SCHEMA.md Q17). `Rack.plugins`
+   looks for `Vst3Preset`, the only plugin wrapper any donor here holds, so a
+   rack whose plugin is a VST2 or an Audio Unit reports none rather than a
+   guessed tag. Settled by saving a rack with one of each and diffing.
+   Related and also unrecorded: what a mapped `PowerMacroControlIndex` looks
+   like (Q20).
 2. **"Loads in Live" is not "looks like a rack."** Both Q19 faults produced a
    valid file with working mappings that 122 passing tests could not see. Every
    new device the contract learns to insert gets opened in Live before it
@@ -1086,6 +1059,43 @@ explanations behind question marks.**
 - The guide still ships only to the website: `Landing.tsx` exports both the
   masthead and the guide, and `Landing.embedded.tsx` stubs both, so the images
   stay out of the `.amxd` (4.7).
+
+### D11. The plugin dependency view - DONE
+
+What a rack needs in order to load, above the rack: its plugins, one entry per
+plugin rather than per instance, each with the chains it sits in. Read only,
+and it answers a question nothing else does - will this rack load on this
+machine, and what does it drag in.
+
+- **The file names no plugin** (SCHEMA.md Q17). `Rack.plugins` reports the
+  class id from `Vst3Preset/Uid`, plus the CHAIN name, which is the only
+  readable string anywhere near a plugin and is the user's own typing. Nested
+  racks are walked too: the dependency question is about the whole file.
+- **A name is a byte search over the user's own folder** (Q18).
+  `showDirectoryPicker()` once, then every `.vst3` is streamed and searched for
+  the 16 bytes in both COM and plain order, and the FILENAME is the answer.
+  Cached as `uid -> name` in `localStorage` - a few dozen short strings, and a
+  scan can always be run again. Chromium only, feature-detected, and the strip
+  says so where it cannot.
+- **A MISS is a real answer**, kept as such: an id searched for and not found
+  reads "not on this machine", which is different from an id nobody has looked
+  for yet.
+- **Only `Vst3Preset`.** VST2 and Audio Unit presets are other tags and no
+  donor here holds one, so nothing looks for them (Q17). A guessed tag is how a
+  codec starts reading elements that do not exist.
+
+### D12. A macro driving a plugin parameter, visible - DONE
+
+Was Open risk 1. `Binding` carries an optional `plugin` and a `targetPath` that
+addresses the element holding the macro index, which is what a plugin binding
+has instead of a parameter (SCHEMA.md Q20). The mapping table draws the row,
+and an unnamed macro driving one is labelled after it like any other (Q23).
+
+The range is the plugin's own normalized 0..1, in a differently shaped element,
+so it is shown and not offered for editing: `setBindingRange` and
+`invertBindingRange` refuse a plugin path by name rather than writing an
+Ableton-shaped range into it. `unbindOne` writes -1 and leaves the parameter
+exposed.
 
 ### D4. The site - DONE
 
