@@ -667,3 +667,42 @@ test('it is installable: icons, theme colour and an apple touch icon', async ({ 
     expect(response.status(), icon).toBe(200);
   }
 });
+
+test('dropping a parameter back on its own macro leaves one cable, not two', async ({ page }) => {
+  await loadRack(page);
+  await turnMapOn(page);
+  await openFirstDevice(page);
+
+  const param = page.locator('.mapped-params .param', { hasText: 'ParamA' }).first();
+  const knob = rootKnobs(page).first();
+  const before = await page.locator('.mapping-cable').count();
+
+  await param.hover();
+  await page.mouse.down();
+  await knob.hover();
+  // Over the macro that already drives it: the cable stops promising a
+  // connection, because dropping there does nothing.
+  await expect(page.locator('.patch-cable')).toHaveClass(/already-bound/);
+  await page.mouse.up();
+
+  // No connect echo on top of the cable that is already drawn.
+  await expect(page.locator('.patch-cable')).toHaveCount(0);
+  await expect.poll(() => page.locator('.mapping-cable').count()).toBe(before);
+});
+
+test('the rack row and the panels under it share one width', async ({ page }) => {
+  await page.setViewportSize({ width: 1900, height: 1000 });
+  await loadRack(page);
+
+  const box = async (selector: string) => (await page.locator(selector).boundingBox())!;
+  const row = await box('.rack-editor-scroll');
+  const features = await box('.contract-strip');
+  const mappings = await box('.mapping-table');
+
+  // One block: same left edge, same right edge, whatever the rack's own width.
+  expect(Math.round(row.x)).toBe(Math.round(features.x));
+  expect(Math.round(row.x + row.width)).toBe(Math.round(mappings.x + mappings.width));
+  // A rack narrower than the block is padded out by empty device slots rather
+  // than leaving a gap that reads as a layout fault.
+  await expect(page.locator('.rack-filler')).toBeVisible();
+});

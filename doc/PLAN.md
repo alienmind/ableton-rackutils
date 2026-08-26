@@ -617,12 +617,22 @@ codec and through a browser; "loads in Live" is a different claim (Open risk
 - **Cables are clipped to the rack row - BUILT.** The layer covers the
   viewport, so a cable to a control scrolled out of the row used to be drawn
   across the page beside it.
-- **The rack row is as wide as the window, and it comes first - BUILT.** Prose
-  reads badly past 900px and a rack of racks runs to thousands, so the rack
-  breaks out of the text column rather than sharing its width. The two panels
-  that READ the rack - the features strip and the mapping table - sit under it
-  as two columns and stack when there is not room for both, because neither is
-  better for being stretched across a monitor.
+- **The editor is ONE block, one width - BUILT.** The rack comes first and the
+  two panels that read it - the features strip and the mapping table - sit
+  under it as two columns, stacking when there is not room for both. All three
+  share a left and a right edge: the rack was full-bleed while the panels were
+  capped and centred, which put three different edges on one screen. A rack
+  narrower than the block is padded out by the empty device slots it has room
+  for, drawn the way Live draws them, rather than by a gap that reads as a
+  layout fault. Prose keeps its own 900px measure, since text is unreadable at
+  1500.
+- **Dropping a parameter back on its own macro does nothing, visibly - BUILT.**
+  It already did nothing to the file (a parameter has one macro, Constraint 5,
+  and that was it), but the drop still played a connect animation on top of the
+  cable Map mode was already drawing, so two cables arrived at one knob. The
+  cable now says "already there" while hovering it, the drop is a no-op with no
+  echo, and the stored cable for a parameter being dragged is hidden for the
+  length of the drag.
 - **A macro resets from its own knob - BUILT.** The `x` unbinds it and puts its
   name and colour back to an untouched slot's, leaving the slot where it is.
 - **Cables while Map is on - BUILT.** Every mapping in the rack is drawn as a

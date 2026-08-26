@@ -446,3 +446,29 @@ describe('chain colour (SCHEMA.md Q13)', () => {
     expect(row.style.getPropertyValue('--chain-ink')).not.toBe('');
   });
 });
+
+describe('dropping a parameter back where it already is', () => {
+  test('changes nothing and draws no second cable', () => {
+    // Map mode already draws this binding's cable; a connect animation on top
+    // of it put two lines into one knob.
+    click(container.querySelector('.map-button')!);
+    click(container.querySelector('.device-panel.collapsed .device-title-strip')!);
+    const param = [...container.querySelectorAll('.param')].find((p) => p.textContent === 'ParamA')!;
+    const before = rack.macros[0].bindings.map((b) => b.targetName).sort();
+
+    const knob = container.querySelectorAll('.macro-knob')[0];
+    const original = document.elementFromPoint;
+    document.elementFromPoint = () => knob;
+    try {
+      act(() => param.dispatchEvent(Object.assign(new Event('pointerdown', { bubbles: true }), { button: 0, clientX: 0, clientY: 0 })));
+      act(() => window.dispatchEvent(Object.assign(new Event('pointermove'), { clientX: 60, clientY: 0 })));
+      act(() => window.dispatchEvent(Object.assign(new Event('pointerup'), { clientX: 60, clientY: 0 })));
+    } finally {
+      document.elementFromPoint = original;
+    }
+
+    expect(rack.macros[0].bindings.map((b) => b.targetName).sort()).toEqual(before);
+    // No echo: the drag cable is gone the moment the pointer comes up.
+    expect(container.querySelector('.patch-cable')).toBeNull();
+  });
+});
