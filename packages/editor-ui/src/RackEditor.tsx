@@ -4,7 +4,7 @@ import { RackPanel } from './RackPanel';
 import { EditorProvider, resolveRackPath, type ArmedParam, type RackPath } from './context';
 import { MappingTable } from './MappingTable';
 import { PatchCable } from './PatchCable';
-import { MappingCables } from './MappingCables';
+import { MappingCables, mapKey } from './MappingCables';
 import { ContractStrip } from './ContractStrip';
 import { useParamDrag } from './useParamDrag';
 
@@ -145,6 +145,12 @@ export function RackEditor({ rack, onChange, onSave, liveValues }: RackEditorPro
         <div className="rack-editor-scroll">
           <div className="rack-row">
             <RackPanel rack={rack} rackPath={[]} depth={0} />
+            {/* The empty slots a rack has room for. Live draws them too, and
+                without them a rack narrower than the window sat in a box of
+                dead space that read as a layout bug rather than as a rack
+                with room in it. Decorative: nothing can be dropped here,
+                devices come from Live. */}
+            <div className="rack-filler" aria-hidden="true" />
           </div>
         </div>
 
@@ -153,7 +159,11 @@ export function RackEditor({ rack, onChange, onSave, liveValues }: RackEditorPro
           <MappingTable rack={rack} />
         </div>
 
-        <MappingCables rack={rack} active={mapping} />
+        <MappingCables
+          rack={rack}
+          active={mapping}
+          hidden={paramDrag.param && paramDrag.rackPath ? mapKey(paramDrag.rackPath, paramDrag.param.path) : null}
+        />
         <PatchCable drag={paramDrag} echo={cableEcho} onEchoDone={clearCableEcho} />
       </div>
     </EditorProvider>

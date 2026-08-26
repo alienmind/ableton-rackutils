@@ -27,6 +27,15 @@ export interface ParamDragState {
   overMacro: number | null;
   /** True when the knob under the pointer belongs to a DIFFERENT rack, which cannot be bound (SCHEMA.md Q2). */
   overForeignRack: boolean;
+  /**
+   * True when the knob under the pointer ALREADY drives this parameter.
+   *
+   * Dropping there changes nothing - a parameter has one macro (Constraint 5)
+   * and this is that macro - so the gesture has to say so rather than play a
+   * connect animation over the cable that is already there, which drew two
+   * lines into one knob.
+   */
+  overBound: boolean;
   /** Where the cable is plugged in: the parameter it was pulled from. Viewport coordinates. */
   origin: Point | null;
   /** Where the free end currently is. Viewport coordinates. */
@@ -49,7 +58,16 @@ export interface CableEcho {
   color: string | null;
 }
 
-const IDLE: ParamDragState = { param: null, rackPath: null, overMacro: null, overForeignRack: false, origin: null, pointer: null, overColor: null };
+const IDLE: ParamDragState = {
+  param: null,
+  rackPath: null,
+  overMacro: null,
+  overForeignRack: false,
+  overBound: false,
+  origin: null,
+  pointer: null,
+  overColor: null,
+};
 
 export interface UseParamDragOptions {
   onBind: (rackPath: RackPath, macroIndex: number, param: ParamRef) => void;
@@ -89,7 +107,7 @@ export function useParamDrag({ onBind }: UseParamDragOptions) {
       const origin = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
       active.current = { param, rackPath, origin };
       setEcho(null);
-      setState({ param, rackPath, overMacro: null, overForeignRack: false, origin, pointer: origin, overColor: null });
+      setState({ param, rackPath, overMacro: null, overForeignRack: false, overBound: false, origin, pointer: origin, overColor: null });
 
       const key = rackPath.join('|');
 
@@ -106,7 +124,14 @@ export function useParamDrag({ onBind }: UseParamDragOptions) {
 
       const move = (ev: PointerEvent) => {
         const { macro, foreign, color } = locate(ev.clientX, ev.clientY);
-        setState((s) => ({ ...s, overMacro: macro, overForeignRack: foreign, overColor: color, pointer: { x: ev.clientX, y: ev.clientY } }));
+        setState((s) => ({
+          ...s,
+          overMacro: macro,
+          overForeignRack: foreign,
+          overBound: macro !== null && !foreign && param.boundToMacro === macro,
+          overColor: color,
+          pointer: { x: ev.clientX, y: ev.clientY },
+        }));
       };
 
       const finish = (ev: PointerEvent) => {
@@ -119,6 +144,13 @@ export function useParamDrag({ onBind }: UseParamDragOptions) {
         // owning-rack walk), so a drop onto another rack's knob does nothing
         // rather than writing a mapping the file cannot express.
         const bound = macro !== null && !foreign;
+
+        // Dropped back on the macro it already drives: nothing to write, and
+        // nothing to animate either. The cable for that pair is already on
+        // screen in Map mode, and a connect echo over it read as two cables
+        // arriving at one knob.
+        if (bound && dragged.param.boundToMacro === macro) return;
+
         const target = bound && knob ? centreOf(knob) : { x: ev.clientX, y: ev.clientY };
         echoId.current += 1;
         setEcho({ id: echoId.current, from: dragged.origin, to: target, connected: bound, color: bound ? color : null });

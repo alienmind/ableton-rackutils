@@ -63,7 +63,9 @@ export function MacroBank(props: MacroBankProps) {
       dragging={drag.from === macro.index}
       dropTarget={drag.from !== null && drag.over === macro.index && drag.from !== macro.index}
       dropSwaps={drag.swap}
-      bindTarget={paramDrag.param !== null && paramDrag.overMacro === macro.index && !paramDrag.overForeignRack}
+      // Not a target when it is already the answer: the parameter is bound to
+      // this macro, so there is nothing to light up.
+      bindTarget={paramDrag.param !== null && paramDrag.overMacro === macro.index && !paramDrag.overForeignRack && !paramDrag.overBound}
       mapSource={mapping && onMapSource !== undefined}
       mapKeys={[macroKey(rackPath, macro.index), parentKeys?.[macro.index]].filter(Boolean).join(' ')}
       // In Map mode a knob is a source, not a macro to move: the two gestures

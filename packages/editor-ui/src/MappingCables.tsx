@@ -26,6 +26,13 @@ import { collectMappings } from './mappings';
 export interface MappingCablesProps {
   rack: Rack;
   active: boolean;
+  /**
+   * The cable NOT to draw: the one for a parameter being dragged right now.
+   *
+   * Its live cable follows the pointer, and drawing the stored one underneath
+   * put two lines on one binding for as long as the drag lasted.
+   */
+  hidden?: string | null;
 }
 
 /** The box the cables are allowed to be seen in: the rack's own scrolling row. */
@@ -53,7 +60,7 @@ export function macroKey(rackPath: readonly string[], index: number): string {
   return `${rackPath.join('|')}#macro${index}`;
 }
 
-export function MappingCables({ rack, active }: MappingCablesProps) {
+export function MappingCables({ rack, active, hidden }: MappingCablesProps) {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [clip, setClip] = useState<Clip | null>(null);
 
@@ -86,6 +93,7 @@ export function MappingCables({ rack, active }: MappingCablesProps) {
 
       const next: Segment[] = [];
       for (const cable of wanted) {
+        if (hidden && cable.param === hidden) continue;
         // `~=` because a nested rack's knob carries TWO keys: its own, and
         // the one the rack above addresses it by (SCHEMA.md Q22). Keys hold no
         // whitespace, which is what makes the list form safe.
@@ -131,7 +139,7 @@ export function MappingCables({ rack, active }: MappingCablesProps) {
       window.removeEventListener('scroll', schedule, true);
       observer.disconnect();
     };
-  }, [rack, active]);
+  }, [rack, active, hidden]);
 
   if (!active || segments.length === 0) return null;
 
