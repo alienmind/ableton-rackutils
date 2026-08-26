@@ -8,16 +8,18 @@ page, or from the command line.
 
 **Live site:** https://alienmind.github.io/ableton-rackutils/
 
-> **v0.3.0, beta, unreleased.** The editor works end to end: open a rack, rearrange and
+> **v0.4.0, beta.** The editor works end to end: open a rack, rearrange and
 > rebind its macros, add the features you want every rack of yours to have,
 > save, and load the result back into Live. Racks the contract authored have
-> made that round trip too. See [What works today](#what-works-today).
+> made that round trip and been played. See
+> [What works today](#what-works-today).
 
 > **Keep backups anyway.** This tool rewrites rack files. The codec is covered
-> by 155 tests, many against real racks, and the editor by 59 more including a
-> real browser, but a preset that loads without complaint and behaves subtly
-> differently is the failure mode that testing catches last. Racks with Macro
-> Variations deserve a listen before you trust the result.
+> by 189 tests, 88 of them against real racks saved by Live, the editor by 60
+> more, and the site by 49 that drive a real browser - and a preset that loads
+> without complaint and behaves subtly differently is still the failure mode
+> testing catches last. Racks with Macro Variations deserve a listen before you
+> trust the result.
 
 ## Your files stay on your machine
 
@@ -46,10 +48,19 @@ What that means in practice:
 |---|---|
 | Open a rack in the browser and see its macros, chains and drum pads | works |
 | Rearrange, rename, recolour and rebind macros in the browser | works |
-| Save the result and load it back into Live | works, lightly tested |
+| Save the result and load it back into Live | works, confirmed by ear |
+| Save back over the file you opened, instead of downloading a copy | works in Chromium, opt-in per save |
 | Inspect and rearrange macros from the command line | works |
 | Add a gain, a gate, a compressor, a filter or an EQ to every chain at once, on one macro | works |
+| Put a chain selector on a macro | works on a rack; on a DRUM rack, see below |
+| See which plugins a rack needs, and name them from your VST3 folder | works in Chromium |
+| See a macro that drives a plugin parameter | works, read only |
 | Companion Max for Live device | works - the same editor, offline, inside Live |
+
+One known fault: on a drum rack, a chain selector added ALONGSIDE several other
+features stops selecting, though each of them is fine on its own. It is
+bisected, not fixed - if you use that combination, check the knob in Live
+before trusting the rack.
 
 ## The command line tools
 
@@ -136,12 +147,24 @@ left to right, with nested racks and drum pad grids drawn in place.
 - **Drag a knob onto another** to move that macro, or hold Shift to swap two.
 - **Double-click** a name to rename it, click a swatch to recolour it.
 - Under the rack, every mapping is listed in full: rack, macro, device,
-  parameter.
+  parameter, and the range it sweeps. Sort it by any of the first three, or
+  click again for the order the rack is written in.
+- **Plugins**, above the rack, when it has any: what the rack needs in order to
+  load. A `.adg` stores no plugin name, only an id, so point the page at your
+  VST3 folder once and it finds which file each id lives in. One it cannot find
+  is the useful answer: that rack will not fully load on this machine.
+
+If the rack already has a knob doing a feature's job - a Utility gain you wired
+by hand - the strip asks whether to reuse it rather than quietly taking the
+parameter off it. Reuse it and that knob becomes the feature, keeping its
+mapping and gaining the chains it was missing.
 
 The knob is still a placeholder shape, though the colours are Live's own.
 
-Saving downloads a copy named after the rack. Your original file is never
-touched.
+**Export** downloads a copy named after the rack and never touches your
+original. **Save over the original** appears once you have opened the rack
+through the file picker, takes a second click that names the file, and is the
+only thing here that can overwrite anything.
 
 ## The companion device (optional)
 

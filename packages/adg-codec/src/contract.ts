@@ -81,6 +81,22 @@ export interface ContractDevice {
   /** `MacroColor.N`, a palette index (SCHEMA.md Q13). Omit to leave the slot's colour alone. */
   colorIndex?: number;
   /**
+   * Take over a macro of the user's own that already drives this parameter on
+   * SOME chains, rather than building a second one beside it.
+   *
+   * The case is a rack that already half-does the convention by hand: KD's
+   * `KICK GAIN` drives the Utility on one pad. Without this the contract binds
+   * its own macro to that same Utility, Constraint 5 clears the user's macro,
+   * and the rack is left with a knob called `KICK GAIN` that drives nothing.
+   * With it, that knob IS the feature: it keeps its bindings, gains the chains
+   * it was missing, and takes the contract's name and colour - which the user
+   * can then edit, because it is the feature's name from that point on.
+   *
+   * Off by default: adopting renames somebody's macro, which is a decision to
+   * put to them (`inspectContract` reports what would be adopted).
+   */
+  adopt?: boolean;
+  /**
    * Device path of a NESTED rack this feature applies inside of, with the
    * macro that drives it staying on THIS rack. Two links rather than one:
    * this rack's macro drives the nested rack's macro (SCHEMA.md Q22), and that
@@ -152,6 +168,16 @@ export interface ContractStatus {
   /** Chains this option's device already ends. Zero for an option with no device. */
   chainsCovered: number;
   chainCount: number;
+  /**
+   * A macro of the user's own, under a name the contract did not write, that
+   * already drives this option's parameter on some chains.
+   *
+   * Applying the option as-is would take that parameter off it (Constraint 5)
+   * and leave a knob driving nothing, so this is the question to put to the
+   * user before that happens: reuse their knob, or add a second one beside it.
+   * `ContractDevice.adopt` is the answer.
+   */
+  adoptable: { slot: number; macroName: string } | null;
 }
 
 /**
@@ -170,8 +196,17 @@ export function macroNameFor(pattern: string, rackName: string, targetName = '')
  * question by the same rules, so what the strip shows and what ticking it does
  * cannot drift apart.
  */
-export function inspectContract(rack: Rack, devices: readonly ContractDevice[]): ContractStatus[] {
+export function inspectContract(
+  rack: Rack,
+  devices: readonly ContractDevice[],
+  options: ContractOptions = {},
+): ContractStatus[] {
   const chainCount = rack.chains.length;
+  // The name the contract WOULD write with, which is what decides whether a
+  // macro is the user's own or this contract's under a name it has not been
+  // given yet. `PD GAIN` on a rack called "AlienMind Pad Rack" is the
+  // contract's convention, not somebody else's knob.
+  const name = options.name ?? rack.name;
   // Read once. `rack.macros` recomputes every slot and rescans the document
   // for KeyMidi elements, so reading it per slot per option turned the strip
   // into seconds of work on every render.
@@ -179,16 +214,16 @@ export function inspectContract(rack: Rack, devices: readonly ContractDevice[]):
   return devices.map((device) => {
     const chainsCovered = device.deviceTag ? chainsEndingIn(rack, device.deviceTag).length : 0;
     const satisfied = findSatisfiedSlot(rack, device, macros);
-    if (satisfied !== null) return { slot: satisfied, state: 'satisfied', chainsCovered, chainCount };
+    if (satisfied !== null) return { slot: satisfied, state: 'satisfied', chainsCovered, chainCount, adoptable: null };
 
     // An option with no macro is satisfied by its device alone.
     if (device.parameter === undefined && chainCount > 0 && chainsCovered === chainCount) {
-      return { slot: null, state: 'satisfied', chainsCovered, chainCount };
+      return { slot: null, state: 'satisfied', chainsCovered, chainCount, adoptable: null };
     }
 
     const partial = findPartialSlot(rack, device, macros);
     const state: ContractState = partial !== null || chainsCovered > 0 ? 'partial' : 'absent';
-    return { slot: partial, state, chainsCovered, chainCount };
+    return { slot: partial, state, chainsCovered, chainCount, adoptable: adoptableAt(name, device, macros, partial) };
   });
 }
 
@@ -224,10 +259,22 @@ export function applyContract(
   // Split into what is already on the rack and what has to be made room for,
   // before touching anything: the shift has to be sized once.
   const existing = new Map<number, number>(); // index into devices -> macro slot
+  // Adopted slots are `existing` too - they spend no new slot - but the option
+  // still has to be PLACED on them: the chains the user's macro was missing
+  // need the device and the binding.
+  const adopted = new Set<number>();
   const before = rack.macros; // read once: see inspectContract
   devices.forEach((device, i) => {
     const slot = findSatisfiedSlot(rack, device, before);
-    if (slot !== null) existing.set(i, slot);
+    if (slot !== null) {
+      existing.set(i, slot);
+      return;
+    }
+    if (!device.adopt) return;
+    const theirs = findPartialSlot(rack, device, before);
+    if (theirs === null) return;
+    existing.set(i, theirs);
+    adopted.add(i);
   });
 
   const toAdd = devices.filter((d, i) => d.parameter !== undefined && !existing.has(i)).length;
@@ -250,7 +297,7 @@ export function applyContract(
     const slot = existing.get(i) ?? (device.parameter === undefined ? -1 : nextFreeSlot++);
     slots.push(slot);
 
-    if (!existing.has(i)) {
+    if (!existing.has(i) || adopted.has(i)) {
       const landed = placeOption(rack, device, name, slot, inserted, warnings);
       if (!landed.ok) return { ok: false, warnings: [...warnings, ...landed.warnings], slots: [] };
     }
@@ -511,6 +558,26 @@ function findSatisfiedSlot(rack: Rack, device: ContractDevice, macros: readonly 
     if (bindings.every((b) => drivesThisOption(rack, b.targetPath, device))) return slot;
   }
   return null;
+}
+
+/**
+ * The user's own macro doing this option's job, where there is one.
+ *
+ * "Their own" is decided by the NAME, the same tell `removeContractOption`
+ * uses on devices: the contract writes `{name} GAIN` and never renames what it
+ * did not put there, so a macro driving the right parameter under any other
+ * name was somebody's own work. Adopting is then a question rather than a
+ * silent overwrite.
+ */
+function adoptableAt(
+  name: string,
+  device: ContractDevice,
+  macros: readonly Macro[],
+  slot: number | null,
+): { slot: number; macroName: string } | null {
+  if (slot === null || device.parameter === undefined) return null;
+  const macroName = macros[slot].name;
+  return macroName === macroNameFor(device.namePattern, name, device.targetName) ? null : { slot, macroName };
 }
 
 /** The slot driving this option on SOME chains but not all - partial satisfaction (doc/PLAN.md 4.3.3). */

@@ -696,6 +696,13 @@ other element carries one. The only human-readable string near it is the CHAIN
 name, `MiniBrute`, which its author typed. Live resolves the `Uid` against
 installed plugins at load time.
 
+**A VST2 or an Audio Unit is some other tag, and which one is not recorded
+here.** Every donor with a plugin in it holds a `Vst3Preset`, so that is the
+only tag `Rack.plugins` looks for. A rack whose plugin is one of the others
+reports no plugins, which is wrong but honest; guessing a tag is how a codec
+starts reading elements that do not exist. To settle it: save a rack holding
+one of each and diff.
+
 The four `Uid` fields concatenate to `41727475415649534D42525450726F63`, which
 decodes as ASCII to `ArtuAVISMBRTProc`. Some vendors build readable UIDs like
 that; it is a coincidence to exploit for display, never a fact to rely on.
@@ -860,10 +867,24 @@ them now. Two details:
 - Unbinding writes -1 rather than removing the element. The parameter stays
   exposed on the device, it just stops being driven.
 
-**Still open: the editor cannot SHOW these.** `Macro.bindings` is built from
-`KeyMidi` and a plugin binding has no `targetPath`, so the mapping table lists
-nothing for a macro that drives a plugin parameter. Correctness first; display
-is a separate change to the `Binding` model.
+**The editor shows these now.** `Binding` carries an optional `plugin`
+(`uid`, `parameterId`, `power`) and its `targetPath` addresses the element
+holding the macro index rather than a parameter, which is what a plugin binding
+has instead of one. Two consequences the UI has to respect:
+
+- **The range is the plugin's, not the parameter's.** It reads 0..1 - the
+  plugin's normalized value - and it sits in a `MidiControllerRange` nested in
+  another one. An Ableton-shaped range written there is a file that loads and
+  behaves wrong, so `setBindingRange` and `invertBindingRange` refuse a plugin
+  path by name and the table shows those two numbers without an input on them.
+- **Unbinding writes -1**, as `unbindMacro` already did: the parameter stays
+  exposed on the device.
+
+**What a mapped POWER switch looks like has still not been seen.**
+`PowerMacroControlIndex` is -1 in every donor, beside a flat
+`PowerMacroMappingRange` of 64..127. That element is read as the range for a
+power binding, which is an inference from its name and its shape rather than
+from a diff. To settle it: map a plugin's on/off to a macro, save, and diff.
 
 ## Q21. What is EQ Three, and what are its band gains?
 

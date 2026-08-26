@@ -1,5 +1,6 @@
-import type { Macro, Rack } from '@rackutils/adg-codec';
+import type { Macro, PluginBinding, Rack } from '@rackutils/adg-codec';
 import { macroColor } from './macroColors';
+import { loadPluginNames } from './pluginScan';
 
 export interface MappingTarget {
   /** The device that owns the parameter, e.g. "Reverb". */
@@ -12,6 +13,12 @@ export interface MappingTarget {
   rangeMax: number;
   /** Stored as Min > Max, which Live drives backwards. */
   inverted: boolean;
+  /**
+   * Set when the target is a plugin parameter (SCHEMA.md Q20). Its range is
+   * the plugin's normalized 0..1 and lives in a differently shaped element, so
+   * the row shows it and does not offer to edit it.
+   */
+  plugin?: PluginBinding;
 }
 
 export interface MacroMapping {
@@ -58,6 +65,10 @@ export function macroLabel(macro: Macro): string {
 
 export function collectMappings(root: Rack): MacroMapping[] {
   const rows: MacroMapping[] = [];
+  // A plugin binding has no device to name: the file carries a class id and
+  // nothing else (SCHEMA.md Q17). Whatever a folder scan has resolved is the
+  // only name available, and "Plugin" is the honest answer without one.
+  const pluginNames = loadPluginNames();
 
   const visit = (rack: Rack, path: readonly string[]) => {
     const deviceOf = new Map<string, string>();
@@ -83,12 +94,13 @@ export function collectMappings(root: Rack): MacroMapping[] {
           // Falls back to the rack itself, which is where a binding on a
           // rack's own parameter lives - ChainSelector (SCHEMA.md Q15) has no
           // device to belong to.
-          device: deviceOf.get(b.targetPath) ?? rack.name,
+          device: b.plugin ? pluginNames[b.plugin.uid] || 'Plugin' : (deviceOf.get(b.targetPath) ?? rack.name),
           parameter: b.targetName,
           targetPath: b.targetPath,
           rangeMin: b.rangeMin,
           rangeMax: b.rangeMax,
           inverted: b.inverted,
+          plugin: b.plugin,
         })),
       });
     }

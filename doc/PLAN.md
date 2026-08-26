@@ -1,6 +1,6 @@
 # ableton-rackutils: Implementation Plan (v6)
 
-**Product status: v0.2.0 released, 0.3.0 on the branch.** The editor works end
+**Product status: 0.4.0 on the branch, v0.2.0 the last tagged release.** The editor works end
 to end, racks the contract authored have been loaded back into Live, and the
 device now carries the same editor offline. Version numbers are the
 maintainer's to cut; nothing here bumps one. Still young: keep backups.
@@ -53,13 +53,14 @@ editing, batch library operations - is out. See Parked.
 
 ## Current state
 
-- **`packages/adg-codec`** - built. Twenty-one mutations plus the contract, 167
-  tests, 42 of them against the committed donor racks.
+- **`packages/adg-codec`** - built. Twenty-one mutations plus the contract, 182
+  tests, 88 of them against the committed donor racks.
 - **`packages/editor-ui`** - built. Reproduces Live's layout, plus the rack
-  features strip, feature templates, Map mode and the cable layer. 39 tests.
+  features strip, the plugin strip, feature templates, Map mode and the cable
+  layer. 60 tests.
 - **`apps/site`** - the editor under a landing page that is two controls and
   two question marks, deployed to Pages. Installable, offline, and laid out for
-  a phone as well as an ultra-wide. 39 Playwright specs against real Chromium
+  a phone as well as an ultra-wide. 49 Playwright specs against real Chromium
   in CI.
 - **`tools/adg-tool`** - `unpack`/`diff`/`mappings`/`move`/`move-mapping`, plus
   `adg-palette` and `adg-harvest`.
@@ -71,21 +72,17 @@ editing, batch library operations - is out. See Parked.
 
 ## Where this branch is
 
-`feature/options-strip-and-m4l-device`, unmerged, no PR opened. Everything
-below is built, tested headless and in a real browser, and NOT yet confirmed in
-Live. The full state, and what still has to be confirmed by hand, is in
-"Confirmed, and not" at the end of this section.
+`feat/vst-dependency-view`. `feature/options-strip-and-m4l-device` is merged
+(PR #5). Everything below is built, tested headless and in a real browser, and
+NOT yet confirmed in Live. The full state, and what still has to be confirmed
+by hand, is in "Confirmed, and not" at the end of this section.
 
 ## Next steps, in order
 
-1. **VST dependency view** (4.1). The resolution route is settled (SCHEMA.md
-   Q18): pick the plugin folder once, byte-search each `.vst3` for the class
-   id, cache the answer.
-2. **Show a plugin binding in the editor** (Open risk 1). Moves are correct;
-   the mapping table still cannot draw one, because a plugin binding has no
-   `targetPath`.
-3. **Editor open items** (4.4), the mapping table's units and sorting.
-4. **Save in place** (4.6).
+1. **Mapping table units** (4.4). The last open editor item, and the only one
+   that needs something the file does not carry: the target parameter's native
+   range, which patchbay's donor index knows and this repo would have to
+   import.
 
 None of these is what the next session should do first. **Open the racks in
 Live** (Open risk 2): the Gate, the Compressor, EQ Three, the chain selector
@@ -99,23 +96,43 @@ The maintainer walked the browser UI on `donors/KD.adg` and confirmed steps 1
 to 10 of the test script - the rack-of-racks fix, the scrollbar, Map mode,
 mapping a nested rack's knob, the per-knob reset, the collapsed mapping rows,
 adding and removing features, the pad-targeted chain selector, reordering,
-templates. Everything after that is unconfirmed, and specifically:
+templates. The rest was walked in Live on 2026-08-26, and stands as:
 
-- **Nothing has been opened in Live on this branch.** Two racks are authored
-  and waiting at `tmp/BS-features.adg` and `tmp/KD-features.adg`. The chain
-  selector's range splitting (Q24) is the newest and least proven of it: if
-  `BS SEL` sweeps without changing which chain sounds, that is the bug.
-- **The device has not been installed.** It builds, the payload is guarded, the
-  window is declared - nobody has pressed Open in Live.
-- **The PWA has not been installed on a phone.** The manifest and icons are
-  right in a desktop browser; the install prompt needs HTTPS, so it needs
-  Pages.
-- **The knob drag has not been tried with a finger.** If it is fiddly the fix
-  is a bigger hit area under `@media (pointer: coarse)`, sized from a real
-  report rather than guessed.
-- **The animations have not been seen by anyone but the code.** Panels animate
-  their width, the cables follow and swing, devices fold as the row narrows.
-  Tests assert the states, not that it looks right.
+- **`BS-features.adg` passes in Live.** The chain selector sweeps and the
+  chains change, which confirms Q24's range splitting on an ordinary rack.
+- **`KD-features.adg` renders correctly and its KICK SEL does not work**, which
+  is the same feature on a DRUM rack, where the selector reaches its chains
+  through a pad rack (Q24's two links). The file's wiring is identical to the
+  maintainer's working rack on that path - same `BranchSelectorRange`
+  partition, same `ChainSelector` KeyMidi, same range - and differs only in
+  which root slot drives it.
+
+  **Bisected twice.** Each half works alone - `tmp/KD-selector-only.adg` sweeps
+  correctly and `tmp/KD-no-selector.adg` keeps the original selector working -
+  and so does the selector plus any ONE feature (`KD-sel-gain`, `KD-sel-gate`,
+  `KD-sel-eq`, all three confirmed). Only the full set fails. So it is neither
+  feature and neither half: it is a function of how many, which points at the
+  MACRO SHIFT or at the bank size the shift produces (six features take the
+  visible count to 16, where one takes it to 12).
+
+  Waiting on the third bisect, which separates those two:
+  `tmp/KD-sel-three.adg` (three features, twelve macros) and
+  `tmp/KD-sel-16macros.adg` (ONE feature, then the bank widened by hand to 16).
+  If the 16-macro one fails, the count is the fault and this belongs in
+  SCHEMA.md Q19 beside the odd-count finding; if the three-feature one fails,
+  it is the shift.
+- **The device is installed and its window opens.**
+- **The PWA has not been installed on a phone**, and the knob drag has not been
+  tried with a finger. Both wait on Pages: the install prompt needs HTTPS. If
+  the drag is fiddly the fix is a bigger hit area under
+  `@media (pointer: coarse)`, sized from a real report rather than guessed.
+- **The animations are confirmed by eye.**
+- **Saving over the original is confirmed on a real file.**
+- The version badge reads whatever `package.json` says, which the workspace
+  bump put at `0.4.0`. A browser spec fails if the page and `package.json` ever
+  disagree again, which is what the stale `v0.2.0` on the deployed site was.
+- **The plugin scan resolves a real plugin from a real folder**, confirmed
+  against `donors/BS-VST3.adg` and the maintainer's own VST3 directory.
 
 Use it on real racks throughout. Every bug this project has hit came from that,
 not from tests - including a UI whose every interaction was broken while its
@@ -246,6 +263,12 @@ Consequence: every mutation that changes macro slots must permute variation
 value arrays identically. This is the single easiest way to corrupt a rack, and
 the codec tests it explicitly.
 
+The same rule the other way round: a macro's stored values only become
+meaningless once it drives NOTHING. `bindParameter` used to clear them whenever
+it took a parameter off another macro (Constraint 5), which broke every
+variation of a macro that still drove three other chains - exactly what
+applying the contract's gain option to a rack does.
+
 ### Constraint 5: A parameter can only be driven by one macro
 
 Live enforces this in its UI. The file format allows expressing a violation.
@@ -345,37 +368,9 @@ The fix has three parts:
 Test against `BS.adg`: 19 `KeyMidi` elements, `NoteOrController` 0 through 8,
 and the codec must report bindings for all nine macros rather than eight.
 
-### 4.1 VST dependency view
+### 4.1 VST dependency view - DONE
 
-**Build this first.** Read-only, no donors, no insertion, no ambiguity, useful
-on its own.
-
-Walk the rack for plugin devices and list the unique plugins it needs:
-`PluginDevice`, `Vst3PluginInfo`, `VstPluginInfo` and the Audio Unit
-equivalents, each carrying a plugin name and a unique id. Show them as a strip
-above the rack.
-
-It answers a question nothing else answers: will this rack load on this
-machine, and what does it drag in. Useful for a rack downloaded from elsewhere,
-and for an old rack of your own built on a plugin you have since removed.
-
-The schema is settled (SCHEMA.md Q17, Q18). A plugin is a `Vst3Preset`, a
-sibling wrapper of `AbletonDevicePreset` with no `Device` child, and it carries
-a `Uid` of four big-endian ints and NO plugin name.
-
-Resolving that to a name is a byte search, not a lookup:
-`showDirectoryPicker()` on the user's VST3 folder once, then stream each
-`.vst3` looking for the 16 bytes in both COM and plain order - Windows embeds
-the COM form, and the SDK is not COM-ordered everywhere. The filename is the
-answer, and the result is a `uid -> name` table worth caching in IndexedDB so
-the scan happens once rather than per rack.
-
-`moduleinfo.json` is the documented route and is not usable as the primary
-one: it is opt-in for vendors and there are zero of them on the maintainer's
-machine, where every `.vst3` is a bare DLL.
-
-A MISS is a useful answer. A class id no local plugin contains is a rack this
-machine cannot fully load, which is the question the view exists to answer.
+See D11.
 
 ### 4.2 Colour index mapping - CLOSED
 
@@ -408,7 +403,10 @@ same thought: the rack is called this, and this is the file it becomes.
 
 **One name, everywhere.** It reaches the rack, every macro the contract adds,
 every device it inserts, and the saved file, so a rack is identifiable from any
-one of them. A device already in the chain keeps whatever its owner called it -
+one of them. There are two ways to type it - the rack's title bar and the
+strip's box - and they are the same name: the box reads the rack rather than
+keeping a copy it took when it mounted, and a rename from either relabels every
+feature. A device already in the chain keeps whatever its owner called it -
 renaming someone else's device is not this tool's job.
 
 The name is the RACK's name, in full, and a feature's label is its own field:
@@ -420,6 +418,32 @@ patterned.
 **A piece already present is detected, not duplicated.** If the rack already
 ends in a Utility, the option shows as satisfied, coloured differently, and the
 user can still edit its name, colour and slot. The tool reuses what is there.
+
+**A KNOB already present is a question - BUILT.** A device the rack already has
+is reused silently, because reusing it takes nothing away from anybody. A MACRO
+is different: a parameter has exactly one macro (Constraint 5), so binding the
+feature's macro to a Utility that `KICK GAIN` already drives takes it off
+`KICK GAIN` and leaves a named, coloured knob driving nothing. So the strip
+asks - "KICK GAIN on macro 10 already does this. Reuse it as KD GAIN?" - and:
+
+- **Reuse it** adopts that knob: it keeps its bindings, gains the chains it was
+  missing, moves into the feature's leading slot, and takes the feature's name
+  and colour. It is the feature from then on, renameable from the settings
+  column like any other. It spends no new macro slot.
+- **Add another** is the old behaviour, kept because it is sometimes right: the
+  parameter moves to the new macro and theirs is left as it falls.
+- The answer is stored on the feature, so re-applying the template does not ask
+  again.
+- **The same offer appears in the settings column** of a feature that is
+  already mounted. A template carried over from the last rack arrives with its
+  features in the list, so the arrow - and its question - is never pressed, and
+  the offer has to be reachable without taking the feature out and putting it
+  back.
+
+The tell for "theirs" is the NAME, the same one `removeContractOption` uses on
+devices: the contract writes `{name} GAIN` and never renames what it did not
+put there, so a macro driving the right parameter under any other name was
+somebody's own work.
 
 **The contract's macros take the FIRST slots, and the rack's own macros shift
 right.** That is what makes them familiar: whatever rack you open, the leading
@@ -700,7 +724,12 @@ codec and through a browser; "loads in Live" is a different claim (Open risk
   target parameter's own units (`20.0 Hz`, `-inf dB`), which are not
   recoverable from the file for every parameter type. patchbay's donor index
   knows the native range per parameter, so importing it would supply this.
-- **Sorting the mapping table** by column header, as Live's own list does.
+- **Sorting the mapping table - BUILT.** Macro, Path and Name each sort on
+  their header, and a third click gives back the order the rack is written in,
+  which is the only order that says where a macro physically sits. Sorting is
+  by GROUP: a macro's targets stay together under it, and a collapsed group
+  sorts by its first target rather than by the "2 parameters" summary the cell
+  shows.
 
 ### 4.5 Offline, installable, and usable on a phone - DONE
 
@@ -745,32 +774,9 @@ Two things worth keeping:
   stale UI after a device update. `release-device.yml` carries a note to guard
   on `sw.js` when embedding lands.
 
-### 4.6 Save in place
+### 4.6 Save in place - DONE
 
-`showOpenFilePicker()` returns a handle writable through `createWritable()`, so
-the site can save the modified `.adg` over the original instead of downloading
-a copy the user then has to find.
-
-```typescript
-const [handle] = await window.showOpenFilePicker({
-  types: [{ description: 'Ableton Device Group', accept: { 'application/gzip': ['.adg'] } }],
-});
-const rack = Rack.parse(new Uint8Array(await (await handle.getFile()).arrayBuffer()));
-
-// ...edit...
-
-const writable = await handle.createWritable();
-await writable.write(rack.serialize());
-await writable.close();
-```
-
-- Reuse trackster's `src/types/file-system-access.d.ts`.
-- Firefox and Safari support is weaker than Chromium's, so keep the `<input
-  type="file">` plus download path as an automatic fallback, and detect rather
-  than assume.
-- Writing over the user's original file raises the stakes on Constraint 4.
-  Default to read-only, and require an explicit opt-in before any destructive
-  write.
+See D13.
 
 ### 4.7 The Max for Live device, as a bundle - DONE
 
@@ -782,18 +788,16 @@ See D7.
 
 | Order | Work | Risk if skipped |
 |---|---|---|
-| 1 | 4.1 VST dependency view | None, but the route is settled and cheap |
-| 2 | Show a plugin binding (Open risk 1) | A macro reads as unmapped when it is not |
-| 3 | 4.4 editor open items | Feature gaps only |
-| 4 | 4.6 save in place | Current download flow works |
+| 1 | 4.4 mapping table units | Numbers without units, as now |
 
 ### Open risks
 
-1. **A plugin binding is invisible in the editor** (SCHEMA.md Q20). Macro
-   moves carry it correctly now, tested against `BS-VST3-mapped.adg`, but
-   `Macro.bindings` is built from `KeyMidi` so the mapping table shows nothing
-   for a macro driving a plugin parameter. Showing it means widening the
-   `Binding` model, since a plugin binding has no `targetPath`.
+1. **A plugin that is not a VST3 is invisible** (SCHEMA.md Q17). `Rack.plugins`
+   looks for `Vst3Preset`, the only plugin wrapper any donor here holds, so a
+   rack whose plugin is a VST2 or an Audio Unit reports none rather than a
+   guessed tag. Settled by saving a rack with one of each and diffing.
+   Related and also unrecorded: what a mapped `PowerMacroControlIndex` looks
+   like (Q20).
 2. **"Loads in Live" is not "looks like a rack."** Both Q19 faults produced a
    valid file with working mappings that 122 passing tests could not see. Every
    new device the contract learns to insert gets opened in Live before it
@@ -1086,6 +1090,71 @@ explanations behind question marks.**
 - The guide still ships only to the website: `Landing.tsx` exports both the
   masthead and the guide, and `Landing.embedded.tsx` stubs both, so the images
   stay out of the `.amxd` (4.7).
+
+### D11. The plugin dependency view - DONE
+
+What a rack needs in order to load, above the rack: its plugins, one entry per
+plugin rather than per instance, each with the chains it sits in. Read only,
+and it answers a question nothing else does - will this rack load on this
+machine, and what does it drag in.
+
+- **The file names no plugin** (SCHEMA.md Q17). `Rack.plugins` reports the
+  class id from `Vst3Preset/Uid`, plus the CHAIN name, which is the only
+  readable string anywhere near a plugin and is the user's own typing. Nested
+  racks are walked too: the dependency question is about the whole file.
+- **A name is a byte search over the user's own folder** (Q18).
+  `showDirectoryPicker()` once, then every `.vst3` is streamed and searched for
+  the 16 bytes in both COM and plain order, and the FILENAME is the answer.
+  Cached as `uid -> name` in `localStorage` - a few dozen short strings, and a
+  scan can always be run again. Chromium only, feature-detected, and the strip
+  says so where it cannot.
+- **A MISS is a real answer**, kept as such: an id searched for and not found
+  reads "not on this machine", which is different from an id nobody has looked
+  for yet.
+- **Only `Vst3Preset`.** VST2 and Audio Unit presets are other tags and no
+  donor here holds one, so nothing looks for them (Q17). A guessed tag is how a
+  codec starts reading elements that do not exist.
+
+### D12. A macro driving a plugin parameter, visible - DONE
+
+Was Open risk 1. `Binding` carries an optional `plugin` and a `targetPath` that
+addresses the element holding the macro index, which is what a plugin binding
+has instead of a parameter (SCHEMA.md Q20). The mapping table draws the row,
+and an unnamed macro driving one is labelled after it like any other (Q23).
+
+The range is the plugin's own normalized 0..1, in a differently shaped element,
+so it is shown and not offered for editing: `setBindingRange` and
+`invertBindingRange` refuse a plugin path by name rather than writing an
+Ableton-shaped range into it. `unbindOne` writes -1 and leaves the parameter
+exposed.
+
+### D14. The version on the page is the repo's - DONE
+
+The site went out reading `v0.2.0` while the repo had moved on: the badge was a
+literal in the masthead, and a literal is a fact nobody remembers to update.
+`vite.config.ts` substitutes `__APP_VERSION__` from the repo's own
+`package.json` at build time, and a browser spec asserts the two agree - so the
+drift is a failing test rather than a thing somebody notices on the deployed
+page. A release bump moves the badge on its own.
+
+### D13. Save in place - DONE
+
+The edited rack goes back over the file it came from, rather than into the
+downloads folder for the user to find and drag.
+
+- **Opening is what makes it possible.** `showOpenFilePicker()` returns a
+  handle; `<input type="file">` returns bytes and no way back. One button uses
+  the picker where the browser has one and the input everywhere else, and a
+  dropped rack gets a handle too where `getAsFileSystemHandle` offers one.
+- **Read-only until asked.** Opening requests read only. Write permission is
+  requested at the moment of saving, so a user who only wanted to look at a
+  rack is never prompted about writing to it.
+- **Two clicks, the second naming the file.** Everything else this tool does
+  produces another copy; this is the one control that can destroy a rack, and
+  Constraint 4 is why. Export stays, unconditionally, as the way out that
+  cannot.
+- **Firefox and Safari lose nothing they had.** No picker means no handle,
+  which means the overwrite control is simply not rendered.
 
 ### D4. The site - DONE
 

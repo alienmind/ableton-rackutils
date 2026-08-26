@@ -1,9 +1,11 @@
 import { gunzipSync } from 'node:zlib';
 import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { writeRackFile } from './rack-file';
 
-async function loadRack(page: Page, kind: 'instrument' | 'drum' | 'plugin' = 'instrument') {
+async function loadRack(page: Page, kind: 'instrument' | 'drum' | 'plugin' | 'plugin-mapped' | 'handmade' = 'instrument') {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
@@ -773,4 +775,156 @@ test.describe('the plugin strip (doc/PLAN.md 4.1)', () => {
     await loadRack(page);
     await expect(page.locator('.plugin-strip')).toHaveCount(0);
   });
+});
+
+test('a macro driving a plugin parameter is listed, with a range it does not offer to edit', async ({ page }) => {
+  await loadRack(page, 'plugin-mapped');
+  // Slot 13, driven by MacroControlIndex and by no KeyMidi at all (SCHEMA.md
+  // Q20). It used to be missing from this table entirely.
+  const row = mappingRowForSlot(page, 13);
+  await expect(row).toHaveCount(1);
+  await expect(row.locator('.col-name')).toHaveText('Parameter 70');
+  await expect(row.locator('.mapping-fixed')).toHaveCount(2);
+  await expect(row.locator('.mapping-invert')).toHaveCount(0);
+});
+
+test('the version badge is the repo version, not a literal somebody has to remember', async ({ page }) => {
+  await page.goto('/');
+  // The site shipped reading v0.2.0 while the repo had moved on. The badge is
+  // substituted from package.json at build time (`vite.config.ts`), and this
+  // is what stops it drifting again.
+  const version = JSON.parse(
+    readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'package.json'), 'utf8'),
+  ).version as string;
+  await expect(page.locator('.masthead .badge')).toHaveText(`v${version} beta`);
+});
+
+test('the mapping table sorts by a column header, and gives the file order back', async ({ page }) => {
+  await loadRack(page);
+  const names = () => page.locator('.mapping-grid tbody .col-name').allTextContents();
+  const header = (label: string) => page.locator('.mapping-grid th .mapping-sort', { hasText: label });
+
+  const asWritten = await names();
+  await header('Name').click();
+  const ascending = await names();
+  expect(ascending).not.toEqual(asWritten);
+  await expect(page.locator('.mapping-grid th.col-name')).toHaveAttribute('aria-sort', 'ascending');
+
+  await header('Name').click();
+  expect(await names()).toEqual([...ascending].reverse());
+
+  await header('Name').click();
+  expect(await names()).toEqual(asWritten);
+});
+
+/**
+ * Saving over the original (doc/PLAN.md 4.6).
+ *
+ * The picker cannot be driven from a test - it is a browser dialog - so the
+ * page is given one that returns a handle over bytes the test controls. What
+ * that leaves real is everything this project can actually get wrong: that
+ * opening through a handle enables the control, that overwriting takes two
+ * clicks, and that what lands in the file is a rack Live could open.
+ */
+async function stubPicker(page: Page, bytes: Buffer, fileName = 'BS.adg') {
+  await page.addInitScript(
+    ([base64, name]) => {
+      const raw = atob(base64 as string);
+      const data = Uint8Array.from(raw, (c) => c.charCodeAt(0));
+      const written: number[][] = [];
+      (window as unknown as { __written: number[][] }).__written = written;
+      const handle = {
+        name,
+        getFile: async () => new File([data as BlobPart], name as string),
+        queryPermission: async () => 'granted',
+        requestPermission: async () => 'granted',
+        createWritable: async () => ({
+          write: async (chunk: BufferSource) => {
+            written.push([...new Uint8Array(chunk as ArrayBufferLike)]);
+          },
+          close: async () => {},
+        }),
+      };
+      (window as unknown as { showOpenFilePicker: unknown }).showOpenFilePicker = async () => [handle];
+    },
+    [bytes.toString('base64'), fileName] as const,
+  );
+}
+
+test('a rack opened through the picker can be saved back over itself, in two clicks', async ({ page }) => {
+  await stubPicker(page, readFileSync(writeRackFile()));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Open a rack' }).click();
+  await page.waitForSelector('.macro-knob');
+
+  // Read-only until asked: the destructive control is a second button, and the
+  // first click on it only names the file.
+  await expect(page.locator('.overwrite-yes')).toHaveCount(0);
+  await page.locator('.transfer-secondary').click();
+  await expect(page.locator('.overwrite-yes')).toHaveText('Overwrite BS.adg');
+
+  await page.locator('.overwrite-yes').click();
+  await expect(page.locator('.transfer-note').last()).toContainText('Saved over BS.adg');
+
+  const written = await page.evaluate(() => (window as unknown as { __written: number[][] }).__written);
+  expect(written).toHaveLength(1);
+  // A gzip that unpacks to a rack, not a blob of whatever was in memory.
+  const bytes = Buffer.from(written[0]);
+  expect(bytes[0]).toBe(0x1f);
+  expect(gunzipSync(bytes).toString()).toContain('<GroupDevicePreset');
+});
+
+test('cancelling leaves the file alone', async ({ page }) => {
+  await stubPicker(page, readFileSync(writeRackFile()));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Open a rack' }).click();
+  await page.waitForSelector('.macro-knob');
+
+  await page.locator('.transfer-secondary').click();
+  await page.locator('.overwrite-no').click();
+  await expect(page.locator('.overwrite-yes')).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as { __written: number[][] }).__written)).toHaveLength(0);
+});
+
+test('a rack opened through the file input offers Export and nothing destructive', async ({ page }) => {
+  // No handle, so no way back to the original - and the control that would
+  // need one is simply not there.
+  await loadRack(page);
+  await expect(page.locator('.transfer-secondary')).toHaveCount(0);
+});
+
+test('a knob the user already made is reused rather than emptied', async ({ page }) => {
+  await loadRack(page, 'handmade');
+  await page.locator('.contract-entry-name', { hasText: 'Utility Gain' }).click();
+  await page.locator('.contract-arrows button').first().click();
+
+  // The question comes before anything happens to the rack.
+  await expect(page.locator('.contract-adopt')).toContainText('KICK GAIN');
+  await expect(page.locator('.macro-knob-name', { hasText: 'KICK GAIN' })).toHaveCount(1);
+
+  await page.locator('.adopt-yes').click();
+  await expect(page.locator('.contract-adopt')).toHaveCount(0);
+  // That knob IS the feature now: renamed, in the leading slot, and no knob
+  // called KICK GAIN left driving nothing.
+  await expect(page.locator('.macro-knob-name', { hasText: 'KICK GAIN' })).toHaveCount(0);
+  await expect(page.locator('.macro-knob').first().locator('.macro-knob-name')).toHaveText(/GAIN/);
+});
+
+test('the rack name is one name: renaming it anywhere renames it everywhere', async ({ page }) => {
+  await loadRack(page);
+  const strip = page.locator('.contract-code');
+  const title = page.locator('.rack-name').first();
+
+  // From the title bar. The strip's box used to keep the name the rack had
+  // when it mounted, so the two read as separate things.
+  await title.dblclick();
+  await page.locator('.rack-name-input').first().fill('KD');
+  await page.locator('.rack-name-input').first().blur();
+  await expect(title).toHaveText('KD');
+  await expect(strip).toHaveValue('KD');
+
+  // And back the other way.
+  await strip.fill('ZZ');
+  await strip.blur();
+  await expect(title).toHaveText('ZZ');
 });

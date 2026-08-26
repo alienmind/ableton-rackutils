@@ -1765,3 +1765,86 @@
 .plugin-error {
   color: #e0736a;
 }
+
+/* A range the tool shows and does not edit: a plugin's own (SCHEMA.md Q20). */
+.mapping-fixed {
+  color: var(--edit-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Sortable headers, as Live's own mapping list has (doc/PLAN.md 4.4). */
+.mapping-grid th .mapping-sort {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  width: 100%;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.mapping-grid th.is-sorted .mapping-sort {
+  color: var(--edit-text);
+}
+
+.mapping-sort-arrow {
+  font-size: 8px;
+  color: var(--edit-accent);
+}
+
+/* The reuse question: the one thing the features strip asks before acting. */
+.contract-adopt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  padding: 5px 8px;
+  font-size: 11px;
+  color: var(--edit-text);
+  background: #23201a;
+  border: 1px solid #6a4a2a;
+  border-radius: 4px;
+}
+
+.adopt-yes,
+.adopt-no {
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 10px;
+  color: var(--edit-text);
+  background: transparent;
+  border: 1px solid var(--edit-line);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.adopt-yes {
+  color: #101116;
+  background: #d0954a;
+  border-color: #d0954a;
+}
+
+.adopt-cancel {
+  font: inherit;
+  font-size: 10px;
+  color: var(--edit-dim);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+/* The same offer, inside the settings column rather than across the strip. */
+.contract-adopt.inline {
+  display: block;
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+.contract-adopt.inline .adopt-yes {
+  margin-left: 6px;
+}

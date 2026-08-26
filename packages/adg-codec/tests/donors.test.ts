@@ -14,6 +14,7 @@ import { describe, expect, test } from 'vitest';
 import { MACRO_SLOTS, Rack, UNSET_MACRO_VALUE } from '../src/model';
 import { applyContract, inspectContract, removeContractOption, macroNameFor } from '../src/contract';
 import {
+  bindParameter,
   colorChainMacros,
   distributeChainSelector,
   evenMacroCount,
@@ -23,8 +24,10 @@ import {
   removeDevice,
   reorderMacro,
   resetMacro,
+  setBindingRange,
   swapMacros,
   unbindMacro,
+  unbindOne,
 } from '../src/mutate';
 
 const load = (name: string) => new Uint8Array(readFileSync(join(__dirname, '..', 'donors', name)));
@@ -490,6 +493,97 @@ describe('EQ Three, the three-macro option (doc/PLAN.md 4.3.2)', () => {
   });
 });
 
+describe('adopting a macro the user already made (doc/PLAN.md 4.3.1)', () => {
+  const gain = { deviceTag: 'StereoGain', parameter: 'Gain', namePattern: '{name} GAIN', colorIndex: 69 };
+
+  test('KD.adg KICK GAIN is reported as adoptable, not as the contract own', () => {
+    const rack = Rack.parse(load('KD.adg'));
+    // One pad of four has a Utility with a macro on it, called by hand.
+    expect(inspectContract(rack, [gain], { name: 'KD' })[0]).toMatchObject({
+      state: 'partial',
+      chainsCovered: 1,
+      adoptable: { slot: 9, macroName: 'KICK GAIN' },
+    });
+  });
+
+  test('a macro the contract itself would have written is not a question', () => {
+    // BS.adg already has BS GAIN across both chains, which is satisfied and
+    // nobody needs asking about.
+    expect(inspectContract(Rack.parse(load('BS.adg')), [gain], { name: 'BS' })[0]).toMatchObject({
+      state: 'satisfied',
+      adoptable: null,
+    });
+  });
+
+  test('without adopting, their knob is left driving nothing', () => {
+    const rack = Rack.parse(load('KD.adg'));
+    const result = applyContract(rack, [gain], { name: 'KD' });
+    expect(result.warnings.join(' ')).toContain('now drives nothing');
+    const after = Rack.parse(rack.serialize());
+    expect(after.macros.find((m) => m.name === 'KICK GAIN')?.bindings).toEqual([]);
+  });
+
+  test('adopting keeps that knob, finishes its job and makes it the feature', () => {
+    const rack = Rack.parse(load('KD.adg'));
+    const result = applyContract(rack, [{ ...gain, adopt: true }], { name: 'KD' });
+
+    expect(result.ok).toBe(true);
+    expect(result.warnings).toEqual([]);
+    const after = Rack.parse(rack.serialize());
+    // One macro, in the contract's leading slot, driving the Utility on every
+    // pad - the one it already drove included.
+    expect(result.slots).toEqual([0]);
+    expect(after.macros[0].name).toBe('KD GAIN');
+    expect(after.macros[0].color).toBe(69);
+    expect(after.macros[0].bindings).toHaveLength(after.chains.length);
+    // And no leftover: the name is gone because that knob IS the feature now.
+    expect(after.macros.some((m) => m.name === 'KICK GAIN')).toBe(false);
+    expect(after.macros.filter((m) => m.bindings.length === 0 && m.name !== `Macro ${m.index + 1}`)).toEqual([]);
+  });
+
+  test('adopting spends no macro slot, so the bank does not grow', () => {
+    const before = Rack.parse(load('KD.adg')).macroCount;
+    const rack = Rack.parse(load('KD.adg'));
+    applyContract(rack, [{ ...gain, adopt: true }], { name: 'KD' });
+    expect(Rack.parse(rack.serialize()).macroCount).toBe(before);
+  });
+});
+
+describe('taking a parameter off a macro that drives several (Constraint 4)', () => {
+  test('the macro keeps its variation values while it still drives something else', () => {
+    // PD.adg is the donor with a variation in it, and two of its macros drive
+    // two parameters each. The contract taking ONE of those used to wipe the
+    // macro's stored variation values as if it had been emptied, which breaks
+    // every variation in the rack.
+    const rack = Rack.parse(load('PD.adg'));
+    const donor = rack.macros.find((m) => m.bindings.length > 1);
+    expect(donor).toBeDefined();
+    const before = rack.variations.map((v) => v.values[donor!.index]);
+    expect(rack.variations.length).toBeGreaterThan(0);
+
+    const stolen = donor!.bindings[0];
+    const param = { path: stolen.targetPath, name: stolen.targetName, boundToMacro: donor!.index };
+    const result = bindParameter(rack, 15, param);
+
+    expect(result.ok).toBe(true);
+    expect(result.warnings.join(' ')).toContain(`cleared macro ${donor!.index + 1}`);
+    const after = Rack.parse(rack.serialize());
+    expect(after.variations.map((v) => v.values[donor!.index])).toEqual(before);
+    expect(after.macros[donor!.index].bindings.length).toBe(donor!.bindings.length - 1);
+  });
+
+  test('a macro left driving nothing says so, and its variation values go', () => {
+    const rack = Rack.parse(load('PD.adg'));
+    const single = rack.macros.find((m) => m.bindings.length === 1)!;
+    const stolen = single.bindings[0];
+    const result = bindParameter(rack, 15, { path: stolen.targetPath, name: stolen.targetName, boundToMacro: single.index });
+
+    expect(result.warnings.join(' ')).toContain('now drives nothing');
+    const after = Rack.parse(rack.serialize());
+    for (const variation of after.variations) expect(variation.values[single.index]).toBe(UNSET_MACRO_VALUE);
+  });
+});
+
 describe('a macro driving a plugin parameter (SCHEMA.md Q20)', () => {
   /** The plugin binding is an integer on PluginParameterSettings, not a KeyMidi. */
   const pluginMacro = (rack: Rack): number =>
@@ -500,8 +594,42 @@ describe('a macro driving a plugin parameter (SCHEMA.md Q20)', () => {
   test('BS-VST3-mapped.adg binds its plugin parameter by index', () => {
     const rack = Rack.parse(load('BS-VST3-mapped.adg'));
     expect(pluginMacro(rack)).toBe(12);
-    // And it is invisible to the KeyMidi machinery, which is the whole problem.
-    expect(rack.macros[12].bindings).toHaveLength(0);
+  });
+
+  test('the macro reports the binding, rather than reading as unmapped', () => {
+    const rack = Rack.parse(load('BS-VST3-mapped.adg'));
+    const [binding] = rack.macros[12].bindings;
+    // No KeyMidi anywhere near it: this comes from MacroControlIndex on the
+    // exposed parameter (SCHEMA.md Q20). Its range is the plugin normalized
+    // 0..1, not the 0..127 an Ableton parameter carries.
+    expect(binding.plugin).toEqual({ uid: '41727475415649534d42525450726f63', parameterId: 70, power: false });
+    expect(binding.targetName).toBe('Parameter 70');
+    expect([binding.rangeMin, binding.rangeMax]).toEqual([0, 1]);
+  });
+
+  test('an empty slot still reads as unmapped', () => {
+    const rack = Rack.parse(load('BS-VST3-mapped.adg'));
+    expect(rack.macros[13].bindings).toHaveLength(0);
+  });
+
+  test('editing that binding range is refused rather than written in the wrong shape', () => {
+    const rack = Rack.parse(load('BS-VST3-mapped.adg'));
+    const [binding] = rack.macros[12].bindings;
+    const result = setBindingRange(rack, 12, binding.targetPath, { min: 0, max: 64 });
+    expect(result.ok).toBe(false);
+    expect(result.warnings.join(' ')).toContain('plugin parameter');
+  });
+
+  test('unbinding it writes -1 and leaves the parameter exposed', () => {
+    const rack = Rack.parse(load('BS-VST3-mapped.adg'));
+    const [binding] = rack.macros[12].bindings;
+    expect(unbindOne(rack, 12, binding.targetPath).ok).toBe(true);
+    const after = Rack.parse(rack.serialize());
+    expect(pluginMacro(after)).toBe(-1);
+    expect(after.macros[12].bindings).toHaveLength(0);
+    // The PluginParameterSettings element stays: the parameter is still
+    // exposed on the device, it just stops being driven (SCHEMA.md Q20).
+    expect(after.document.getElementsByTagName('PluginParameterSettings')).toHaveLength(1);
   });
 
   test('moving that macro carries the plugin binding with it', () => {

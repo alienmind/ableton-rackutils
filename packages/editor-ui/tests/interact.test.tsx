@@ -4,6 +4,8 @@
  * Every interaction in the first cut of this UI was broken and every render
  * test still passed.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
@@ -15,8 +17,8 @@ let container: HTMLDivElement;
 let root: Root;
 let rack: Rack;
 
-function mount() {
-  rack = Rack.parse(buildFixtureBytes());
+function mount(bytes: Uint8Array = buildFixtureBytes()) {
+  rack = Rack.parse(bytes);
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -470,5 +472,168 @@ describe('dropping a parameter back where it already is', () => {
     expect(rack.macros[0].bindings.map((b) => b.targetName).sort()).toEqual(before);
     // No echo: the drag cable is gone the moment the pointer comes up.
     expect(container.querySelector('.patch-cable')).toBeNull();
+  });
+});
+
+describe('sorting the mapping table (doc/PLAN.md 4.4)', () => {
+  const nameCells = () => [...container.querySelectorAll('.mapping-grid tbody .col-name')].map((c) => c.textContent);
+  const header = (label: string) =>
+    [...container.querySelectorAll('.mapping-grid th .mapping-sort')].find((b) => b.textContent?.startsWith(label))!;
+
+  test('a click sorts by the column, a second reverses, a third gives the file back', () => {
+    const asWritten = nameCells();
+
+    click(header('Name'));
+    const ascending = nameCells();
+    // By the FIRST target's name, not by the cell's text: a collapsed group
+    // reads "2 parameters", which is a summary and not a sort key.
+    expect(ascending).toEqual(['InnerParam', '2 parametersx2']);
+    expect(ascending).not.toEqual(asWritten);
+
+    click(header('Name'));
+    expect(nameCells()).toEqual([...ascending].reverse());
+
+    // The order the rack is written in is the only one that says where a
+    // macro physically sits, so it is reachable again rather than a reload.
+    click(header('Name'));
+    expect(nameCells()).toEqual(asWritten);
+  });
+
+  test('the sorted header says so, for a reader who is not looking at the arrow', () => {
+    click(header('Macro'));
+    expect(container.querySelector('.mapping-grid th.col-macro')?.getAttribute('aria-sort')).toBe('ascending');
+    click(header('Macro'));
+    expect(container.querySelector('.mapping-grid th.col-macro')?.getAttribute('aria-sort')).toBe('descending');
+  });
+});
+
+/**
+ * These mount `donors/KD.adg`, a drum rack of racks, and apply the contract to
+ * it under jsdom - seconds of work rather than the milliseconds a synthetic
+ * fixture takes, hence the timeout. The real rack is the point: this case only
+ * exists on a rack somebody made by hand.
+ */
+const REAL_RACK_TIMEOUT = 30_000;
+
+describe('a knob the user already made for the job (doc/PLAN.md 4.3.1)', () => {
+  const KD = new Uint8Array(readFileSync(join(__dirname, '..', '..', 'adg-codec', 'donors', 'KD.adg')));
+
+  const remount = () => {
+    act(() => root.unmount());
+    container.remove();
+    window.localStorage.clear();
+    // KD.adg has KICK GAIN on one pad's Utility and nothing on the other
+    // three, which is the case that used to empty that knob silently.
+    mount(KD);
+  };
+
+  const featureNamed = (label: string) =>
+    [...container.querySelectorAll('.contract-entry-name')].find((el) => el.textContent === label)!;
+  const addArrow = () => container.querySelectorAll('.contract-arrows button')[0];
+  const macroNames = () => [...container.querySelectorAll('.macro-knob .macro-knob-name')].map((el) => el.textContent);
+
+  test('adding the gain feature asks before taking it over', () => {
+    remount();
+    click(featureNamed('Utility Gain'));
+    click(addArrow());
+
+    const question = container.querySelector('.contract-adopt');
+    expect(question?.textContent).toContain('KICK GAIN');
+    // Nothing has happened to the rack yet: the question comes first.
+    expect(macroNames()).toContain('KICK GAIN');
+  }, REAL_RACK_TIMEOUT);
+
+  test('reusing it makes that knob the feature, and leaves nothing behind', () => {
+    remount();
+    click(featureNamed('Utility Gain'));
+    click(addArrow());
+    click(container.querySelector('.adopt-yes')!);
+
+    expect(container.querySelector('.contract-adopt')).toBeNull();
+    const gain = rack.macros.find((m) => m.name.endsWith('GAIN'))!;
+    expect(gain.bindings).toHaveLength(rack.chains.length);
+    expect(rack.macros.some((m) => m.name === 'KICK GAIN')).toBe(false);
+  }, REAL_RACK_TIMEOUT);
+
+  test('adding another leaves their knob alone and builds a second device', () => {
+    remount();
+    const before = rack.chains[0].devices.length;
+    click(featureNamed('Utility Gain'));
+    click(addArrow());
+    click(container.querySelector('.adopt-no')!);
+
+    expect(container.querySelector('.contract-adopt')).toBeNull();
+    // Their knob keeps its name. It is the parameter that moves, which is
+    // Constraint 5 and is what the question was about.
+    expect(rack.macros.some((m) => m.name === 'KICK GAIN')).toBe(true);
+    expect(rack.chains[0].devices.length).toBeGreaterThanOrEqual(before);
+  }, REAL_RACK_TIMEOUT);
+
+  test('a feature already in the list still offers to reuse it', () => {
+    // The maintainer's case: a template carried over from the last rack
+    // arrives mounted, so the arrow - and its question - is never pressed.
+    act(() => root.unmount());
+    container.remove();
+    window.localStorage.setItem(
+      'rackutils.templates.v1',
+      JSON.stringify({
+        format: 1,
+        activeId: 't1',
+        templates: [{ id: 't1', name: 'Mine', features: [{ key: 'f1', option: 'utility', namePattern: '{name} GAIN', settings: {} }] }],
+      }),
+    );
+    mount(KD);
+
+    // The right-hand list: what the rack has mounted.
+    click(container.querySelectorAll('.contract-column')[1].querySelector('.contract-entry')!);
+    const offer = container.querySelector('.contract-settings .contract-adopt');
+    expect(offer?.textContent).toContain('KICK GAIN');
+
+    click(offer!.querySelector('.adopt-yes')!);
+    expect(rack.macros.some((m) => m.name === 'KICK GAIN')).toBe(false);
+    expect(rack.macros.find((m) => m.name.endsWith('GAIN'))?.bindings).toHaveLength(rack.chains.length);
+  }, REAL_RACK_TIMEOUT);
+
+  test('cancelling adds nothing at all', () => {
+    remount();
+    const before = rack.macros.map((m) => m.name);
+    click(featureNamed('Utility Gain'));
+    click(addArrow());
+    click(container.querySelector('.adopt-cancel')!);
+
+    expect(container.querySelector('.contract-adopt')).toBeNull();
+    expect(rack.macros.map((m) => m.name)).toEqual(before);
+  }, REAL_RACK_TIMEOUT);
+});
+
+describe('the rack name is one name, with two ways in', () => {
+  const nameInput = () => container.querySelector('.contract-code') as HTMLInputElement;
+  const titleBar = () => container.querySelector('.rack-name') as HTMLElement;
+
+  const renameFromTitleBar = (next: string) => {
+    act(() => titleBar().dispatchEvent(new MouseEvent('dblclick', { bubbles: true })));
+    const input = container.querySelector('.rack-name-input') as HTMLInputElement;
+    act(() => {
+      input.value = next;
+      // React delegates onBlur through focusout (see the template tests above).
+      input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    });
+  };
+
+  test('renaming from the title bar moves the features strip with it', () => {
+    renameFromTitleBar('KD');
+    expect(rack.name).toBe('KD');
+    // The box used to keep the name the rack had when the strip mounted.
+    expect(nameInput().value).toBe('KD');
+  });
+
+  test('renaming from the strip renames the rack', () => {
+    const input = nameInput();
+    act(() => {
+      input.value = 'ZZ';
+      input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    });
+    expect(rack.name).toBe('ZZ');
+    expect(titleBar().textContent).toBe('ZZ');
   });
 });
