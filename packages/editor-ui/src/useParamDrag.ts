@@ -1,6 +1,7 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import type { ParamRef } from '@rackutils/adg-codec';
 import type { RackPath } from './context';
+import { armDrag } from './holdToDrag';
 
 /**
  * Drag a parameter onto a macro knob to bind it - the gesture people reach for
@@ -102,75 +103,89 @@ export function useParamDrag({ onBind }: UseParamDragOptions) {
     (param: ParamRef, rackPath: RackPath, e: React.PointerEvent) => {
       if (e.button !== 0) return;
       // The cable hangs from the middle of the control it was pulled out of,
-      // not from wherever the pointer happened to land on it.
+      // not from wherever the pointer happened to land on it. Measured HERE
+      // rather than inside the arming callback: `currentTarget` is null once
+      // the handler has returned.
       const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
       const origin = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
-      active.current = { param, rackPath, origin };
-      setEcho(null);
-      setState({ param, rackPath, overMacro: null, overForeignRack: false, overBound: false, origin, pointer: origin, overColor: null });
+      // Same hold as the knobs: on touch this gesture is how the rack scrolls.
+      armDrag(e, () => {
+        active.current = { param, rackPath, origin };
+        setEcho(null);
+        setState({
+          param,
+          rackPath,
+          overMacro: null,
+          overForeignRack: false,
+          overBound: false,
+          origin,
+          pointer: origin,
+          overColor: null,
+        });
 
-      const key = rackPath.join('|');
+        const key = rackPath.join('|');
 
-      const locate = (x: number, y: number) => {
-        const el = document.elementFromPoint(x, y);
-        const knob = el?.closest('[data-macro-index]') ?? null;
-        if (!knob) return { macro: null as number | null, foreign: false, knob, color: null as string | null };
-        const macro = Number(knob.getAttribute('data-macro-index'));
-        // The knob publishes its macro's colour as a custom property; the
-        // cable takes it so a patch reads as belonging to that macro.
-        const color = getComputedStyle(knob).getPropertyValue('--macro-color').trim() || null;
-        return { macro, foreign: rackPathUnder(knob) !== key, knob, color };
-      };
+        const locate = (x: number, y: number) => {
+          const el = document.elementFromPoint(x, y);
+          const knob = el?.closest('[data-macro-index]') ?? null;
+          if (!knob) return { macro: null as number | null, foreign: false, knob, color: null as string | null };
+          const macro = Number(knob.getAttribute('data-macro-index'));
+          // The knob publishes its macro's colour as a custom property; the
+          // cable takes it so a patch reads as belonging to that macro.
+          const color = getComputedStyle(knob).getPropertyValue('--macro-color').trim() || null;
+          return { macro, foreign: rackPathUnder(knob) !== key, knob, color };
+        };
 
-      const move = (ev: PointerEvent) => {
-        const { macro, foreign, color } = locate(ev.clientX, ev.clientY);
-        setState((s) => ({
-          ...s,
-          overMacro: macro,
-          overForeignRack: foreign,
-          overBound: macro !== null && !foreign && param.boundToMacro === macro,
-          overColor: color,
-          pointer: { x: ev.clientX, y: ev.clientY },
-        }));
-      };
+        const move = (ev: PointerEvent) => {
+          const { macro, foreign, color } = locate(ev.clientX, ev.clientY);
+          setState((s) => ({
+            ...s,
+            overMacro: macro,
+            overForeignRack: foreign,
+            overBound: macro !== null && !foreign && param.boundToMacro === macro,
+            overColor: color,
+            pointer: { x: ev.clientX, y: ev.clientY },
+          }));
+        };
 
-      const finish = (ev: PointerEvent) => {
-        const dragged = active.current;
-        const { macro, foreign, knob, color } = locate(ev.clientX, ev.clientY);
-        stop();
-        if (!dragged) return;
+        const finish = (ev: PointerEvent) => {
+          const dragged = active.current;
+          const { macro, foreign, knob, color } = locate(ev.clientX, ev.clientY);
+          stop();
+          if (!dragged) return;
 
-        // A macro can only drive a parameter in its OWN rack (SCHEMA.md Q2's
-        // owning-rack walk), so a drop onto another rack's knob does nothing
-        // rather than writing a mapping the file cannot express.
-        const bound = macro !== null && !foreign;
+          // A macro can only drive a parameter in its OWN rack (SCHEMA.md Q2's
+          // owning-rack walk), so a drop onto another rack's knob does nothing
+          // rather than writing a mapping the file cannot express.
+          const bound = macro !== null && !foreign;
 
-        // Dropped back on the macro it already drives: nothing to write, and
-        // nothing to animate either. The cable for that pair is already on
-        // screen in Map mode, and a connect echo over it read as two cables
-        // arriving at one knob.
-        if (bound && dragged.param.boundToMacro === macro) return;
+          // Dropped back on the macro it already drives: nothing to write, and
+          // nothing to animate either. The cable for that pair is already on
+          // screen in Map mode, and a connect echo over it read as two cables
+          // arriving at one knob.
+          if (bound && dragged.param.boundToMacro === macro) return;
 
-        const target = bound && knob ? centreOf(knob) : { x: ev.clientX, y: ev.clientY };
-        echoId.current += 1;
-        setEcho({ id: echoId.current, from: dragged.origin, to: target, connected: bound, color: bound ? color : null });
-        if (bound) handler.current(dragged.rackPath, macro, dragged.param);
-      };
+          const target = bound && knob ? centreOf(knob) : { x: ev.clientX, y: ev.clientY };
+          echoId.current += 1;
+          setEcho({ id: echoId.current, from: dragged.origin, to: target, connected: bound, color: bound ? color : null });
+          if (bound) handler.current(dragged.rackPath, macro, dragged.param);
+        };
 
-      const cancel = (ev: KeyboardEvent) => {
-        if (ev.key === 'Escape') stop();
-      };
+        const cancel = (ev: KeyboardEvent) => {
+          if (ev.key === 'Escape') stop();
+        };
 
-      window.addEventListener('pointermove', move);
-      window.addEventListener('pointerup', finish);
-      window.addEventListener('pointercancel', stop);
-      window.addEventListener('keydown', cancel);
-      detach.current = () => {
-        window.removeEventListener('pointermove', move);
-        window.removeEventListener('pointerup', finish);
-        window.removeEventListener('pointercancel', stop);
-        window.removeEventListener('keydown', cancel);
-      };
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', finish);
+        window.addEventListener('pointercancel', stop);
+        window.addEventListener('keydown', cancel);
+        detach.current = () => {
+          window.removeEventListener('pointermove', move);
+          window.removeEventListener('pointerup', finish);
+          window.removeEventListener('pointercancel', stop);
+          window.removeEventListener('keydown', cancel);
+        };
+      });
     },
     [stop],
   );

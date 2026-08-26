@@ -13,6 +13,22 @@ import { canOpenWithHandle, handleFromDrop, openRackFile, saveInPlace, type Writ
  */
 const EMBEDDED = import.meta.env.VITE_EMBED === '1';
 
+/**
+ * What the file input will offer, which is not the same question on a phone.
+ *
+ * A desktop browser filters by the extension and `.adg` is exactly right.
+ * Android's picker filters by MIME TYPE, derived from what is in `accept` -
+ * and `.adg` maps to no type it knows, so every file in Downloads greyed out
+ * and a rack could not be opened at all. Renaming it `.adg.gz` was the only
+ * way in.
+ *
+ * So on a touch screen it offers everything and the gzip check does the
+ * filtering, which it did anyway: a file that is not a rack is refused by its
+ * first two bytes, with a message, whatever it is called.
+ */
+const FILE_ACCEPT =
+  typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches ? undefined : '.adg';
+
 interface Loaded {
   fileName: string;
   rack: Rack;
@@ -144,7 +160,7 @@ export default function App() {
           >
             {loaded ? 'Open another rack' : 'Open a rack'}
           </button>
-          <input ref={fileInput} className="file-input" type="file" accept=".adg" onChange={onFileInput} />
+          <input ref={fileInput} className="file-input" type="file" accept={FILE_ACCEPT} onChange={onFileInput} />
           <p className="transfer-note">.adg, read in this tab. Nothing is uploaded.</p>
         </div>
 

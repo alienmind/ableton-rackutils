@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { armDrag } from './holdToDrag';
 
 /**
  * Pointer-based drag for the macro grid, NOT the HTML5 drag-and-drop API.
@@ -64,37 +65,42 @@ export function useMacroDrag({ onReorder, onSwap }: UseMacroDragOptions) {
   const startDrag = useCallback(
     (index: number, e: React.PointerEvent) => {
       if (e.button !== 0) return;
-      from.current = index;
-      setState({ from: index, over: index, swap: e.shiftKey });
+      // On a touch screen this same gesture scrolls the rack, so the drag
+      // waits for a hold (`holdToDrag.ts`). A mouse starts on the spot.
+      const shiftKey = e.shiftKey;
+      armDrag(e, () => {
+        from.current = index;
+        setState({ from: index, over: index, swap: shiftKey });
 
-      const move = (ev: PointerEvent) => {
-        const over = indexUnder(ev.clientX, ev.clientY);
-        setState((s) => (s.over === over && s.swap === ev.shiftKey ? s : { ...s, over, swap: ev.shiftKey }));
-      };
+        const move = (ev: PointerEvent) => {
+          const over = indexUnder(ev.clientX, ev.clientY);
+          setState((s) => (s.over === over && s.swap === ev.shiftKey ? s : { ...s, over, swap: ev.shiftKey }));
+        };
 
-      const finish = (ev: PointerEvent) => {
-        const source = from.current;
-        const target = indexUnder(ev.clientX, ev.clientY);
-        stop();
-        if (source === null || target === null || source === target) return;
-        if (ev.shiftKey) handlers.current.onSwap(source, target);
-        else handlers.current.onReorder(source, target);
-      };
+        const finish = (ev: PointerEvent) => {
+          const source = from.current;
+          const target = indexUnder(ev.clientX, ev.clientY);
+          stop();
+          if (source === null || target === null || source === target) return;
+          if (ev.shiftKey) handlers.current.onSwap(source, target);
+          else handlers.current.onReorder(source, target);
+        };
 
-      const cancel = (ev: KeyboardEvent) => {
-        if (ev.key === 'Escape') stop();
-      };
+        const cancel = (ev: KeyboardEvent) => {
+          if (ev.key === 'Escape') stop();
+        };
 
-      window.addEventListener('pointermove', move);
-      window.addEventListener('pointerup', finish);
-      window.addEventListener('pointercancel', stop);
-      window.addEventListener('keydown', cancel);
-      detach.current = () => {
-        window.removeEventListener('pointermove', move);
-        window.removeEventListener('pointerup', finish);
-        window.removeEventListener('pointercancel', stop);
-        window.removeEventListener('keydown', cancel);
-      };
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', finish);
+        window.addEventListener('pointercancel', stop);
+        window.addEventListener('keydown', cancel);
+        detach.current = () => {
+          window.removeEventListener('pointermove', move);
+          window.removeEventListener('pointerup', finish);
+          window.removeEventListener('pointercancel', stop);
+          window.removeEventListener('keydown', cancel);
+        };
+      });
     },
     [stop],
   );

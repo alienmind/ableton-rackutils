@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { Rack } from '@rackutils/adg-codec';
 import { RackEditor } from '../src/RackEditor';
 import { buildFixtureBytes } from '../../adg-codec/tests/fixture';
@@ -49,6 +49,9 @@ afterEach(() => {
 });
 
 const click = (el: Element) => act(() => el.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+
+/** jsdom has no elementFromPoint; the drag helpers stub it and put this back. */
+const originalElementFromPoint = document.elementFromPoint;
 
 /** Devices render collapsed to a title strip; open the first one to reach its parameters. */
 const openFirstDevice = () => click(container.querySelector('.device-panel.collapsed .device-title-strip')!);
@@ -635,5 +638,58 @@ describe('the rack name is one name, with two ways in', () => {
     });
     expect(rack.name).toBe('ZZ');
     expect(titleBar().textContent).toBe('ZZ');
+  });
+});
+
+/**
+ * A finger, which is the same gesture as scrolling the rack sideways. The
+ * knobs fill that row, so a drag has to wait for a hold and a swipe has to
+ * reach the browser (`holdToDrag.ts`).
+ */
+describe('dragging a knob with a finger', () => {
+  const touchDown = (index: number, target: Element) => {
+    const dial = container.querySelectorAll('.macro-knob-dial')[index];
+    document.elementFromPoint = () => target;
+    act(() =>
+      dial.dispatchEvent(
+        Object.assign(new Event('pointerdown', { bubbles: true }), { button: 0, pointerType: 'touch', clientX: 0, clientY: 0 }),
+      ),
+    );
+  };
+  const move = (x: number) => act(() => window.dispatchEvent(Object.assign(new Event('pointermove'), { clientX: x, clientY: 0 })));
+  const up = (x: number) => act(() => window.dispatchEvent(Object.assign(new Event('pointerup'), { clientX: x, clientY: 0 })));
+
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    document.elementFromPoint = originalElementFromPoint;
+  });
+
+  test('a swipe across a knob scrolls rather than moving the macro', () => {
+    const before = [knobName(0), knobName(1)];
+    touchDown(0, container.querySelectorAll('.macro-knob')[1]);
+    // Moving before the hold is a scroll, and stays one however long the
+    // finger is down afterwards.
+    move(40);
+    act(() => void vi.advanceTimersByTime(1000));
+    up(40);
+    expect([knobName(0), knobName(1)]).toEqual(before);
+  });
+
+  test('a tap moves nothing either', () => {
+    const before = [knobName(0), knobName(1)];
+    touchDown(0, container.querySelectorAll('.macro-knob')[1]);
+    up(0);
+    act(() => void vi.advanceTimersByTime(1000));
+    expect([knobName(0), knobName(1)]).toEqual(before);
+  });
+
+  test('holding still first, then dragging, moves the macro', () => {
+    const first = knobName(0);
+    touchDown(0, container.querySelectorAll('.macro-knob')[1]);
+    act(() => void vi.advanceTimersByTime(400));
+    move(40);
+    up(40);
+    expect(knobName(1)).toBe(first);
   });
 });

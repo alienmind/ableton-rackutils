@@ -928,3 +928,43 @@ test('the rack name is one name: renaming it anywhere renames it everywhere', as
   await strip.blur();
   await expect(title).toHaveText('ZZ');
 });
+
+/**
+ * The phone. A touch context is not the same page as a narrow window: the
+ * file input filters differently, and the row that scrolls sideways is made
+ * of the same knobs a drag starts on.
+ */
+test('on a touch screen the file input offers everything, not just .adg', async ({ browser }) => {
+  const context = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 412, height: 915 } });
+  const page = await context.newPage();
+  await page.goto('/');
+  // Android's picker filters by MIME type and knows no `.adg`, so every rack
+  // in Downloads greyed out. The gzip check refuses anything else anyway.
+  await expect(page.locator('input[type=file]')).not.toHaveAttribute('accept', /.+/);
+  await context.close();
+});
+
+test('a desktop file input still filters to .adg', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('input[type=file]')).toHaveAttribute('accept', '.adg');
+});
+
+test('the rack row can be scrolled sideways from a knob', async ({ browser }) => {
+  const context = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 412, height: 915 } });
+  const page = await context.newPage();
+  await page.goto('/');
+  await page.setInputFiles('input[type=file]', writeRackFile());
+  await page.waitForSelector('.macro-knob');
+
+  // `touch-action: none` here - which is what a pointer drag normally wants -
+  // is what made the row unscrollable with a finger.
+  const knobTouch = await page.locator('.macro-knob').first().evaluate((el) => getComputedStyle(el).touchAction);
+  expect(knobTouch).toBe('manipulation');
+
+  const scroller = page.locator('.rack-editor-scroll');
+  const scrollable = await scroller.evaluate((el) => el.scrollWidth > el.clientWidth);
+  expect(scrollable).toBe(true);
+  await scroller.evaluate((el) => el.scrollBy({ left: 200 }));
+  expect(await scroller.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+  await context.close();
+});

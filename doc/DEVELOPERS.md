@@ -96,10 +96,10 @@ Run all four of `lint`, `typecheck`, `test`, `build` clean before committing.
 ## Testing the codec
 
 ```bash
-pnpm test                                  # everything headless, 249 tests
+pnpm test                                  # everything headless, 252 tests
 pnpm --filter @rackutils/adg-codec test    # 189 codec tests
-pnpm --filter @rackutils/editor-ui test    # 60 UI tests
-pnpm test:e2e                              # 49 browser specs, needs Chromium
+pnpm --filter @rackutils/editor-ui test    # 63 UI tests
+pnpm test:e2e                              # 52 browser specs, needs Chromium
 ```
 
 The first time, install the browser: `pnpm --filter @rackutils/site exec
@@ -141,7 +141,11 @@ was silently dropped. Slow enough to pass by hand, fast enough to fail under
 Playwright - and it would have failed for anyone who flicks a knob quickly.
 
 Add a spec here whenever a change touches DOM serialization, pointer handling,
-or layout that must not overflow.
+or layout that must not overflow. Three of them open a TOUCH context
+(`hasTouch`, a phone viewport), which is a different page from a narrow window
+and is where both mobile faults lived: a file input that filters by MIME type
+rather than extension, and a row that scrolls sideways made of elements a drag
+starts on.
 
 Of the codec's 189, most are synthetic and always run, 88 run against the
 donor racks committed in `packages/adg-codec/donors/` - real Ableton-saved
