@@ -54,13 +54,13 @@ editing, batch library operations - is out. See Parked.
 ## Current state
 
 - **`packages/adg-codec`** - built. Twenty-one mutations plus the contract, 182
-  tests, 81 of them against the committed donor racks.
+  tests, 88 of them against the committed donor racks.
 - **`packages/editor-ui`** - built. Reproduces Live's layout, plus the rack
   features strip, the plugin strip, feature templates, Map mode and the cable
-  layer. 53 tests.
+  layer. 57 tests.
 - **`apps/site`** - the editor under a landing page that is two controls and
   two question marks, deployed to Pages. Installable, offline, and laid out for
-  a phone as well as an ultra-wide. 47 Playwright specs against real Chromium
+  a phone as well as an ultra-wide. 48 Playwright specs against real Chromium
   in CI.
 - **`tools/adg-tool`** - `unpack`/`diff`/`mappings`/`move`/`move-mapping`, plus
   `adg-palette` and `adg-harvest`.
@@ -102,14 +102,18 @@ templates. The rest was walked in Live on 2026-08-26, and stands as:
   chains change, which confirms Q24's range splitting on an ordinary rack.
 - **`KD-features.adg` renders correctly and its KICK SEL does not work**, which
   is the same feature on a DRUM rack, where the selector reaches its chains
-  through a pad rack (Q24's two links). Unresolved: the generated file's wiring
-  is identical to the maintainer's working rack on that path - same
-  `BranchSelectorRange` partition, same `ChainSelector` KeyMidi, same range -
-  and differs only in which root slot drives it (0 rather than 3). Two bisect
-  racks are waiting: `tmp/KD-selector-only.adg` (the selector and nothing else)
-  and `tmp/KD-no-selector.adg` (everything else). Which of them fails says
-  whether the fault is the selector feature or an interaction with the devices
-  the contract inserts.
+  through a pad rack (Q24's two links). The file's wiring is identical to the
+  maintainer's working rack on that path - same `BranchSelectorRange`
+  partition, same `ChainSelector` KeyMidi, same range - and differs only in
+  which root slot drives it.
+
+  **Bisected once: each half works alone.** `tmp/KD-selector-only.adg` (the
+  selector and nothing else) sweeps correctly, and `tmp/KD-no-selector.adg`
+  (the devices, the original selector macro untouched) keeps working. So the
+  fault is in the COMBINATION, which points at the macro shift rather than at
+  either feature. Waiting on the next bisect: `tmp/KD-sel-gain.adg`,
+  `tmp/KD-sel-gate.adg` and `tmp/KD-sel-eq.adg`, the selector plus one feature
+  each.
 - **The device is installed and its window opens.**
 - **The PWA has not been installed on a phone**, and the knob drag has not been
   tried with a finger. Both wait on Pages: the install prompt needs HTTPS. If
@@ -404,6 +408,27 @@ patterned.
 **A piece already present is detected, not duplicated.** If the rack already
 ends in a Utility, the option shows as satisfied, coloured differently, and the
 user can still edit its name, colour and slot. The tool reuses what is there.
+
+**A KNOB already present is a question - BUILT.** A device the rack already has
+is reused silently, because reusing it takes nothing away from anybody. A MACRO
+is different: a parameter has exactly one macro (Constraint 5), so binding the
+feature's macro to a Utility that `KICK GAIN` already drives takes it off
+`KICK GAIN` and leaves a named, coloured knob driving nothing. So the strip
+asks - "KICK GAIN on macro 10 already does this. Reuse it as KD GAIN?" - and:
+
+- **Reuse it** adopts that knob: it keeps its bindings, gains the chains it was
+  missing, moves into the feature's leading slot, and takes the feature's name
+  and colour. It is the feature from then on, renameable from the settings
+  column like any other. It spends no new macro slot.
+- **Add another** is the old behaviour, kept because it is sometimes right: the
+  parameter moves to the new macro and theirs is left as it falls.
+- The answer is stored on the feature, so re-applying the template does not ask
+  again.
+
+The tell for "theirs" is the NAME, the same one `removeContractOption` uses on
+devices: the contract writes `{name} GAIN` and never renames what it did not
+put there, so a macro driving the right parameter under any other name was
+somebody's own work.
 
 **The contract's macros take the FIRST slots, and the rack's own macros shift
 right.** That is what makes them familiar: whatever rack you open, the leading
