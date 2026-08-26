@@ -158,7 +158,7 @@ test('macros are numbered across then down', async ({ page }) => {
 test('a saved file has exactly one XML declaration and reparses', async ({ page }) => {
   await loadRack(page);
   await dragKnob(page, 0, 1); // edit first, so this is a mutated document
-  const download = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Save a copy' }).click()]).then(
+  const download = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export .adg' }).click()]).then(
     ([d]) => d,
   );
   const path = await download.path();
@@ -489,7 +489,7 @@ test('a contract-authored rack saves as a file that reparses', async ({ page }) 
   await page.locator('.contract-column').nth(0).locator('.contract-entry', { hasText: 'Utility Gain' }).click();
   await page.locator('.contract-arrows button').first().click();
 
-  const file = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Save a copy' }).click()]).then(
+  const file = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export .adg' }).click()]).then(
     ([d]) => d,
   );
   // Named after the code, one file per rack, as the convention says.
@@ -705,4 +705,53 @@ test('the rack row and the panels under it share one width', async ({ page }) =>
   // A rack narrower than the block is padded out by empty device slots rather
   // than leaving a gap that reads as a layout fault.
   await expect(page.locator('.rack-filler')).toBeVisible();
+});
+
+test('devices fold as the row runs out of width, and come back when it does not', async ({ page }) => {
+  await page.setViewportSize({ width: 1900, height: 1000 });
+  await loadRack(page);
+
+  // Open what there is room for. The list re-renders after each click.
+  for (let i = 0; i < 4; i++) {
+    const strip = page.locator('.device-panel.collapsed .device-title-strip').first();
+    if ((await strip.count()) === 0) break;
+    await strip.click();
+  }
+  const wide = await page.locator('.device-panel:not(.collapsed)').count();
+  expect(wide).toBeGreaterThan(0);
+  // A nested rack starts closed and the budget must not open it.
+  await expect(page.locator('.rack-panel.collapsed')).toHaveCount(1);
+
+  await page.setViewportSize({ width: 800, height: 1000 });
+  await expect.poll(() => page.locator('.device-panel:not(.collapsed)').count()).toBeLessThan(wide);
+
+  // Folding is a view, not a decision: the width comes back and so do they.
+  await page.setViewportSize({ width: 1900, height: 1000 });
+  await expect.poll(() => page.locator('.device-panel:not(.collapsed)').count()).toBe(wide);
+});
+
+test('the landing is the two controls, with the walkthrough behind a question mark', async ({ page }) => {
+  await page.goto('/');
+
+  // In and out first, directly under the masthead: the guide used to sit
+  // between them and the title.
+  const masthead = (await page.locator('.app > header').boundingBox())!;
+  const transfer = (await page.locator('.transfer').boundingBox())!;
+  const guide = (await page.locator('.getting-started').boundingBox())!;
+  expect(transfer.y).toBeGreaterThan(masthead.y);
+  expect(guide.y).toBeGreaterThan(transfer.y);
+
+  // Both halves are one box: the same height, whatever is in them.
+  const dropzone = (await page.locator('.dropzone').boundingBox())!;
+  const exportzone = (await page.locator('.exportzone').boundingBox())!;
+  expect(Math.round(dropzone.height)).toBe(Math.round(exportzone.height));
+  expect(Math.round(dropzone.y)).toBe(Math.round(exportzone.y));
+
+  // The screenshots are in a panel now, not on the page.
+  await expect(page.locator('.guide-steps')).toHaveCount(0);
+  await page.locator('.help-button').first().click();
+  await expect(page.locator('.modal .guide-steps li')).toHaveCount(3);
+
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.modal')).toHaveCount(0);
 });
