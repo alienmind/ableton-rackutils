@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Chain } from '@rackutils/adg-codec';
 import { ColorPicker } from './ColorPicker';
-import { macroColor } from './macroColors';
+import { contrastInk, macroColor } from './macroColors';
 import { noteName } from './noteName';
 
 export interface ChainListProps {
@@ -66,7 +66,16 @@ export function ChainList({ chains, selected, onSelect, drum, onRecolor }: Chain
             // Live colours each chain row. The index -> colour table is not
             // confirmed (SCHEMA.md Q13), so this is the placeholder palette
             // and is not necessarily the colour Live would draw.
-            style={chain.colorIndex === null ? undefined : ({ '--chain-color': macroColor(chain.colorIndex) } as React.CSSProperties)}
+            // The row IS the colour, as Live draws it. A stripe on a grey row
+            // said "this chain has a colour" without ever showing it.
+            style={
+              chain.colorIndex === null || chain.colorIndex < 0
+                ? undefined
+                : ({
+                    '--chain-color': macroColor(chain.colorIndex),
+                    '--chain-ink': contrastInk(macroColor(chain.colorIndex)),
+                  } as React.CSSProperties)
+            }
           >
             {drum && chain.receivingNote !== null && <span className="chain-note">{noteName(chain.receivingNote)}</span>}
             <span className="chain-row-name">{chain.name || 'Chain'}</span>

@@ -27,6 +27,19 @@ const rootDials = (page: Page) => rootBody(page).locator('> .macro-bank-wrap .ma
 const rootChainRows = (page: Page) => rootBody(page).locator('> .chain-list .chain-row');
 const macroNames = (page: Page) => rootKnobs(page).locator('.macro-knob-name').allTextContents();
 
+/**
+ * One mapping row, by macro slot. Not by the macro's label: an unnamed macro
+ * is labelled after what it drives (SCHEMA.md Q23), so the label changes the
+ * moment the binding under test exists.
+ */
+const mappingRowForSlot = (page: Page, slot: number) =>
+  page.locator('.mapping-grid tbody tr').filter({ has: page.locator(`.mapping-slot:text-is("${slot}")`) });
+
+/** Binding is modal now: a parameter does nothing until Map mode is on (`context.tsx`). */
+async function turnMapOn(page: Page) {
+  await page.locator('.map-button').first().click();
+}
+
 /** Devices render as collapsed title strips; open the first to reach its parameters. */
 async function openFirstDevice(page: Page) {
   await page.locator('.device-panel.collapsed .device-title-strip').first().click();
@@ -108,12 +121,13 @@ test('picking a colour recolours the knob', async ({ page }) => {
 
 test('arming a parameter then clicking a knob binds it', async ({ page }) => {
   await loadRack(page);
+  await turnMapOn(page);
   await openFirstDevice(page);
   await page.locator('.more-toggle').first().click();
   await page.locator('.param', { hasText: 'ParamB' }).first().click();
   await rootDials(page).nth(3).click();
   // Confirmed in the mapping table: the knob no longer names what it drives.
-  await expect(page.locator('.mapping-grid tbody tr', { hasText: 'Macro 4' }).locator('.col-name')).toContainText('ParamB');
+  await expect(mappingRowForSlot(page, 4).locator('.col-name')).toContainText('ParamB');
 });
 
 test('macros are numbered across then down', async ({ page }) => {
@@ -144,7 +158,7 @@ test('macros are numbered across then down', async ({ page }) => {
 test('a saved file has exactly one XML declaration and reparses', async ({ page }) => {
   await loadRack(page);
   await dragKnob(page, 0, 1); // edit first, so this is a mutated document
-  const download = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Save a copy' }).click()]).then(
+  const download = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export .adg' }).click()]).then(
     ([d]) => d,
   );
   const path = await download.path();
@@ -173,6 +187,7 @@ test('dragging a parameter onto a knob binds it', async ({ page }) => {
   // The gesture people reach for first. Binding used to be click-to-arm then
   // click-a-knob, which is discoverable only if you read the instructions.
   await loadRack(page);
+  await turnMapOn(page);
   await openFirstDevice(page);
   await page.locator('.more-toggle').first().click();
 
@@ -180,7 +195,7 @@ test('dragging a parameter onto a knob binds it', async ({ page }) => {
   const knob = rootKnobs(page).nth(5);
   await dragBetween(page, param, knob);
 
-  await expect(page.locator('.mapping-grid tbody tr', { hasText: 'Macro 6' }).locator('.col-name')).toContainText('ParamB');
+  await expect(mappingRowForSlot(page, 6).locator('.col-name')).toContainText('ParamB');
   // The drag must not also leave the parameter armed.
   await expect(page.locator('.armed-note')).toHaveCount(0);
 });
@@ -253,6 +268,7 @@ test('the macro count control is gone from the title bar', async ({ page }) => {
 
 test('a patch cable hangs from the parameter while dragging, and lands on the knob', async ({ page }) => {
   await loadRack(page);
+  await turnMapOn(page);
   await openFirstDevice(page);
   await page.locator('.more-toggle').first().click();
   const param = page.locator('.param', { hasText: 'ParamB' }).first();
@@ -292,13 +308,14 @@ test('a patch cable hangs from the parameter while dragging, and lands on the kn
   expect(await cable.evaluate((el) => getComputedStyle(el).stroke)).toBe(knobColour);
 
   await page.mouse.up();
-  await expect(page.locator('.mapping-grid tbody tr', { hasText: 'Macro 6' }).locator('.col-name')).toContainText('ParamB');
+  await expect(mappingRowForSlot(page, 6).locator('.col-name')).toContainText('ParamB');
   // The cable settles and then takes itself off screen.
   await expect(page.locator('.patch-cable')).toHaveCount(0, { timeout: 4000 });
 });
 
 test('a cable dropped on nothing retracts and binds nothing', async ({ page }) => {
   await loadRack(page);
+  await turnMapOn(page);
   await openFirstDevice(page);
   await page.locator('.more-toggle').first().click();
   const param = page.locator('.param', { hasText: 'ParamB' }).first();
@@ -357,15 +374,18 @@ test('every rack sits in one flat row, nested racks included', async ({ page }) 
 
 test('the mapping table lists macro, path, name and range', async ({ page }) => {
   await loadRack(page);
+  // A macro driving several parameters is one collapsed row until opened.
+  await page.locator('.mapping-expand-all').click();
   // Scoped to the root rack: the nested rack has a Macro 1 of its own.
   const rows = page
     .locator('.mapping-grid tbody tr')
     .filter({ has: page.locator('.col-path', { hasText: 'Test Rack' }) })
-    .filter({ has: page.locator('.col-macro', { hasText: 'Macro 1' }) });
+    .filter({ has: page.locator('.mapping-slot:text-is("1")') });
   // The fixture's macro 1 drives two parameters, one row each, Live's layout.
   await expect(rows).toHaveCount(2);
   const row = rows.first();
-  await expect(row.locator('.col-macro')).toContainText('Macro 1');
+  // Unnamed, so it is labelled after what it drives (SCHEMA.md Q23).
+  await expect(row.locator('.col-macro')).toContainText('ParamA');
   await expect(row.locator('.col-path')).toContainText('Test Rack');
   await expect(row.locator('.col-path')).toContainText('TestSynth');
   await expect(row.locator('.col-name')).toContainText('Param');
@@ -384,6 +404,7 @@ test('devices and nested racks start collapsed', async ({ page }) => {
 
 test('the unbind buttons line up on the right edge', async ({ page }) => {
   await loadRack(page);
+  await page.locator('.mapping-expand-all').click();
   const rights = await page.locator('.mapping-unbind').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().right)));
   expect(rights.length).toBeGreaterThan(1);
   expect(new Set(rights).size).toBe(1);
@@ -394,6 +415,8 @@ test('the mapping table edits a range and inverts it', async ({ page }) => {
   // table is the only place they can be authored. Browser-only because the
   // edit has to survive a real serialize/reparse cycle.
   await loadRack(page);
+  // Macro 1 drives two parameters, so its rows live behind the summary.
+  await page.locator('.mapping-expand-all').click();
   const row = page.locator('.mapping-grid tbody tr', { hasText: 'ParamA' }).first();
   const min = row.locator('.mapping-range').first();
   const max = row.locator('.mapping-range').nth(1);
@@ -406,4 +429,329 @@ test('the mapping table edits a range and inverts it', async ({ page }) => {
   await expect(min).toHaveValue('100');
   await expect(max).toHaveValue('20');
   await expect(row.locator('.mapping-invert')).toHaveClass(/is-inverted/);
+});
+
+test('the row scrolls sideways when it is wider than the window', async ({ page }) => {
+  // A rack wider than the window had no scrollbar and no hint that anything
+  // was off to the right, until some panel toggled and forced a re-layout.
+  await page.setViewportSize({ width: 420, height: 900 });
+  await loadRack(page, 'drum');
+
+  const scroller = page.locator('.rack-editor-scroll');
+  const overflow = await scroller.evaluate((el) => el.scrollWidth - el.clientWidth);
+  expect(overflow).toBeGreaterThan(0);
+});
+
+test('Map mode draws the existing cables, and leaving it takes them away', async ({ page }) => {
+  await loadRack(page);
+  await openFirstDevice(page);
+  await expect(page.locator('.mapping-cable')).toHaveCount(0);
+
+  await turnMapOn(page);
+  // The fixture's macro 1 drives two parameters of this device, and both ends
+  // are on screen, so both cables can be drawn.
+  await expect(page.locator('.mapping-cable').first()).toBeVisible();
+
+  await turnMapOn(page); // Unmap
+  await expect(page.locator('.mapping-cable')).toHaveCount(0);
+});
+
+test('a rack feature goes in from the left and comes back out from the right', async ({ page }) => {
+  await loadRack(page);
+  await page.locator('.contract-code').fill('BS');
+  await page.locator('.contract-code').press('Enter');
+
+  const available = page.locator('.contract-column').nth(0);
+  const inRack = page.locator('.contract-column').nth(1);
+  await available.locator('.contract-entry', { hasText: 'Auto Filter' }).click();
+  await page.locator('.contract-arrows button').first().click();
+
+  // Leading slot, the rack name on the knob, and the feature now sits in the
+  // right-hand list under its own label.
+  await expect(rootKnobs(page).first().locator('.macro-knob-name')).toHaveText('BS FILTER');
+  await expect(inRack.locator('.contract-entry-name')).toHaveText(['BS FILTER']);
+  await expect(page.locator('.rack-name').first()).toHaveText('BS');
+  // The settings column is the one that was just added.
+  await expect(page.locator('.contract-settings h4')).toHaveText('Auto Filter');
+
+  await inRack.locator('.contract-entry', { hasText: 'BS FILTER' }).click();
+  await page.locator('.contract-arrows button').nth(1).click();
+  await expect(inRack.locator('.contract-entry-name')).toHaveCount(0);
+  await expect(rootKnobs(page).first().locator('.macro-knob-name')).not.toHaveText('BS FILTER');
+});
+
+test('a contract-authored rack saves as a file that reparses', async ({ page }) => {
+  // The whole point of the strip: what it writes has to survive a round trip,
+  // because the next thing that opens it is Live.
+  await loadRack(page);
+  await page.locator('.contract-code').fill('BS');
+  await page.locator('.contract-code').press('Enter');
+  await page.locator('.contract-column').nth(0).locator('.contract-entry', { hasText: 'Utility Gain' }).click();
+  await page.locator('.contract-arrows button').first().click();
+
+  const file = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export .adg' }).click()]).then(
+    ([d]) => d,
+  );
+  // Named after the code, one file per rack, as the convention says.
+  expect(file.suggestedFilename()).toBe('BS.adg');
+
+  const xml = gunzipSync(readFileSync((await file.path())!)).toString('utf8');
+  expect(xml.split('<?xml')).toHaveLength(2);
+  // The macro label, the rack name and the inserted device all read the code.
+  expect(xml).toContain('<MacroDisplayNames.0 Value="BS GAIN"/>');
+  expect(xml).toContain('<UserName Value="BS"/>');
+  // The Utility the contract inserted, named from the same code.
+  expect(xml).toContain('<StereoGain');
+  expect(xml).toContain('<UserName Value="BS GAIN"/>');
+});
+
+test('a macro driving several parameters is one row until it is opened', async ({ page }) => {
+  // What the contract writes is one knob across every chain, and four
+  // identical rows say nothing four times.
+  await loadRack(page);
+  const summary = page.locator('.mapping-summary').first();
+  await expect(summary).toBeVisible();
+  await expect(summary.locator('.mapping-fanout')).toHaveText('x2');
+
+  await summary.dblclick();
+  await expect(page.locator('.mapping-summary')).toHaveCount(0);
+  await expect(page.locator('.mapping-grid tbody tr', { hasText: 'ParamC' })).toHaveCount(1);
+});
+
+test('a macro can be reset from its own knob', async ({ page }) => {
+  await loadRack(page);
+  const knob = rootKnobs(page).first();
+  await expect(knob.locator('.macro-knob-name')).toHaveText('ParamA');
+  await knob.locator('.macro-knob-reset').click();
+
+  // Unbound, back to the default name, and no colour.
+  await expect(knob.locator('.macro-knob-name')).toHaveText('Macro 1');
+  await expect(knob).toHaveClass(/unmapped/);
+});
+
+test('a rack feature is added with the arrow and reordered by dragging', async ({ page }) => {
+  await loadRack(page);
+  await page.locator('.contract-code').fill('BS');
+  await page.locator('.contract-code').press('Enter');
+
+  const available = page.locator('.contract-column').nth(0);
+  const inRack = page.locator('.contract-column').nth(1);
+  const [addButton, removeButton] = [page.locator('.contract-arrows button').nth(0), page.locator('.contract-arrows button').nth(1)];
+
+  await available.locator('.contract-entry', { hasText: 'Auto Filter' }).click();
+  await addButton.click();
+  await available.locator('.contract-entry', { hasText: 'Utility Gain' }).click();
+  await addButton.click();
+  await expect(inRack.locator('.contract-entry-name')).toHaveText(['BS FILTER', 'BS GAIN']);
+  await expect(rootKnobs(page).nth(0).locator('.macro-knob-name')).toHaveText('BS FILTER');
+
+  // Drag the second one over the first: the list order IS the knob order.
+  const rows = inRack.locator('li[data-feature-index]');
+  const source = rows.nth(1).locator('.contract-grip');
+  const target = rows.nth(0);
+  await source.hover();
+  await page.mouse.down();
+  await target.hover();
+  await page.mouse.up();
+
+  await expect(inRack.locator('.contract-entry-name')).toHaveText(['BS GAIN', 'BS FILTER']);
+  await expect(rootKnobs(page).nth(0).locator('.macro-knob-name')).toHaveText('BS GAIN');
+
+  // And back out through the other arrow.
+  await inRack.locator('.contract-entry', { hasText: 'BS GAIN' }).click();
+  await removeButton.click();
+  await expect(inRack.locator('.contract-entry-name')).toHaveText(['BS FILTER']);
+});
+
+test('EQ Three is one feature with three knobs, and a band can be dropped', async ({ page }) => {
+  await loadRack(page);
+  await page.locator('.contract-code').fill('BS');
+  await page.locator('.contract-code').press('Enter');
+
+  const available = page.locator('.contract-column').nth(0);
+  await expect(available.locator('.contract-entry', { hasText: 'EQ Three' })).toHaveCount(1);
+  await available.locator('.contract-entry', { hasText: 'EQ Three' }).click();
+  await page.locator('.contract-arrows button').first().click();
+
+  await expect(page.locator('.contract-column').nth(1).locator('.contract-entry-name')).toHaveText(['BS EQ (Lo, Mid, Hi)']);
+  await expect(rootKnobs(page).nth(0).locator('.macro-knob-name')).toHaveText('BS LO');
+  await expect(rootKnobs(page).nth(2).locator('.macro-knob-name')).toHaveText('BS HI');
+
+  // Dropping the Mid band drops its knob and keeps the EQ.
+  await page.locator('.contract-band', { hasText: 'Mid' }).locator('input[type="checkbox"]').uncheck();
+  await expect(rootKnobs(page).nth(1).locator('.macro-knob-name')).toHaveText('BS HI');
+  await expect(page.locator('.contract-column').nth(1).locator('.contract-entry-name')).toHaveText(['BS EQ (Lo, Hi)']);
+});
+
+test('a chain wears its colour, and so do the macros that only drive it', async ({ page }) => {
+  await loadRack(page);
+  await rootChainRows(page).first().locator('.chain-swatch').click();
+  await page.locator('.color-swatch').nth(21).click();
+
+  const row = rootChainRows(page).first();
+  await expect
+    .poll(() => row.evaluate((el) => getComputedStyle(el).backgroundColor))
+    .not.toBe('rgb(58, 61, 69)'); // the default row grey
+  // The knob that drives only that chain now matches it.
+  const knobColour = await rootKnobs(page).first().evaluate((el) => getComputedStyle(el).getPropertyValue('--macro-color').trim());
+  const rowColour = await row.evaluate((el) => getComputedStyle(el).getPropertyValue('--chain-color').trim());
+  expect(knobColour).toBe(rowColour);
+});
+
+test('the cables stay inside the rack row', async ({ page }) => {
+  await loadRack(page);
+  await openFirstDevice(page);
+  await turnMapOn(page);
+  await expect(page.locator('.mapping-cable').first()).toBeVisible();
+
+  // The layer covers the viewport, so it is clipped to the row: without that,
+  // a cable to a control scrolled out of view was drawn across the page.
+  const clip = await page.locator('.mapping-cable-layer').evaluate((el) => getComputedStyle(el).clipPath);
+  expect(clip).toContain('inset');
+});
+
+test('the rack sits above the two panels, which stack when there is no room', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await loadRack(page);
+
+  const box = async (selector: string) => (await page.locator(selector).boundingBox())!;
+  const row = await box('.rack-editor-scroll');
+  const features = await box('.contract-strip');
+  const mappings = await box('.mapping-table');
+
+  // The rack first, and it gets the width; the panels read it from underneath.
+  expect(features.y).toBeGreaterThan(row.y + row.height - 1);
+  expect(Math.abs(features.y - mappings.y)).toBeLessThan(2); // side by side
+  expect(mappings.x).toBeGreaterThan(features.x + features.width - 1);
+
+  await page.setViewportSize({ width: 700, height: 1000 });
+  const narrowFeatures = await box('.contract-strip');
+  const narrowMappings = await box('.mapping-table');
+  // No room for both, so one goes under the other rather than shrinking to
+  // nothing.
+  expect(narrowMappings.y).toBeGreaterThan(narrowFeatures.y + narrowFeatures.height - 1);
+});
+
+test('the page fits a phone, and only the rack and the table scroll sideways', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await loadRack(page);
+
+  // Nothing may push the PAGE sideways: a phone with a horizontal scrollbar
+  // means something is laid out for a desktop and the user gets to hunt for
+  // it. The rack row and the mapping table scroll inside themselves instead.
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+
+  const rackScrolls = await page.locator('.rack-editor-scroll').evaluate((el) => el.scrollWidth > el.clientWidth);
+  expect(rackScrolls).toBe(true);
+  const tableScrolls = await page.locator('.mapping-scroll').evaluate((el) => el.scrollWidth > el.clientWidth);
+  expect(tableScrolls).toBe(true);
+
+  // The two lists stack rather than sharing a line 190px wide.
+  const available = (await page.locator('.contract-column').nth(0).boundingBox())!;
+  const inRack = (await page.locator('.contract-column').nth(1).boundingBox())!;
+  expect(inRack.y).toBeGreaterThan(available.y + available.height - 1);
+});
+
+test('it is installable: icons, theme colour and an apple touch icon', async ({ page }) => {
+  await page.goto('/');
+  // A manifest with no icons is not installable at all - both Chrome and
+  // Safari decline to offer it - and iOS reads the link tags rather than the
+  // manifest.
+  await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveAttribute('href', /apple-touch-icon\.png$/);
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#14151a');
+  await expect(page.locator('meta[name="apple-mobile-web-app-capable"]')).toHaveAttribute('content', 'yes');
+
+  for (const icon of ['icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png', 'favicon.svg']) {
+    const response = await page.request.get(`/${icon}`);
+    expect(response.status(), icon).toBe(200);
+  }
+});
+
+test('dropping a parameter back on its own macro leaves one cable, not two', async ({ page }) => {
+  await loadRack(page);
+  await turnMapOn(page);
+  await openFirstDevice(page);
+
+  const param = page.locator('.mapped-params .param', { hasText: 'ParamA' }).first();
+  const knob = rootKnobs(page).first();
+  const before = await page.locator('.mapping-cable').count();
+
+  await param.hover();
+  await page.mouse.down();
+  await knob.hover();
+  // Over the macro that already drives it: the cable stops promising a
+  // connection, because dropping there does nothing.
+  await expect(page.locator('.patch-cable')).toHaveClass(/already-bound/);
+  await page.mouse.up();
+
+  // No connect echo on top of the cable that is already drawn.
+  await expect(page.locator('.patch-cable')).toHaveCount(0);
+  await expect.poll(() => page.locator('.mapping-cable').count()).toBe(before);
+});
+
+test('the rack row and the panels under it share one width', async ({ page }) => {
+  await page.setViewportSize({ width: 1900, height: 1000 });
+  await loadRack(page);
+
+  const box = async (selector: string) => (await page.locator(selector).boundingBox())!;
+  const row = await box('.rack-editor-scroll');
+  const features = await box('.contract-strip');
+  const mappings = await box('.mapping-table');
+
+  // One block: same left edge, same right edge, whatever the rack's own width.
+  expect(Math.round(row.x)).toBe(Math.round(features.x));
+  expect(Math.round(row.x + row.width)).toBe(Math.round(mappings.x + mappings.width));
+  // A rack narrower than the block is padded out by empty device slots rather
+  // than leaving a gap that reads as a layout fault.
+  await expect(page.locator('.rack-filler')).toBeVisible();
+});
+
+test('devices fold as the row runs out of width, and come back when it does not', async ({ page }) => {
+  await page.setViewportSize({ width: 1900, height: 1000 });
+  await loadRack(page);
+
+  // Open what there is room for. The list re-renders after each click.
+  for (let i = 0; i < 4; i++) {
+    const strip = page.locator('.device-panel.collapsed .device-title-strip').first();
+    if ((await strip.count()) === 0) break;
+    await strip.click();
+  }
+  const wide = await page.locator('.device-panel:not(.collapsed)').count();
+  expect(wide).toBeGreaterThan(0);
+  // A nested rack starts closed and the budget must not open it.
+  await expect(page.locator('.rack-panel.collapsed')).toHaveCount(1);
+
+  await page.setViewportSize({ width: 800, height: 1000 });
+  await expect.poll(() => page.locator('.device-panel:not(.collapsed)').count()).toBeLessThan(wide);
+
+  // Folding is a view, not a decision: the width comes back and so do they.
+  await page.setViewportSize({ width: 1900, height: 1000 });
+  await expect.poll(() => page.locator('.device-panel:not(.collapsed)').count()).toBe(wide);
+});
+
+test('the landing is the two controls, with the walkthrough behind a question mark', async ({ page }) => {
+  await page.goto('/');
+
+  // In and out first, directly under the masthead: the guide used to sit
+  // between them and the title.
+  const masthead = (await page.locator('.app > header').boundingBox())!;
+  const transfer = (await page.locator('.transfer').boundingBox())!;
+  const guide = (await page.locator('.getting-started').boundingBox())!;
+  expect(transfer.y).toBeGreaterThan(masthead.y);
+  expect(guide.y).toBeGreaterThan(transfer.y);
+
+  // Both halves are one box: the same height, whatever is in them.
+  const dropzone = (await page.locator('.dropzone').boundingBox())!;
+  const exportzone = (await page.locator('.exportzone').boundingBox())!;
+  expect(Math.round(dropzone.height)).toBe(Math.round(exportzone.height));
+  expect(Math.round(dropzone.y)).toBe(Math.round(exportzone.y));
+
+  // The screenshots are in a panel now, not on the page.
+  await expect(page.locator('.guide-steps')).toHaveCount(0);
+  await page.locator('.help-button').first().click();
+  await expect(page.locator('.modal .guide-steps li')).toHaveCount(3);
+
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.modal')).toHaveCount(0);
 });

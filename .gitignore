@@ -1,6 +1,8 @@
 node_modules/
 dist/
 dist-relative/
+# The site, built into the device (doc/PLAN.md 4.7). A build output, not a source.
+apps/m4l-device/site/
 *.tsbuildinfo
 .DS_Store
 

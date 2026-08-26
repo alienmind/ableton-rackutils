@@ -22,6 +22,31 @@ import { child, childValue, elementChildren, parseXmlDoc, pathOf, resolvePath, s
 import { compress, decompress } from './gzip';
 
 export const MACRO_SLOTS = 16;
+
+/** `MacroControls.7` and friends: a rack device's own macro, which another rack's macro can drive (SCHEMA.md Q22). */
+const MACRO_CONTROLS = /^MacroControls\.(\d+)$/;
+
+/**
+ * What to call a bound parameter. A rack's macro carries no `Name`, so the raw
+ * tag reads `MacroControls.1` where Live shows the knob's own label - which is
+ * the whole point of mapping one rack's macro to another's.
+ */
+function parameterName(target: Element): string {
+  const macro = MACRO_CONTROLS.exec(target.tagName);
+  if (macro && target.parentElement) {
+    const index = Number(macro[1]);
+    return childValue(target.parentElement, `MacroDisplayNames.${index}`) || `Macro ${index + 1}`;
+  }
+  return childValue(target, 'Name') ?? target.tagName;
+}
+
+/** The `GroupDevicePreset` at or above `el` - the element a rack device hangs off (SCHEMA.md Q2). */
+function nearestGroupPreset(el: Element | null): Element | null {
+  let node = el;
+  while (node && node.tagName !== 'GroupDevicePreset') node = node.parentElement;
+  return node;
+}
+
 /** The "unset" sentinel Live itself writes for an unmapped macro slot (SCHEMA.md Q5/Q6). */
 export const UNSET_MACRO_VALUE = -1;
 
@@ -310,10 +335,20 @@ export class Rack {
    * shape has none of, so it ran past and returned null.
    */
   private owningRackDevice(el: Element): Element | null {
-    let node: Element | null = el.parentElement;
-    while (node && node.tagName !== 'GroupDevicePreset') node = node.parentElement;
-    const device = child(node, 'Device');
-    return device?.firstElementChild ?? null;
+    let node = nearestGroupPreset(el.parentElement);
+    const device = child(node, 'Device')?.firstElementChild ?? null;
+    if (!device) return null;
+
+    // A binding on a rack's own MacroControls.N belongs to the rack ABOVE it
+    // (SCHEMA.md Q22). A macro cannot drive its own rack's macro, so the walk
+    // has to carry on one level up; stopping here credited the child and left
+    // the parent's knob drawn as unmapped.
+    const target = el.tagName === 'KeyMidi' ? this.targetParameterOf(el) : null;
+    if (target && MACRO_CONTROLS.test(target.tagName) && target.parentElement === device) {
+      node = nearestGroupPreset(node?.parentElement ?? null);
+      return child(node, 'Device')?.firstElementChild ?? null;
+    }
+    return device;
   }
 
   /** @internal The target parameter a KeyMidi lives on: its parent, or if wrapped, its parent's parent (SCHEMA.md Q1's `Timeable` finding). */
@@ -330,7 +365,7 @@ export class Rack {
     const max = Number(childValue(range, 'Max') ?? 127);
     return {
       targetPath: this.pathOf(target),
-      targetName: childValue(target, 'Name') ?? target.tagName,
+      targetName: parameterName(target),
       rangeMin: min,
       rangeMax: max,
       inverted: min > max,

@@ -31,7 +31,7 @@ export default defineConfig({
           VitePWA({
             registerType: 'autoUpdate',
             scope: base,
-            includeAssets: ['favicon.svg'],
+            includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
             manifest: {
               name: 'ableton-rackutils',
               short_name: 'rackutils',
@@ -41,6 +41,16 @@ export default defineConfig({
               display: 'standalone',
               background_color: '#14151a',
               theme_color: '#14151a',
+              orientation: 'any',
+              // Without icons a manifest is not installable at all: Chrome and
+              // Safari both decline to offer "Add to Home Screen". Drawn by
+              // `scripts/make-icons.mjs`; the maskable one keeps its art inside
+              // the circle Android crops to.
+              icons: [
+                { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
+                { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
+                { src: 'icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+              ],
             },
             workbox: {
               // The default glob omits jpg, which is what the logo is, so an

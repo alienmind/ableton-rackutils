@@ -517,3 +517,258 @@ function deviceTagOfPreset(preset: Element): string | null {
   return child(preset, 'Device')?.firstElementChild?.tagName ?? null;
 }
 
+
+/**
+ * Write one value inside an inserted device, addressed by the chain of tags
+ * from the device element down: `['BassMono', 'Manual']` on a `StereoGain`,
+ * `['SideChain', 'OnOff', 'Manual']` on a `Gate`.
+ *
+ * Every element on the way must already exist. A donor carries the device
+ * Live wrote, so a tag that is not there is a wrong tag rather than a missing
+ * feature, and creating it would produce a file that loads and behaves wrong -
+ * the failure mode this codec exists to avoid (Constraint 7).
+ */
+export function setDeviceValue(
+  rack: Rack,
+  devicePath: string,
+  path: readonly string[],
+  value: string | number | boolean,
+): MutationResult {
+  if (path.length === 0) throw new RangeError('setDeviceValue needs at least one tag');
+  const deviceEl = child(rack.resolveTarget(devicePath), 'Device')?.firstElementChild;
+  if (!deviceEl) return fail(`no device at "${devicePath}"`);
+
+  let node: Element | null = deviceEl;
+  for (const tag of path.slice(0, -1)) {
+    node = child(node, tag);
+    if (!node) return fail(`${deviceEl.tagName} has no "${path.join('/')}" to set`);
+  }
+  const leaf = path[path.length - 1];
+  if (!child(node, leaf)) return fail(`${deviceEl.tagName} has no "${path.join('/')}" to set`);
+  setChildValue(node, leaf, value);
+  return ok();
+}
+
+/**
+ * Take a device out of its chain, `Id`s of the siblings after it renumbered
+ * from their new positions (SCHEMA.md Q16).
+ *
+ * A macro binding lives INSIDE the parameter it drives (SCHEMA.md Q1), so
+ * removing a device takes its bindings with it. Any macro left driving
+ * nothing at all therefore has to give up its stored variation values as
+ * well, exactly as `unbindMacro` does - a value left in a slot that drives
+ * nothing is Constraint 4's corruption seen from the other side.
+ */
+export function removeDevice(rack: Rack, devicePath: string): MutationResult {
+  const preset = rack.resolveTarget(devicePath);
+  const presets = preset?.parentElement;
+  if (!preset || !presets || presets.tagName !== 'DevicePresets') {
+    return fail(`no device at "${devicePath}" - it may belong to a stale snapshot`);
+  }
+
+  const before = rack.collectMacroBindings();
+  presets.removeChild(preset);
+  elementChildren(presets).forEach((el, i) => el.setAttribute('Id', String(i)));
+
+  const after = rack.collectMacroBindings();
+  for (const macroIndex of before.keys()) {
+    if ((after.get(macroIndex) ?? []).length > 0) continue;
+    permuteVariations(rack, (values) => {
+      values[macroIndex] = UNSET_MACRO_VALUE;
+    });
+  }
+  return ok();
+}
+
+/**
+ * The inverse of `insertMacroSlots` for ONE slot: unbind it, rotate it out to
+ * the end of the bank so everything above it slides down, and clear it.
+ *
+ * Rotating rather than blanking in place is what keeps the contract's macros
+ * leading and contiguous when one option is unticked (doc/PLAN.md 4.3.1), and
+ * it reuses `reorderMacro`, so variation values move on the single tested path
+ * (Constraint 4).
+ *
+ * The visible count comes down by exactly ONE, and is allowed to land on an
+ * odd number on the way: taking three slots off a bank of twelve has to end at
+ * nine before it can be rounded to eight, and rounding at every step would
+ * take two off each time and end at six. `applyContract` evens it out when the
+ * batch is done, which is the only place that knows the batch is done.
+ *
+ * Never below what it takes to show every macro that is still mapped - hiding
+ * a macro that still drives something is how a rack loses a knob with no
+ * explanation (SCHEMA.md Q7).
+ */
+export function removeMacroSlot(rack: Rack, macroIndex: number): MutationResult {
+  assertSlot(macroIndex);
+  const warnings = unbindMacro(rack, macroIndex).warnings;
+  reorderMacro(rack, macroIndex, MACRO_SLOTS - 1);
+  clearMacroSlot(rack, MACRO_SLOTS - 1);
+  renumberDefaultNames(rack, macroIndex);
+
+  setMacroCount(rack, Math.max(visibleFloor(rack), rack.macroCount - 1));
+  return ok(warnings);
+}
+
+/**
+ * Round the visible macro count DOWN to even, never hiding a macro that still
+ * drives something.
+ *
+ * The end of a batch. `removeMacroSlot` takes slots off one at a time and lets
+ * the count sit on an odd number in between - taking three off a bank of
+ * twelve has to pass through nine to reach eight - and an odd
+ * `NumVisibleMacroControls` loads and draws the grid wrong (SCHEMA.md Q19). So
+ * whoever ends a batch of removals calls this; `applyContract` does it for the
+ * batches it runs.
+ */
+export function evenMacroCount(rack: Rack): MutationResult {
+  const count = rack.macroCount;
+  return setMacroCount(rack, Math.max(visibleFloor(rack), count - (count % 2)));
+}
+
+/**
+ * The fewest macros a rack can show without hiding one that still drives
+ * something, rounded up to even (SCHEMA.md Q19).
+ */
+export function visibleFloor(rack: Rack): number {
+  const mapped = rack.collectMacroBindings();
+  const highest = Math.max(-1, ...Array.from(mapped.keys()).filter((i) => (mapped.get(i) ?? []).length > 0));
+  const needed = highest + 1;
+  return Math.max(2, needed + (needed % 2));
+}
+
+/**
+ * Give one macro back to the rack: unbind whatever it drives and put its name,
+ * colour and value back to what an untouched slot carries.
+ *
+ * The slot STAYS where it is - this is the editor's per-knob reset, not
+ * `removeMacroSlot`, which is the contract taking a leading slot away and
+ * closing the gap behind it.
+ */
+export function resetMacro(rack: Rack, macroIndex: number): MutationResult {
+  assertSlot(macroIndex);
+  const warnings = unbindMacro(rack, macroIndex).warnings;
+  clearMacroSlot(rack, macroIndex);
+  return ok(warnings);
+}
+
+/**
+ * Put the default names back in step with their slots, from `from` upwards.
+ *
+ * The rotation that empties a slot carries names down with it, so a bank that
+ * had `Macro 14`, `Macro 15`, `Macro 16` sitting empty at the top ends up
+ * reading `Macro 16` three times. Only slots that are empty AND still carry a
+ * default name are touched: a name somebody typed is theirs, wherever it
+ * lands.
+ */
+function renumberDefaultNames(rack: Rack, from: number): void {
+  const bindings = rack.collectMacroBindings();
+  for (let i = from; i < MACRO_SLOTS; i++) {
+    if ((bindings.get(i) ?? []).length > 0) continue;
+    const name = childValue(rack.deviceEl, `MacroDisplayNames.${i}`) ?? '';
+    if (/^Macro \d+$/.test(name)) setChildValue(rack.deviceEl, `MacroDisplayNames.${i}`, `Macro ${i + 1}`);
+  }
+}
+
+/** Write the untouched-slot defaults over one slot. Does NOT unbind: callers do that first, deliberately. */
+function clearMacroSlot(rack: Rack, macroIndex: number): void {
+  const device = rack.deviceEl;
+  for (const field of PER_SLOT_FIELDS) {
+    const el = child(device, `${field}.${macroIndex}`);
+    if (el) el.setAttribute('Value', MACRO_DEFAULTS[field] ?? '');
+  }
+  setChildValue(device, `MacroDisplayNames.${macroIndex}`, `Macro ${macroIndex + 1}`);
+  const controls = child(device, `MacroControls.${macroIndex}`);
+  if (controls) setChildValue(controls, 'Manual', 0);
+}
+
+/**
+ * What an untouched macro slot carries in a rack Live wrote, read off the
+ * empty slots of `donors/BS.adg` (macros 10 to 16). `MacroDisplayNames` is
+ * not here because its default is the slot's own number.
+ */
+const MACRO_DEFAULTS: Record<string, string> = {
+  MacroDefaults: '0',
+  MacroAnnotations: '',
+  MacroColor: '-1',
+  ForceDisplayGenericValue: 'false',
+  ExcludeMacroFromRandomization: 'false',
+  ExcludeMacroFromSnapshots: 'false',
+};
+
+/**
+ * Give every chain an equal slice of the chain selector's 0..127, so the
+ * selector actually selects one chain at a time (SCHEMA.md Q24).
+ *
+ * A chain selector macro on a rack whose chains all span the full range moves
+ * a control that changes nothing: every chain stays active at every position.
+ * `donors/KD.adg`'s Kick rack is the worked example - eight chains, sixteen
+ * wide each, crossfade edges flush with the range so there is no blend.
+ *
+ * Leaves a rack that ALREADY partitions its range alone. A layered rack whose
+ * chains deliberately overlap is somebody's instrument, not a mistake to
+ * correct.
+ */
+export function distributeChainSelector(rack: Rack): MutationResult {
+  const bp = rack.branchPresetsEl;
+  const chains = bp ? elementChildren(bp) : [];
+  if (chains.length < 2) return fail('a rack with one chain has nothing to select between');
+
+  if (alreadyDistributed(chains)) return ok(['the chains already split the selector range, so they were left alone']);
+
+  const width = 128 / chains.length;
+  chains.forEach((chain, i) => {
+    const min = Math.round(i * width);
+    const max = (i === chains.length - 1 ? 128 : Math.round((i + 1) * width)) - 1;
+    let range = child(chain, 'BranchSelectorRange');
+    if (!range) {
+      range = rack.document.createElement('BranchSelectorRange');
+      // Before ZoneSettings, which is where Live writes it. Order is not known
+      // to matter, and matching what Live writes costs nothing.
+      chain.insertBefore(range, child(chain, 'ZoneSettings'));
+    }
+    setChildValue(range, 'Min', min);
+    setChildValue(range, 'Max', max);
+    // Crossfade edges flush with the range: no blend between chains, which is
+    // what a selector wants (a blend is a layer).
+    setChildValue(range, 'CrossfadeMin', min);
+    setChildValue(range, 'CrossfadeMax', max);
+  });
+  return ok();
+}
+
+/** True when the chains hold different selector ranges already - somebody set them, by hand or by us. */
+function alreadyDistributed(chains: readonly Element[]): boolean {
+  const seen = new Set<string>();
+  for (const chain of chains) {
+    const range = child(chain, 'BranchSelectorRange');
+    if (!range) return false;
+    seen.add(`${childValue(range, 'Min')}:${childValue(range, 'Max')}`);
+  }
+  return seen.size === chains.length;
+}
+
+/**
+ * Give every macro that only drives THIS chain the chain's own colour.
+ *
+ * Colour is how a rack of racks stays readable: colour the Rumble pad brown
+ * and the knobs that move Rumble should be brown too, or the colour says
+ * nothing once the knobs are in one bank at the top. Live does not do this;
+ * it is the same argument the contract makes for naming.
+ *
+ * Only macros whose bindings ALL land inside the chain are touched. One that
+ * also drives something elsewhere belongs to no single chain - that is what a
+ * macro across chains IS - and recolouring it would claim otherwise.
+ */
+export function colorChainMacros(rack: Rack, chainPath: string, colorIndex: number): MutationResult {
+  const chain = rack.resolveTarget(chainPath);
+  if (!chain) return fail(`no chain at "${chainPath}" - it may belong to a stale snapshot`);
+
+  const bindings = rack.collectMacroBindings();
+  for (const [macroIndex, keyMidis] of bindings) {
+    if (keyMidis.length === 0) continue;
+    if (!keyMidis.every((km) => chain.contains(rack.targetParameterOf(km)))) continue;
+    setMacroColor(rack, macroIndex, colorIndex);
+  }
+  return ok();
+}

@@ -882,3 +882,109 @@ a range in a unit a human recognises.
 This was the last contract option with no donor and no known tag. `pnpm
 adg-harvest` now lifts it, so all five options in `doc/PLAN.md` 4.3.2 have one.
 
+
+---
+
+## Q22. Who owns a `KeyMidi` on a nested rack's `MacroControls.N`?
+
+Found on `donors/KD.adg`, a drum rack whose four pads each hold a rack. Live
+draws its macro 4 as `KICK SEL`, mapped; the editor drew it as an empty slot
+with a default label, while the mapping table listed the mapping under the
+nested rack. Both were reading the same file.
+
+**Answer: the rack ABOVE the one the element sits in.** A parent macro drives a
+child rack's macro by a `KeyMidi` on the child's own `MacroControls.N`:
+
+```
+root macro 4  <- MacroControls.1 < InstrumentGroupDevice "AlienMind KD Kick Selector"
+                                 < Device < GroupDevicePreset < DevicePresets
+                                 < DrumBranchPreset "Kick" < BranchPresets
+```
+
+`owningRackDevice()` walks up to the nearest `GroupDevicePreset`, which here is
+the CHILD's, so every one of these was credited to the child. On this rack that
+is six of the root's ten macros.
+
+**`ChainSelector` on the same device element goes the other way**, and the same
+file proves it: the child's own macro 2 (`KICK SEL`, colour 13) drives the
+child's `ChainSelector`, exactly the shape Q15 recorded on `BS.adg`. So the
+disambiguator is the PARAMETER, not the depth:
+
+| Parameter of a rack device | Owner |
+|---|---|
+| `MacroControls.N` | the rack above it |
+| everything else (`ChainSelector`, ...) | the rack itself |
+
+The rule behind it: a macro cannot drive its own rack's macro. There is nothing
+for such a mapping to mean, so a `KeyMidi` on `MacroControls.N` can only have
+come from the level above.
+
+**Consequence.** The same family of silent corruption as Q15: every
+slot-changing mutation routes through `collectMacroBindings()`, so on a rack
+of racks - the shape a drum rack always has - `moveMapping` moved nothing while
+permuting variation values as if it had, and `reorderMacro` left the parent's
+bindings on the vacated index.
+
+---
+
+## Q23. What does Live show on a macro that has no name?
+
+Same rack, same screenshot. `donors/KD.adg`'s root carries
+`MacroDisplayNames.4` through `.8` at their defaults (`Macro 5` ... `Macro 9`)
+and Live labels those knobs `Rumble Length`, `Rumble Reverb`, `Rumble Drive`,
+`Rumble Freq` and `Atmo Gain`.
+
+**Answer: an unnamed macro is labelled with the name of what it drives.** Each
+of those five is the name of the child rack macro at the other end of the Q22
+binding. Macro 4 is the same case with a colour of its own: default name,
+`MacroColor.3 = 13`, drawn white and labelled `KICK SEL` after the child macro
+it drives.
+
+The default is recognisable rather than empty: `Macro ${index + 1}`, exactly
+what `MacroDisplayNames.N` holds when nobody has renamed the slot, which is
+also what the empty slots of `BS.adg` carry.
+
+A macro driving several parameters is normal (Q1), and what Live labels one of
+those has not been checked against a rack that has one. The editor shows the
+first target's name; every macro in this rack drives exactly one thing, so the
+screenshot does not settle the multi-target case.
+
+---
+
+## Q24. What makes a chain selector actually select?
+
+Asked because the chain select feature wrote a macro that moved and changed
+nothing: every chain stayed audible at every position of the knob.
+
+**Answer: each chain carries a `BranchSelectorRange`, and they have to
+partition 0..127.** From `donors/KD.adg`'s Kick rack, eight chains:
+
+```xml
+<InstrumentBranchPreset>
+  <BranchSelectorRange>
+    <Min Value="0" />           <!-- chain 0 -->
+    <Max Value="15" />
+    <CrossfadeMin Value="0" />
+    <CrossfadeMax Value="15" />
+  </BranchSelectorRange>
+  <ZoneSettings>...</ZoneSettings>
+```
+
+`0-15`, `16-31`, ... `112-127`: 128 divided by the chain count, no gaps and no
+overlap. **The crossfade edges sit flush with the range**, which is what makes
+it a selector rather than a blend - Live fades between chains across the
+crossfade region, and there is none here.
+
+Written by `distributeChainSelector`, which the chain select feature calls
+before binding its macro. It leaves a rack whose chains already hold DIFFERENT
+ranges alone: a layered instrument whose chains overlap on purpose is somebody
+else's design, not a mistake to correct.
+
+**A drum rack is the trap.** `DrumGroupDevice` carries a `ChainSelector`
+element of its own - the file allows binding it - and its pads are chains. But
+a pad answers to a note, not to a selector position, so a chain selector on the
+drum rack itself is a control that loads and does nothing. What a drum rack
+wants is what `KD.adg` does by hand: a pad holds a rack, one of THAT rack's
+macros drives ITS chain selector, and the drum rack's macro drives that macro
+(Q22). The feature therefore takes a target rack, and the UI offers the pads
+rather than the drum rack itself.

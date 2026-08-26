@@ -8,7 +8,9 @@
   "scripts": {
     "dev": "node scripts/dev.mjs rack-editor",
     "dev:rack-editor": "node scripts/dev.mjs rack-editor",
-    "build": "tsc -b && node scripts/build-ui.mjs && m4l-jweb build",
+    "build": "tsc -b && node scripts/bundle-site.mjs && node scripts/build-ui.mjs && m4l-jweb build",
+    "bundle:site": "node scripts/bundle-site.mjs",
+    "check:site": "node scripts/check-site-bundle.mjs site",
     "build:wrapper": "m4l-jweb wrapper",
     "build:patchers": "m4l-jweb patchers",
     "install:device": "m4l-jweb install",

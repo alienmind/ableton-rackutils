@@ -136,18 +136,21 @@ export function PatchCable({ drag, echo, onEchoDone }: PatchCableProps) {
   const currentSag = sag.current * (1 - t);
 
   const connected = echo?.connected ?? false;
-  const willConnect = dragging && drag.overMacro !== null && !drag.overForeignRack;
+  const willConnect = dragging && drag.overMacro !== null && !drag.overForeignRack && !drag.overBound;
+  // Over the macro that already drives it: dropping here does nothing, so the
+  // cable stops promising a connection.
+  const alreadyBound = dragging && drag.overBound;
   const refused = dragging && drag.overMacro !== null && drag.overForeignRack;
 
   // The cable takes the colour of the macro it is over, so a patch reads as
   // belonging to that knob. Refusal keeps its own red: that is a state, not a
   // macro, and it has to say so regardless of what colour the knob is.
-  const color = refused ? undefined : (echo?.color ?? (willConnect ? drag.overColor : null)) ?? undefined;
+  const color = refused || alreadyBound ? undefined : (echo?.color ?? (willConnect ? drag.overColor : null)) ?? undefined;
 
   return (
     <svg className="patch-cable-layer" aria-hidden="true">
       <path
-        className={`patch-cable${connected ? ' connected' : ''}${willConnect ? ' will-connect' : ''}${refused ? ' refused' : ''}`}
+        className={`patch-cable${connected ? ' connected' : ''}${willConnect ? ' will-connect' : ''}${alreadyBound ? ' already-bound' : ''}${refused ? ' refused' : ''}`}
         style={color ? { stroke: color } : undefined}
         d={cablePath(from, to, currentSag)}
       />

@@ -95,6 +95,17 @@
   cursor: default;
 }
 
+/* A collapsed panel is a title strip, and the width is what animates. */
+.panel.collapsed {
+  max-width: 24px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    transition: none;
+  }
+}
+
 /* --- Macro Variations, to the left of the macros as Live places it --- */
 
 .variations-panel {
@@ -148,6 +159,10 @@
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 4px;
+  /* Left aligned, like everything under it: the rack, the features and the
+     mappings all start on the same line. A rack narrower than the box is
+     padded out by `.rack-filler` rather than centred. */
+  display: flex;
 }
 
 /*
@@ -161,12 +176,30 @@
   align-items: stretch;
   gap: 2px;
   height: calc(var(--device-height) + var(--header-height));
+  /* Sized by its contents, not by the scroll box. Without this the row is as
+     wide as the viewport, panels overhang it, and the scroll container decides
+     it has nothing to scroll - so a rack wider than the window had no
+     scrollbar at all until some panel toggled and forced a re-layout.
+     `width: 100%` on top of it is what gives the empty slots at the end
+     something to fill when the rack is NARROWER than the box. */
+  min-width: max-content;
+  width: 100%;
 }
 
 .panel {
   flex: 0 0 auto;
   height: 100%;
   display: flex;
+  /*
+   * Opening and closing a panel is a move, not a cut. `max-width` rather than
+   * `width` because a panel is sized by its contents and CSS cannot animate to
+   * `auto`; the cap sweeps past the content width and the panel follows it.
+   * The cables watch for these transitions and swing with them
+   * (`MappingCables`).
+   */
+  max-width: 460px;
+  overflow: hidden;
+  transition: max-width 0.2s ease;
   flex-direction: column;
   background: var(--edit-panel);
   border: 1px solid var(--edit-line);
@@ -468,7 +501,9 @@
 
 .macro-knob.mapped .macro-knob-name {
   background: var(--macro-color);
-  color: #14151a;
+  /* Picked per knob: the palette runs from near black to white, and a fixed
+     dark ink disappeared on the dark half of it. */
+  color: var(--macro-ink, #14151a);
   font-weight: 600;
 }
 
@@ -609,22 +644,23 @@
   display: flex;
   align-items: center;
   gap: 3px;
-  background: #3a3d45;
-  /* Live colours chain rows; the stripe is that colour where a chain has one.
-     Placeholder palette (SCHEMA.md Q13) - not necessarily Live's colour. */
-  border-left: 3px solid var(--chain-color, transparent);
+  /* The row wears the chain's own colour, as Live draws it, with its ink
+     picked for contrast (SCHEMA.md Q13's palette runs black to white). */
+  background: var(--chain-color, #3a3d45);
   border: 1px solid var(--edit-line);
   border-radius: 2px;
-  color: var(--edit-text);
+  color: var(--chain-ink, var(--edit-text));
   padding: 1px 3px;
   cursor: pointer;
   text-align: left;
   flex: 0 0 auto;
 }
 
+/* Selection cannot be another background - the background is the chain's
+   colour now - so it is a ring, which reads on any of them. */
 .chain-row.selected {
-  background: var(--edit-accent);
-  color: #14151a;
+  outline: 2px solid var(--edit-accent);
+  outline-offset: -2px;
   font-weight: 600;
 }
 
@@ -781,6 +817,8 @@
 
 .patch-cable.will-connect { stroke: #9ad49a; }
 .patch-cable.refused { stroke: #ff6b6b; }
+/* Already driven by the knob under the pointer: dropping changes nothing. */
+.patch-cable.already-bound { stroke: var(--edit-dim); opacity: 0.5; }
 .patch-cable.connected { stroke: #9ad49a; }
 
 .patch-plug {
@@ -794,16 +832,70 @@
 /* --- the mapping table, laid out like Live's own Macro Mappings list --- */
 
 .mapping-table {
-  margin-top: 10px;
-  border-top: 1px solid var(--edit-line);
-  padding-top: 6px;
+  flex: 1 1 460px;
+  min-width: 0;
+  padding: 6px 8px 8px;
+  border: 1px solid var(--edit-line);
+  border-radius: 4px;
+  background: #1a1c22;
 }
 
-.mapping-table h4 {
-  margin: 0 0 4px;
-  font-size: 11px;
-  color: var(--edit-dim);
-  font-weight: 500;
+/*
+ * The empty slots to the right of a rack that does not fill its width.
+ *
+ * Drawn as the collapsed device strips Live shows: a rack with room in it
+ * looks like a rack with room in it, where a bare gap looked like the panel
+ * had failed to size itself. It takes no pointer events - devices come from
+ * Live, not from here.
+ */
+.rack-filler {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  margin-left: 2px;
+  pointer-events: none;
+  border-radius: 2px;
+  /* One 15px strip with a 2px gap, repeated: the same rhythm as a row of
+     collapsed devices beside it. */
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--edit-panel, #1f2129) 0,
+    var(--edit-panel, #1f2129) 15px,
+    transparent 15px,
+    transparent 17px
+  );
+  opacity: 0.5;
+}
+
+/*
+ * The two panels that read the rack, under it. They sit side by side while
+ * there is room for both and stack when there is not, which is what makes the
+ * same layout work on an ultra-wide monitor and in the device's window.
+ */
+.editor-panels {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+/* The two panels under the rack are the same kind of thing, so their titles
+   are the same title. */
+.contract-head h3,
+.mapping-table h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--edit-text);
+}
+
+.mapping-table h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
 }
 
 .mapping-count {
@@ -926,4 +1018,628 @@
 .more-targets {
   color: var(--edit-dim);
   font-size: 9px;
+}
+
+/* --- Map mode (context.tsx): binding is modal, as it is in Live --- */
+
+.map-button {
+  margin-left: auto;
+  font-size: 10px;
+  padding: 1px 7px;
+  border: 1px solid var(--edit-line);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--edit-dim);
+  cursor: pointer;
+}
+
+.map-button.on {
+  background: var(--edit-accent);
+  border-color: var(--edit-accent);
+  color: #101116;
+  font-weight: 600;
+}
+
+.mapping-note {
+  font-size: 11px;
+  color: var(--edit-accent);
+}
+
+/*
+ * The message line. Its height is reserved whether it has anything to say or
+ * not: a warning that pushes the rack down moves every control the user was
+ * about to click.
+ */
+.editor-messages {
+  display: flex;
+  align-items: center;
+  min-height: 20px;
+  margin-bottom: 4px;
+  padding: 0 2px;
+  overflow: hidden;
+  font-size: 11px;
+}
+
+.editor-messages .warnings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin: 0;
+  padding: 1px 6px;
+  border-left: 3px solid #ff9f45;
+  background: #241f18;
+  color: #ffd9ad;
+  border-radius: 2px;
+  list-style: none;
+  /* One line high, whatever the codec has to say. The full text is in the
+     title, and the row does not grow. */
+  max-height: 18px;
+  overflow: hidden;
+}
+
+/* A parameter only invites a drag while Map is on. Outside it, it is text. */
+.param.mappable { cursor: grab; }
+.macro-knob.map-source .macro-knob-dial { cursor: grab; }
+.macro-knob.map-source .knob-body { stroke: var(--edit-accent); stroke-width: 1.5; }
+
+/* A macro nobody named, labelled after what it drives (SCHEMA.md Q23). */
+.macro-knob-name.derived { font-style: italic; }
+
+/* The cables already in the rack, drawn for as long as Map mode is on. Below
+   the drag cable's layer, so a new patch stays legible over the existing ones. */
+.mapping-cable-layer {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 40;
+  overflow: visible;
+}
+
+.mapping-cable {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: 0.55;
+}
+
+.mapping-plug {
+  stroke: #101116;
+  stroke-width: 1;
+  opacity: 0.8;
+}
+
+
+/* --- Rack features: the contract strip (doc/PLAN.md 4.3.1) --- */
+
+.contract-strip {
+  flex: 1 1 460px;
+  min-width: 0;
+  padding: 6px 8px 8px;
+  border: 1px solid var(--edit-line);
+  border-radius: 4px;
+  background: #1a1c22;
+}
+
+.contract-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-bottom: 6px;
+}
+
+.contract-head h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--edit-text);
+}
+
+.contract-rack-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--edit-dim);
+}
+
+.contract-code {
+  width: 170px;
+  padding: 2px 5px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--edit-text);
+  background: #101116;
+  border: 1px solid var(--edit-line);
+  border-radius: 3px;
+}
+
+.contract-io {
+  display: flex;
+  gap: 3px;
+  margin-left: auto;
+}
+
+.contract-io button {
+  font-size: 9px;
+  padding: 2px 6px;
+  color: var(--edit-dim);
+  background: transparent;
+  border: 1px solid var(--edit-line);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.contract-io button:hover { color: var(--edit-text); }
+
+/* Left: what the rack could have. Middle: what it has. Right: the one that is
+   selected. Three columns rather than a row of tiles, so a feature's settings
+   have somewhere to live that does not grow the strip every time - and they
+   wrap, because the strip no longer owns the window's width. */
+.contract-columns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.contract-column { flex: 1 1 140px; min-width: 130px; }
+.contract-settings { flex: 1 1 200px; }
+
+.contract-column h4 {
+  margin: 0 0 3px;
+  font-size: 9px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--edit-dim);
+}
+
+.contract-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 116px;
+  overflow-y: auto;
+}
+
+.contract-list li {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+}
+
+.contract-entry {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  color: var(--edit-text);
+  background: #14151a;
+  border: 1px solid var(--edit-line);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.contract-entry:hover { border-color: var(--edit-accent); }
+
+/* An added feature wears its own colour, with a foreground picked for contrast
+   against it - Live's palette runs from near black to white. */
+.contract-entry.filled { border-color: transparent; }
+.contract-entry.selected { outline: 1px solid var(--edit-text); outline-offset: 1px; }
+
+.contract-entry-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.contract-entry-state {
+  flex: 0 0 auto;
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+  opacity: 0.85;
+}
+
+/* A mounted feature the rack does not actually have yet says so out loud: the
+   two states are separate and the list shows both. */
+.contract-entry-state.absent {
+  background: #7a3434;
+  opacity: 1;
+}
+
+/* The colour chip an editor puts beside a colour value, same idea here. */
+.contract-chip {
+  flex: 0 0 auto;
+  width: 11px;
+  height: 11px;
+  border: 1px solid rgba(0, 0, 0, 0.55);
+  border-radius: 2px;
+}
+
+.contract-remove {
+  flex: 0 0 auto;
+  width: 18px;
+  font-size: 10px;
+  color: var(--edit-dim);
+  background: transparent;
+  border: 1px solid var(--edit-line);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.contract-remove:hover { color: #ff6b6b; border-color: #ff6b6b; }
+
+.contract-empty {
+  padding: 3px 2px;
+  margin: 0;
+  font-size: 10px;
+  color: var(--edit-dim);
+  list-style: none;
+}
+
+.contract-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 8px;
+  border-left: 1px solid var(--edit-line);
+}
+
+.contract-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--edit-dim);
+}
+
+.contract-field-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.contract-pattern {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 4px;
+  font: inherit;
+  font-size: 11px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--edit-text);
+  background: #101116;
+  border: 1px solid var(--edit-line);
+  border-radius: 2px;
+}
+
+.contract-swatch {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border: 1px solid #101116;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.contract-setting {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--edit-text);
+  cursor: pointer;
+}
+
+.contract-setting span { display: flex; flex-direction: column; gap: 1px; }
+
+.contract-note {
+  margin: 0;
+  font-size: 9px;
+  font-style: normal;
+  line-height: 1.35;
+  color: var(--edit-dim);
+}
+
+.contract-note.warn { color: #d8c07a; }
+
+/* --- templates, arrows, reordering (doc/PLAN.md 4.3.7) --- */
+
+.contract-templates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--edit-dim);
+}
+
+.contract-templates label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.contract-templates select,
+.contract-template-name {
+  font: inherit;
+  font-size: 11px;
+  text-transform: none;
+  letter-spacing: 0;
+  padding: 2px 4px;
+  color: var(--edit-text);
+  background: #101116;
+  border: 1px solid var(--edit-line);
+  border-radius: 3px;
+}
+
+.contract-template-name { width: 110px; }
+
+.contract-templates button {
+  font-size: 9px;
+  padding: 2px 6px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--edit-dim);
+  background: transparent;
+  border: 1px solid var(--edit-line);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.contract-templates button:hover { color: var(--edit-text); }
+
+.contract-columns {
+}
+
+/* The two arrows between the lists: in, and back out. */
+.contract-arrows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-self: center;
+}
+
+.contract-arrows button {
+  width: 28px;
+  padding: 3px 0;
+  font-size: 11px;
+  color: var(--edit-text);
+  background: #14151a;
+  border: 1px solid var(--edit-line);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.contract-arrows button:disabled { opacity: 0.35; cursor: default; }
+.contract-arrows button:not(:disabled):hover { border-color: var(--edit-accent); color: var(--edit-accent); }
+
+/* The order of this list is the order of the knobs, so it is draggable. */
+.contract-grip {
+  display: flex;
+  align-items: center;
+  padding: 0 2px;
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: -1px;
+  color: var(--edit-dim);
+  cursor: grab;
+  user-select: none;
+}
+
+.contract-list li.dragging { opacity: 0.55; }
+
+.contract-entry-slot {
+  flex: 0 0 auto;
+  min-width: 12px;
+  font-size: 9px;
+  opacity: 0.8;
+}
+
+/* --- per-knob reset --- */
+
+.macro-knob-reset {
+  /* Over the slot number, top left: the number is the least useful thing on a
+     knob and the corner was already taken by the colour swatch on the right,
+     which the reset overlapped. */
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  color: #f4f5f8;
+  background: #4a4f5c;
+  border: 1px solid #101116;
+  border-radius: 50%;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  /* Hidden until the pointer is on the knob: sixteen little x's is a rack that
+     looks like a form. Not `display: none` - it has to be able to fade. */
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease;
+}
+
+.macro-knob:hover .macro-knob-reset,
+.macro-knob-reset:focus-visible {
+  opacity: 1;
+}
+
+.macro-knob-reset:hover {
+  background: #ff6b6b;
+  color: #101116;
+}
+
+/* The number gets out of the way rather than sitting under the button. */
+.macro-knob:hover .macro-knob-reset + .macro-knob-dial .macro-knob-slot,
+.macro-knob:hover .macro-knob-dial .macro-knob-slot {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+/* --- collapsed mapping groups --- */
+
+.mapping-expand-all {
+  margin-left: 6px;
+  font-size: 9px;
+  padding: 1px 5px;
+  color: var(--edit-dim);
+  background: transparent;
+  border: 1px solid var(--edit-line);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.mapping-expand-all:hover { color: var(--edit-text); }
+
+.mapping-summary { cursor: pointer; }
+
+.mapping-fanout {
+  margin-left: 5px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #2e313a;
+  color: var(--edit-dim);
+  font-size: 9px;
+}
+
+.mapping-open {
+  padding: 0 5px;
+  color: var(--edit-dim);
+  background: transparent;
+  border: 1px solid var(--edit-line);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+/* A feature with several knobs: one row per band, each droppable on its own. */
+.contract-bands {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.contract-band {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.contract-band .contract-setting { min-width: 44px; }
+.contract-band .contract-pattern:disabled { opacity: 0.4; }
+
+
+/* --- touch, and the small screens that come with it --- */
+
+/*
+ * Every drag in this UI is a pointer gesture (doc/PLAN.md D3), and on a touch
+ * screen the browser claims the same gesture for scrolling unless the element
+ * says otherwise. The knobs already do; these are the other two things that
+ * can be dragged.
+ */
+.contract-grip,
+.param.mappable {
+  touch-action: none;
+}
+
+.mapping-scroll {
+  overflow-x: auto;
+}
+
+/* Below this the table cannot show six columns without lying about the
+   numbers, so it keeps its width and scrolls. */
+.mapping-grid {
+  min-width: 620px;
+}
+
+/*
+ * A finger is about 9mm and these controls are drawn for a mouse: 11px for the
+ * reset x, 15px for the rack's side buttons. Rather than making them bigger
+ * everywhere - the rack is a fixed 169px tall and there is nowhere to put the
+ * pixels - they grow only where the pointer is coarse.
+ */
+@media (pointer: coarse) {
+  .macro-knob-reset,
+  .macro-knob-swatch,
+  .chain-swatch {
+    min-width: 18px;
+    min-height: 18px;
+  }
+
+  .side-btn {
+    width: 22px;
+    height: 22px;
+  }
+
+  .side-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .contract-grip {
+    padding: 0 6px;
+  }
+
+  .contract-arrows button {
+    width: 40px;
+    padding: 8px 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .contract-strip,
+  .mapping-table {
+    padding: 5px;
+  }
+
+  .contract-templates {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .contract-column {
+    flex-basis: 100%;
+  }
+
+  /* The arrows sit between two stacked lists here, so they read across rather
+     than down. */
+  .contract-arrows {
+    flex-direction: row;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .contract-arrows button {
+    flex: 1;
+    max-width: 120px;
+  }
 }

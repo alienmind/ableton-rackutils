@@ -22,3 +22,19 @@ export const PALETTE_INDICES: readonly number[] = MACRO_PALETTE.map((_, i) => i)
 
 /** Live lays the picker out 14 wide; matching that keeps the swatches where a user expects them. */
 export const PALETTE_COLUMNS = 14;
+
+/**
+ * Black or white text over a palette colour.
+ *
+ * Live's palette runs from near black to white, so one fixed foreground is
+ * unreadable at one end or the other: a dark grey macro drew its label in
+ * near-black on near-black. Rec. 601 luma, which is what "does this read as
+ * light or dark" actually asks.
+ */
+export function contrastInk(color: string): string {
+  const hex = /^#([0-9a-f]{6})$/i.exec(color.trim());
+  if (!hex) return '#f4f5f8';
+  const n = parseInt(hex[1], 16);
+  const luma = (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+  return luma > 0.55 ? '#101116' : '#f4f5f8';
+}
