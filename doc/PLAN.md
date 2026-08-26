@@ -56,10 +56,11 @@ editing, batch library operations - is out. See Parked.
 - **`packages/adg-codec`** - built. Twenty-one mutations plus the contract, 167
   tests, 42 of them against the committed donor racks.
 - **`packages/editor-ui`** - built. Reproduces Live's layout, plus the rack
-  features strip, feature templates and Map mode. 38 tests.
-- **`apps/site`** - the editor plus a getting-started guide, deployed to Pages.
-  Installable, offline, and laid out for a phone as well as an ultra-wide. 35
-  Playwright specs against real Chromium in CI.
+  features strip, feature templates, Map mode and the cable layer. 39 tests.
+- **`apps/site`** - the editor under a landing page that is two controls and
+  two question marks, deployed to Pages. Installable, offline, and laid out for
+  a phone as well as an ultra-wide. 39 Playwright specs against real Chromium
+  in CI.
 - **`tools/adg-tool`** - `unpack`/`diff`/`mappings`/`move`/`move-mapping`, plus
   `adg-palette` and `adg-harvest`.
 - **`apps/m4l-device`** - the site, bundled. The `.amxd` opens a window holding
@@ -67,6 +68,13 @@ editing, batch library operations - is out. See Parked.
   it. Shipped as a zip; the site's card links the newest versioned release.
 - **`.github/workflows/`** - CI (both jobs), Pages deploy, device release
   (rolling and versioned). Green.
+
+## Where this branch is
+
+`feature/options-strip-and-m4l-device`, unmerged, no PR opened. Everything
+below is built, tested headless and in a real browser, and NOT yet confirmed in
+Live. The full state, and what still has to be confirmed by hand, is in
+"Confirmed, and not" at the end of this section.
 
 ## Next steps, in order
 
@@ -84,6 +92,30 @@ Live** (Open risk 2): the Gate, the Compressor, EQ Three, the chain selector
 and its ranges, and the device's own window have all been through the codec, a
 browser and their tests, and none of them through Live. That is the test this
 project keeps learning it cannot skip.
+
+### Confirmed, and not
+
+The maintainer walked the browser UI on `donors/KD.adg` and confirmed steps 1
+to 10 of the test script - the rack-of-racks fix, the scrollbar, Map mode,
+mapping a nested rack's knob, the per-knob reset, the collapsed mapping rows,
+adding and removing features, the pad-targeted chain selector, reordering,
+templates. Everything after that is unconfirmed, and specifically:
+
+- **Nothing has been opened in Live on this branch.** Two racks are authored
+  and waiting at `tmp/BS-features.adg` and `tmp/KD-features.adg`. The chain
+  selector's range splitting (Q24) is the newest and least proven of it: if
+  `BS SEL` sweeps without changing which chain sounds, that is the bug.
+- **The device has not been installed.** It builds, the payload is guarded, the
+  window is declared - nobody has pressed Open in Live.
+- **The PWA has not been installed on a phone.** The manifest and icons are
+  right in a desktop browser; the install prompt needs HTTPS, so it needs
+  Pages.
+- **The knob drag has not been tried with a finger.** If it is fiddly the fix
+  is a bigger hit area under `@media (pointer: coarse)`, sized from a real
+  report rather than guessed.
+- **The animations have not been seen by anyone but the code.** Panels animate
+  their width, the cables follow and swing, devices fold as the row narrows.
+  Tests assert the states, not that it looks right.
 
 Use it on real racks throughout. Every bug this project has hit came from that,
 not from tests - including a UI whose every interaction was broken while its
@@ -626,6 +658,30 @@ codec and through a browser; "loads in Live" is a different claim (Open risk
   for, drawn the way Live draws them, rather than by a gap that reads as a
   layout fault. Prose keeps its own 900px measure, since text is unreadable at
   1500.
+- **A feature is MOUNTED, and what the rack physically has is a separate
+  thing - BUILT.** Mounting Utility Gain on a drum rack puts a Utility at the
+  end of every pad and nothing in the drum rack itself, which left a user
+  hunting for something that was never going to be there. The right-hand list
+  is the mounted set and stays that way; each entry carries a badge for what
+  the rack actually has (in rack / partly / not applied). A codec refusal no
+  longer un-mounts the feature behind the user's back - it says why in the
+  message row and leaves the decision to them.
+- **Devices fold when the row runs out of width - BUILT.** Past a budget from
+  the row's own width they are drawn as strips, from the right, and come back
+  left to right as the window grows. It is a VIEW over what the user opened,
+  not a change to it: feeding it into the state flipped open the nested racks
+  that start closed by design. Clicking a strip still opens it when the row is
+  tight, because a user asking beats an estimate.
+- **Panels animate, and the cables follow - BUILT.** Opening and closing is a
+  `max-width` transition rather than a cut, and the cable layer measures every
+  frame while anything is moving, with each cable's sag on a damped spring - so
+  a cable swings after its plug and settles instead of snapping to the new
+  place. A cable to a parameter inside a CLOSED device ends at that device's
+  strip rather than not being drawn: the endpoint search walks up the path
+  until it finds something rendered.
+- **One message row, always there - BUILT.** Warnings used to appear above the
+  rack and move everything under them; the row keeps its height and carries the
+  mode notes too.
 - **Dropping a parameter back on its own macro does nothing, visibly - BUILT.**
   It already did nothing to the file (a parameter has one macro, Constraint 5,
   and that was it), but the drop still played a connect animation on top of the
@@ -1009,6 +1065,27 @@ Grid order is not yet confirmed to be stored index order (4.1).
 
 Keys use `node.id`, never name or type. Two Saturators in one chain, or two
 drum pads with default names, would collide otherwise.
+
+### D10. The landing page - DONE
+
+Rebuilt after the maintainer's read of it: **the two controls first, the
+explanations behind question marks.**
+
+- **In and out are one row of two equal halves**, directly under the masthead:
+  open a rack on the left, export it on the right. Export had been one icon
+  inside the features strip, which is the wrong place for the thing the whole
+  tool is for - the rack has to get back to Live.
+- **The walkthrough and the device's small print live in a panel** (`Modal`),
+  one `?` away. Three screenshots of Live above the controls is a page that
+  explains itself to someone who has already read it.
+- **One alignment.** Everything that is not the rack is centred at 900px, and
+  the rack block is centred too. The half-centred, half-left page came from an
+  unscoped `header { margin-inline: auto }` that also hit the title bar of
+  every rack and every device, which is why a rack's name sat in the middle of
+  its own panel.
+- The guide still ships only to the website: `Landing.tsx` exports both the
+  masthead and the guide, and `Landing.embedded.tsx` stubs both, so the images
+  stay out of the `.amxd` (4.7).
 
 ### D4. The site - DONE
 
