@@ -507,6 +507,14 @@ describe('sorting the mapping table (doc/PLAN.md 4.4)', () => {
   });
 });
 
+/**
+ * These mount `donors/KD.adg`, a drum rack of racks, and apply the contract to
+ * it under jsdom - seconds of work rather than the milliseconds a synthetic
+ * fixture takes, hence the timeout. The real rack is the point: this case only
+ * exists on a rack somebody made by hand.
+ */
+const REAL_RACK_TIMEOUT = 30_000;
+
 describe('a knob the user already made for the job (doc/PLAN.md 4.3.1)', () => {
   const KD = new Uint8Array(readFileSync(join(__dirname, '..', '..', 'adg-codec', 'donors', 'KD.adg')));
 
@@ -533,7 +541,7 @@ describe('a knob the user already made for the job (doc/PLAN.md 4.3.1)', () => {
     expect(question?.textContent).toContain('KICK GAIN');
     // Nothing has happened to the rack yet: the question comes first.
     expect(macroNames()).toContain('KICK GAIN');
-  });
+  }, REAL_RACK_TIMEOUT);
 
   test('reusing it makes that knob the feature, and leaves nothing behind', () => {
     remount();
@@ -545,7 +553,7 @@ describe('a knob the user already made for the job (doc/PLAN.md 4.3.1)', () => {
     const gain = rack.macros.find((m) => m.name.endsWith('GAIN'))!;
     expect(gain.bindings).toHaveLength(rack.chains.length);
     expect(rack.macros.some((m) => m.name === 'KICK GAIN')).toBe(false);
-  });
+  }, REAL_RACK_TIMEOUT);
 
   test('adding another leaves their knob alone and builds a second device', () => {
     remount();
@@ -559,7 +567,7 @@ describe('a knob the user already made for the job (doc/PLAN.md 4.3.1)', () => {
     // Constraint 5 and is what the question was about.
     expect(rack.macros.some((m) => m.name === 'KICK GAIN')).toBe(true);
     expect(rack.chains[0].devices.length).toBeGreaterThanOrEqual(before);
-  });
+  }, REAL_RACK_TIMEOUT);
 
   test('cancelling adds nothing at all', () => {
     remount();
@@ -570,5 +578,5 @@ describe('a knob the user already made for the job (doc/PLAN.md 4.3.1)', () => {
 
     expect(container.querySelector('.contract-adopt')).toBeNull();
     expect(rack.macros.map((m) => m.name)).toEqual(before);
-  });
+  }, REAL_RACK_TIMEOUT);
 });
