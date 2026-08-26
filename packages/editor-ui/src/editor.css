@@ -159,6 +159,9 @@
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 4px;
+  /* Android's edge swipe is a back gesture, and a rack scrolled to its end
+     handed the rest of the swipe to the browser. The row keeps it. */
+  overscroll-behavior-x: contain;
   /* Left aligned, like everything under it: the rack, the features and the
      mappings all start on the same line. A rack narrower than the box is
      padded out by `.rack-filler` rather than centred. */
@@ -410,7 +413,10 @@
   border-radius: 2px;
   padding: 1px;
   text-align: center;
-  touch-action: none;
+  /* NOT `none`, which is what a pointer drag normally wants: the knobs fill
+     the row that scrolls sideways, so a finger on one could not move the rack
+     at all. The drag waits for a hold instead (`holdToDrag.ts`). */
+  touch-action: manipulation;
 }
 
 .macro-knob.unmapped { opacity: 0.8; }
@@ -1563,16 +1569,23 @@
 /*
  * Every drag in this UI is a pointer gesture (doc/PLAN.md D3), and on a touch
  * screen the browser claims the same gesture for scrolling unless the element
- * says otherwise. The knobs already do; these are the other two things that
- * can be dragged.
+ * says otherwise.
+ *
+ * The grip is a handle and nothing else, so it takes the gesture outright. A
+ * PARAMETER is a line of the rack that scrolls sideways, so it cannot: it
+ * waits for a hold, like the knobs.
  */
-.contract-grip,
-.param.mappable {
+.contract-grip {
   touch-action: none;
+}
+
+.param.mappable {
+  touch-action: manipulation;
 }
 
 .mapping-scroll {
   overflow-x: auto;
+  overscroll-behavior-x: contain;
 }
 
 /* Below this the table cannot show six columns without lying about the

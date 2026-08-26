@@ -57,11 +57,11 @@ editing, batch library operations - is out. See Parked.
   tests, 88 of them against the committed donor racks.
 - **`packages/editor-ui`** - built. Reproduces Live's layout, plus the rack
   features strip, the plugin strip, feature templates, Map mode and the cable
-  layer. 60 tests.
+  layer. 63 tests.
 - **`apps/site`** - the editor under a landing page that is two controls and
   two question marks, deployed to Pages. Installable, offline, and laid out for
-  a phone as well as an ultra-wide. 49 Playwright specs against real Chromium
-  in CI.
+  a phone as well as an ultra-wide. 52 Playwright specs against real Chromium
+  in CI, three of them in a touch context.
 - **`tools/adg-tool`** - `unpack`/`diff`/`mappings`/`move`/`move-mapping`, plus
   `adg-palette` and `adg-harvest`.
 - **`apps/m4l-device`** - the site, bundled. The `.amxd` opens a window holding
@@ -122,10 +122,27 @@ templates. The rest was walked in Live on 2026-08-26, and stands as:
   SCHEMA.md Q19 beside the odd-count finding; if the three-feature one fails,
   it is the shift.
 - **The device is installed and its window opens.**
-- **The PWA has not been installed on a phone**, and the knob drag has not been
-  tried with a finger. Both wait on Pages: the install prompt needs HTTPS. If
-  the drag is fiddly the fix is a bigger hit area under
-  `@media (pointer: coarse)`, sized from a real report rather than guessed.
+- **The phone found two faults before it could test anything else**, both fixed
+  and neither visible from a desktop browser:
+
+  - **A rack could not be opened at all.** The file input carried
+    `accept=".adg"`, and Android's picker filters by MIME type, which it
+    derives from `accept`: `.adg` maps to nothing it knows, so every rack in
+    Downloads greyed out. Renaming to `.adg.gz` was the only way in. On a
+    coarse pointer the input now offers everything and the gzip check does the
+    filtering, which it did anyway.
+  - **The rack row could not be scrolled.** It is one row that scrolls
+    sideways and it is made of knobs, and a knob carried `touch-action: none`
+    for its drag - so a finger on one moved neither the knob nor the rack. The
+    knobs and the bindable parameters take `manipulation` now, and the drag
+    waits for a 350ms hold (`holdToDrag.ts`), which is also what tells a drag
+    from a swipe. Once the hold has fired, `touchmove` is cancelled for the
+    length of the drag.
+
+  Still to confirm on the phone: the PWA install prompt (it needs HTTPS, so it
+  needs Pages) and whether the knob drag is workable with a finger at all. If
+  it is fiddly the fix is a bigger hit area under `@media (pointer: coarse)`,
+  sized from a real report rather than guessed.
 - **The animations are confirmed by eye.**
 - **Saving over the original is confirmed on a real file.**
 - The version badge reads whatever `package.json` says, which the workspace
