@@ -2,7 +2,7 @@ import type { ContractDevice, DeviceValue } from '@rackutils/adg-codec';
 
 /**
  * The contract's options, as offered in the strip above the rack
- * (doc/PLAN.md 4.3.2). Each one is a piece of a convention a producer wants
+ * (doc/DEVELOPERS.md, the contract). Each one is a piece of a convention a producer wants
  * every rack of theirs to present the same way.
  *
  * The ORDER here is the order the macros land in, on every rack, whatever
@@ -120,7 +120,7 @@ export const CONTRACT_OPTIONS: readonly ContractOptionSpec[] = [
   {
     id: 'autofilter',
     label: 'Auto Filter',
-    // `{name} AUTOFILTER` is what doc/PLAN.md 4.3.2 wrote down, and at 13
+    // `{name} AUTOFILTER` is what doc/DEVELOPERS.md, the contract wrote down, and at 13
     // characters it is past what a knob holds on one line: 12 fits, 21 wraps
     // and grows the whole rack (SCHEMA.md Q19). FILTER says the same thing.
     device: { deviceTag: 'AutoFilter2', parameter: 'Filter_Frequency', namePattern: '{name} FILTER', colorIndex: 3 },
@@ -129,7 +129,7 @@ export const CONTRACT_OPTIONS: readonly ContractOptionSpec[] = [
     id: 'eq3',
     label: 'EQ Three',
     // ONE device, three macros. The bands share the EQ that whichever of them
-    // lands first inserted (doc/PLAN.md 4.3.2).
+    // lands first inserted (doc/DEVELOPERS.md, the contract).
     device: { deviceTag: 'FilterEQ3', namePattern: '{name} EQ', deviceNamePattern: '{name} EQ', colorIndex: 9 },
     bands: [
       { id: 'lo', label: 'Lo', parameter: 'GainLo', namePattern: '{name} LO' },

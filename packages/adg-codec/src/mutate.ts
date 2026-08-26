@@ -121,7 +121,7 @@ export function reorderMacro(rack: Rack, from: number, to: number): MutationResu
  * `count`, leaving slots 0..count-1 empty.
  *
  * The contract puts its own macros in the leading slots so they are in the
- * same place on every rack (doc/PLAN.md 4.3.1), which means the rack's
+ * same place on every rack (doc/DEVELOPERS.md, the contract), which means the rack's
  * existing macros have to move out of the way first.
  *
  * Implemented as repeated `reorderMacro(15, 0)`, which rotates the whole bank
@@ -502,7 +502,7 @@ export interface InsertDeviceResult extends MutationResult {
  * Put `deviceTag` at the end of EVERY chain, reusing one already there.
  *
  * The contract applies in parallel across a rack's chains rather than by
- * wrapping the rack in a parent (doc/PLAN.md 4.3.3): `donors/BS.adg` has a
+ * wrapping the rack in a parent (doc/DEVELOPERS.md, the contract): `donors/BS.adg` has a
  * Utility at the end of each of its two chains with one macro driving both.
  * Wrapping is the cheap answer anyone can do by hand in Live, and it costs a
  * menu dive on Push to reach the knobs it hides.
@@ -626,7 +626,7 @@ export function removeDevice(rack: Rack, devicePath: string): MutationResult {
  * the end of the bank so everything above it slides down, and clear it.
  *
  * Rotating rather than blanking in place is what keeps the contract's macros
- * leading and contiguous when one option is unticked (doc/PLAN.md 4.3.1), and
+ * leading and contiguous when one option is unticked (doc/DEVELOPERS.md, the contract), and
  * it reuses `reorderMacro`, so variation values move on the single tested path
  * (Constraint 4).
  *

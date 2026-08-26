@@ -2,7 +2,7 @@
  * Lifts device instances out of the donor racks and writes them into the codec
  * as XML strings.
  *
- * Device XML cannot be generated, only copied (doc/PLAN.md Constraint 7): a
+ * Device XML cannot be generated, only copied (doc/DEVELOPERS.md, Constraint 7): a
  * stock Live device is hundreds of facts and one assembled from a description
  * produces a file that loads without complaint and behaves wrong. So the
  * contract inserts a real instance, saved by Live, harvested from
@@ -67,7 +67,7 @@ function scrub(preset: Element): void {
   for (const tag of BLANK_TAGS) {
     for (const el of elements(preset, tag)) el.setAttribute('Value', '');
   }
-  // Ids are reallocated on insert (doc/PLAN.md 4.3.4). Zeroing them here means
+  // Ids are reallocated on insert (doc/DEVELOPERS.md, the contract). Zeroing them here means
   // a donor that leaked into a file unrenumbered is obvious rather than subtly
   // colliding with a real one.
   const walk = (el: Element) => {
@@ -108,7 +108,7 @@ function main(): void {
 //
 // Each entry is one \`AbletonDevicePreset\`, scrubbed of macro bindings, names,
 // annotations and machine paths, with every Id zeroed for reallocation on
-// insert (doc/PLAN.md Constraint 7, 4.3.4).
+// insert (doc/DEVELOPERS.md, Constraint 7, 4.3.4).
 
 export const DONOR_DEVICES: Readonly<Record<string, string>> = {
 ${body}

@@ -3,7 +3,7 @@ import { CONTRACT_OPTIONS, optionSpec } from './contractOptions';
 
 /**
  * Feature templates: a named, ordered set of rack features, kept in the
- * browser so the second rack comes out like the first (doc/PLAN.md 4.3.7).
+ * browser so the second rack comes out like the first (doc/DEVELOPERS.md, the contract).
  *
  * A template is the convention. Its ORDER is part of it - the features take
  * the leading macro slots in the order they are listed, so moving one up moves

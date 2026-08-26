@@ -3,7 +3,7 @@
 //
 // Each entry is one `AbletonDevicePreset`, scrubbed of macro bindings, names,
 // annotations and machine paths, with every Id zeroed for reallocation on
-// insert (doc/PLAN.md Constraint 7, 4.3.4).
+// insert (doc/DEVELOPERS.md, Constraint 7, 4.3.4).
 
 export const DONOR_DEVICES: Readonly<Record<string, string>> = {
   // from donors/PD.adg

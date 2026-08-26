@@ -14,7 +14,11 @@ name: Release companion device
 on:
   push:
     branches: [main]
-    tags: ['v*']
+    # Releases, not betas. A `*-beta*` tag is a preview of a branch and has no
+    # business publishing a device release against a version that is not out -
+    # the site's download card reads the newest `vX.Y.Z`, and a beta would win
+    # it. `beta.yml` is what a beta tag is for.
+    tags: ['v[0-9]*.[0-9]*.[0-9]*']
   workflow_dispatch:
 
 permissions:

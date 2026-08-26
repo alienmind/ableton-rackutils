@@ -22,7 +22,7 @@ export interface DeviceRowProps {
 
 /**
  * A device this tool has no specific rendering for: the fallback floor of
- * doc/PLAN.md Part 5, drawn as one panel in the horizontal device chain.
+ * doc/DEVELOPERS.md, drawn as one panel in the horizontal device chain.
  *
  * Collapsing turns it into a vertical title strip, which is what Live does
  * with a collapsed device rather than shrinking it or hiding it.

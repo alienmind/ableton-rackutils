@@ -4,7 +4,7 @@ import { collectMappings } from './mappings';
 
 /**
  * Every mapping the rack already has, drawn as cables, for as long as Map mode
- * is on (doc/PLAN.md 4.4).
+ * is on (doc/PLAN.md).
  *
  * Only while it is on. Cables across a rack of racks are a thicket - forty on
  * `donors/KD.adg` - and the reason to look at them is that you are about to add

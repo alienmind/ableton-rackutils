@@ -2,7 +2,7 @@
  * Polar-to-cartesian SVG arc, the shape Ableton draws a macro value with: a
  * filled portion of a ring rather than a rotated pointer line.
  *
- * -135..+135 degrees, 270 degrees of sweep, matching `doc/PLAN.md` Phase 3.3's
+ * -135..+135 degrees, 270 degrees of sweep, matching `doc/DEVELOPERS.md`'s
  * convention and trackster's `useKnobInteraction`, so a drag-to-set-value hook
  * lifted from there later lines up without conversion.
  */

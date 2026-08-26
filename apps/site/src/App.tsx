@@ -9,25 +9,9 @@ import { canOpenWithHandle, handleFromDrop, openRackFile, saveInPlace, type Writ
  * The Max for Live bundle goes straight to the work: load a rack, author it.
  * The device window is small and its user installed the thing on purpose, so
  * the landing chrome is dropped at BUILD time - see `Landing.tsx` - rather
- * than merely hidden (doc/PLAN.md 4.7).
+ * than merely hidden (doc/PLAN.md).
  */
 const EMBEDDED = import.meta.env.VITE_EMBED === '1';
-
-/**
- * What the file input will offer, which is not the same question on a phone.
- *
- * A desktop browser filters by the extension and `.adg` is exactly right.
- * Android's picker filters by MIME TYPE, derived from what is in `accept` -
- * and `.adg` maps to no type it knows, so every file in Downloads greyed out
- * and a rack could not be opened at all. Renaming it `.adg.gz` was the only
- * way in.
- *
- * So on a touch screen it offers everything and the gzip check does the
- * filtering, which it did anyway: a file that is not a rack is refused by its
- * first two bytes, with a message, whatever it is called.
- */
-const FILE_ACCEPT =
-  typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches ? undefined : '.adg';
 
 interface Loaded {
   fileName: string;
@@ -35,7 +19,7 @@ interface Loaded {
   /**
    * Set when the rack came in through a picker or a drop the browser gave a
    * handle for - the one way the edited file can go back over the original
-   * (doc/PLAN.md 4.6). Null means Export, and only Export.
+   * (doc/PLAN.md). Null means Export, and only Export.
    */
   handle: WritableFile['handle'];
 }
@@ -160,7 +144,21 @@ export default function App() {
           >
             {loaded ? 'Open another rack' : 'Open a rack'}
           </button>
-          <input ref={fileInput} className="file-input" type="file" accept={FILE_ACCEPT} onChange={onFileInput} />
+          {/*
+            * No `accept`, on any platform. It is what a desktop browser wants
+            * and it is why a rack could not be opened on Android AT ALL: that
+            * picker filters by MIME type, derived from `accept`, and `.adg`
+            * maps to no type it knows - so every rack in Downloads greyed out
+            * and renaming to `.adg.gz` was the only way in.
+            *
+            * Restricting `accept` to desktop by `(pointer: coarse)` was the
+            * first fix and it did not work: that query does not match on a
+            * Pixel running stock Chrome, so the phone still got `.adg` and
+            * still could not open a rack. What the attribute buys is a tidier
+            * dialog; what it cost was a platform. The gzip check does the
+            * filtering either way, and always did.
+            */}
+          <input ref={fileInput} className="file-input" type="file" onChange={onFileInput} />
           <p className="transfer-note">.adg, read in this tab. Nothing is uploaded.</p>
         </div>
 
@@ -173,7 +171,7 @@ export default function App() {
           {/* Over the original, and only when the rack came in through a
               handle. Two clicks, the second naming the file, because this is
               the one control in the tool that can destroy a rack rather than
-              produce another copy of one (doc/PLAN.md 4.6). */}
+              produce another copy of one (doc/PLAN.md). */}
           {loaded?.handle &&
             (confirmingOverwrite ? (
               <p className="overwrite-confirm">
@@ -224,7 +222,7 @@ export default function App() {
 /**
  * What the saved file is called: the rack's name, which the features strip
  * also writes - one name on the rack, on its macros, on the devices the
- * contract added, and on the file (doc/PLAN.md 4.3.1). Falls back to the file
+ * contract added, and on the file (doc/DEVELOPERS.md, the contract). Falls back to the file
  * it came from.
  */
 function downloadName(loaded: Loaded): string {

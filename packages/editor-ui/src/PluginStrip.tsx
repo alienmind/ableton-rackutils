@@ -4,7 +4,7 @@ import { canScanPlugins, loadPluginNames, savePluginNames, scanForPlugins, type 
 
 /**
  * What this rack needs in order to load: its plugins, above the rack
- * (doc/PLAN.md 4.1).
+ * (doc/PLAN.md).
  *
  * Read only. It answers a question nothing else answers - will this rack load
  * on this machine, and what does it drag in - which matters for a rack from

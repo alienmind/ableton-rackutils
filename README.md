@@ -8,7 +8,7 @@ page, or from the command line.
 
 **Live site:** https://alienmind.github.io/ableton-rackutils/
 
-> **v0.4.1, beta.** The editor works end to end: open a rack, rearrange and
+> **v0.4.2, beta.** The editor works end to end: open a rack, rearrange and
 > rebind its macros, add the features you want every rack of yours to have,
 > save, and load the result back into Live. Racks the contract authored have
 > made that round trip and been played. See
@@ -56,7 +56,8 @@ What that means in practice:
 | See which plugins a rack needs, and name them from your VST3 folder | works in Chromium |
 | See a macro that drives a plugin parameter | works, read only |
 | Companion Max for Live device | works - the same editor, offline, inside Live |
-| Open a rack on a phone | works; the rack row scrolls with a finger, and a knob drag needs a short hold first |
+| Open a rack on a phone | works; the file picker offers every file and the rack is recognised by its bytes |
+| Use it on a phone | the rack row scrolls with a finger, and a knob drag needs a short hold first |
 
 One known fault: on a drum rack, a chain selector added ALONGSIDE several other
 features stops selecting, though each of them is fine on its own. It is

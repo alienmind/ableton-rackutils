@@ -1,6 +1,6 @@
 /**
  * Applying a contract to a rack: the pieces of a convention a producer wants
- * every one of their racks to present the same way (doc/PLAN.md 4.3).
+ * every one of their racks to present the same way (doc/PLAN.md).
  *
  * One option usually means one device at the end of EVERY chain, driven by ONE
  * macro in a leading slot, named from a pattern and coloured. That parallel
@@ -130,7 +130,7 @@ export interface ContractOptions {
    * characters, and Live wraps a label that long onto a second line, making
    * every macro cell taller and the rack taller with it (SCHEMA.md Q19). Pass
    * the short track code the convention is built on - "BS" - which is what the
-   * UI's rack name field is for (doc/PLAN.md 4.3.1).
+   * UI's rack name field is for (doc/DEVELOPERS.md, the contract).
    *
    * One code, everywhere: the rack, its macros and the devices the contract
    * adds all read `BS`, so a rack is identifiable from any one of them.
@@ -162,7 +162,7 @@ export interface ContractStatus {
    * it on every chain (or, with no macro, the device ends every chain).
    * `partial` - some chains have it and some do not, which is its own state:
    * the contract inserts into the chain that lacks it and binds both
-   * (doc/PLAN.md 4.3.3).
+   * (doc/DEVELOPERS.md, the contract).
    */
   state: ContractState;
   /** Chains this option's device already ends. Zero for an option with no device. */
@@ -192,7 +192,7 @@ export function macroNameFor(pattern: string, rackName: string, targetName = '')
  * What the rack already does about each option, without changing anything.
  *
  * The UI needs this to show an option as satisfied, partial or absent before
- * the user commits to it (doc/PLAN.md 4.3.1). `applyContract` answers the same
+ * the user commits to it (doc/DEVELOPERS.md, the contract). `applyContract` answers the same
  * question by the same rules, so what the strip shows and what ticking it does
  * cannot drift apart.
  */
@@ -232,7 +232,7 @@ export function inspectContract(
  * macro slots.
  *
  * Leading slots are what make the convention worth having: whichever rack you
- * open, the first knobs are the ones you put there (doc/PLAN.md 4.3.1). Their
+ * open, the first knobs are the ones you put there (doc/DEVELOPERS.md, the contract). Their
  * order among themselves is the order of `devices`, not the order the user
  * happened to tick them in, so the same convention lands the same way on every
  * rack. An option the rack already satisfies is moved into its place rather
@@ -288,7 +288,7 @@ export function applyContract(
   // One insertion per device tag per run. `insertDeviceInEveryChain` reuses a
   // device a chain already ends in, which covers consecutive options and not
   // separated ones: EQ Three's three band options share ONE device per chain
-  // (doc/PLAN.md 4.3.2), and an option inserted between them would otherwise
+  // (doc/DEVELOPERS.md, the contract), and an option inserted between them would otherwise
   // leave the third band appending a second EQ.
   const inserted = new Map<string, InsertedDevice[]>();
   let nextFreeSlot = 0;
@@ -514,7 +514,7 @@ function instancePaths(
  * options were given, whatever order the rack had them in.
  *
  * Slot comes from the contract, not from the order the user ticked things -
- * that is the whole of the familiarity claim (doc/PLAN.md 4.3.1). An option
+ * that is the whole of the familiarity claim (doc/DEVELOPERS.md, the contract). An option
  * the rack already satisfied can sit anywhere, so recognising it is not enough
  * on its own. `reorderMacro` rotates rather than overwrites, so nothing is
  * lost when a rack's own macro is pushed along.
@@ -580,7 +580,7 @@ function adoptableAt(
   return macroName === macroNameFor(device.namePattern, name, device.targetName) ? null : { slot, macroName };
 }
 
-/** The slot driving this option on SOME chains but not all - partial satisfaction (doc/PLAN.md 4.3.3). */
+/** The slot driving this option on SOME chains but not all - partial satisfaction (doc/DEVELOPERS.md, the contract). */
 function findPartialSlot(rack: Rack, device: ContractDevice, macros: readonly Macro[] = rack.macros): number | null {
   if (device.parameter === undefined) return null;
   for (let slot = 0; slot < MACRO_SLOTS; slot++) {

@@ -1,5 +1,5 @@
 /**
- * Finds the companion device to offer for download (doc/PLAN.md 4.7, D5).
+ * Finds the companion device to offer for download (doc/DEVELOPERS.md).
  *
  * It is the newest VERSIONED release carrying a device asset, not the rolling
  * `latest-device` build. Three reasons that is the right one now that real

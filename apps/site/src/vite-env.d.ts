@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  /** '1' in the Max for Live bundle. The device view is small and goes straight to the work (doc/PLAN.md 4.7). */
+  /** '1' in the Max for Live bundle. The device view is small and goes straight to the work (doc/PLAN.md). */
   readonly VITE_EMBED?: string;
 }
 

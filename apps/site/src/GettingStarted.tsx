@@ -89,7 +89,7 @@ export function GettingStarted({ compact }: { compact: boolean }) {
  * The download itself, resolved live: the newest VERSIONED release carrying a
  * device asset, falling back to the releases page. GitHub's unauthenticated
  * API is rate-limited per IP and fails for reasons that have nothing to do
- * with the user (doc/PLAN.md D5).
+ * with the user (doc/DEVELOPERS.md).
  */
 function CompanionLink() {
   const [release, setRelease] = useState<CompanionRelease | null>(null);
