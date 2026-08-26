@@ -153,3 +153,22 @@ describe('Live palette', () => {
     expect(macroColor(999)).not.toBe(MACRO_PALETTE[0]);
   });
 });
+
+describe('the plugin strip (doc/PLAN.md 4.1)', () => {
+  const DONORS = join(__dirname, '..', '..', 'adg-codec', 'donors');
+  const donor = (name: string) => Rack.parse(new Uint8Array(readFileSync(join(DONORS, name))));
+
+  test('lists an unresolved plugin by its class id and the chain it sits in', () => {
+    const html = render(donor('BS-VST3.adg'));
+    expect(html).toContain('plugin-strip');
+    // Nothing has resolved the id, so what is shown is the id - here in its
+    // readable ASCII form, which is a vendor habit (SCHEMA.md Q17) and is why
+    // it sits in the id slot rather than the name one.
+    expect(html).toContain('ArtuAVISMBRTProc');
+    expect(html).toContain('MiniBrute');
+  });
+
+  test('a rack with no plugins draws no strip at all', () => {
+    expect(render(donor('BS.adg'))).not.toContain('plugin-strip');
+  });
+});

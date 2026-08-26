@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { writeRackFile } from './rack-file';
 
-async function loadRack(page: Page, kind: 'instrument' | 'drum' = 'instrument') {
+async function loadRack(page: Page, kind: 'instrument' | 'drum' | 'plugin' = 'instrument') {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
@@ -754,4 +754,23 @@ test('the landing is the two controls, with the walkthrough behind a question ma
 
   await page.keyboard.press('Escape');
   await expect(page.locator('.modal')).toHaveCount(0);
+});
+
+test.describe('the plugin strip (doc/PLAN.md 4.1)', () => {
+  test('names the class id and the chain, and takes no space on a rack without one', async ({ page }) => {
+    await loadRack(page, 'plugin');
+    const strip = page.locator('.plugin-strip');
+    await expect(strip).toBeVisible();
+    // Nothing has resolved the id: what is shown is the id, in the readable
+    // form this vendor happens to build (SCHEMA.md Q17).
+    await expect(strip.locator('.plugin-uid')).toHaveText('ArtuAVISMBRTProc');
+    await expect(strip.locator('.plugin-where')).toHaveText('MiniBrute');
+    // The strip sits above the rack and must not push it off the row.
+    await expect(page.locator('.rack-row > .panel.rack-panel').first()).toBeVisible();
+  });
+
+  test('a rack with no plugins draws no strip', async ({ page }) => {
+    await loadRack(page);
+    await expect(page.locator('.plugin-strip')).toHaveCount(0);
+  });
 });

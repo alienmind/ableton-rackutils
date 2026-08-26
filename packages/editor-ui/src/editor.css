@@ -1643,3 +1643,125 @@
     max-width: 120px;
   }
 }
+
+
+/* --- Plugins the rack needs (doc/PLAN.md 4.1) --- */
+
+.plugin-strip {
+  margin-bottom: 6px;
+  padding: 6px 8px 7px;
+  border: 1px solid var(--edit-line);
+  border-radius: 4px;
+  background: #1a1c22;
+}
+
+.plugin-strip-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-bottom: 5px;
+}
+
+.plugin-strip-head h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--edit-text);
+}
+
+.plugin-count {
+  margin-left: 5px;
+  padding: 0 4px;
+  font-size: 10px;
+  color: var(--edit-dim);
+  border: 1px solid var(--edit-line);
+  border-radius: 8px;
+}
+
+.plugin-scan {
+  margin-left: auto;
+  font-size: 9px;
+  padding: 2px 6px;
+  color: var(--edit-dim);
+  background: transparent;
+  border: 1px solid var(--edit-line);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.plugin-scan:hover {
+  color: var(--edit-text);
+  border-color: var(--edit-accent);
+}
+
+.plugin-progress {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--edit-dim);
+  /* A folder of plugins is gigabytes; the filename changing is the only sign
+     anything is happening. Fixed width so it does not shove the row about. */
+  max-width: 320px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.plugin-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.plugin-item {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 7px;
+  background: #101116;
+  border: 1px solid var(--edit-line);
+  border-radius: 3px;
+}
+
+.plugin-missing {
+  border-color: #6a4a2a;
+}
+
+.plugin-name {
+  font-size: 11px;
+  color: var(--edit-text);
+}
+
+.plugin-uid {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  color: var(--edit-dim);
+}
+
+.plugin-where,
+.plugin-instances {
+  font-size: 10px;
+  color: var(--edit-dim);
+}
+
+.plugin-state {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #d0954a;
+}
+
+.plugin-note,
+.plugin-error {
+  margin: 5px 0 0;
+  font-size: 10px;
+  color: var(--edit-dim);
+}
+
+.plugin-error {
+  color: #e0736a;
+}

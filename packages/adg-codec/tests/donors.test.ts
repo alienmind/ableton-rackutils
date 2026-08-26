@@ -315,6 +315,28 @@ describe('BS-VST3.adg - a plugin in a chain (SCHEMA.md Q17)', () => {
     expect(plugin!.parameters).toHaveLength(0);
   });
 
+  test('rack.plugins reports the class id and the chain it sits in (doc/PLAN.md 4.1)', () => {
+    const rack = Rack.parse(load('BS-VST3.adg'));
+    expect(rack.plugins).toEqual([
+      // The four Uid fields, big-endian and concatenated (SCHEMA.md Q18). The
+      // chain name is the user's own typing and the only readable string the
+      // file puts near a plugin.
+      { path: rack.plugins[0].path, type: 'Vst3Preset', uid: '41727475415649534d42525450726f63', chainName: 'MiniBrute' },
+    ]);
+  });
+
+  test('the reported path resolves back to the preset element', () => {
+    const rack = Rack.parse(load('BS-VST3.adg'));
+    expect(rack.chains[2].devices.map((d) => d.path)).toContain(rack.plugins[0].path);
+  });
+
+  test('a rack with no plugin reports none', () => {
+    expect(Rack.parse(load('BS.adg')).plugins).toEqual([]);
+    // A rack of racks: the walk has to reach into the nested ones to be able
+    // to answer the dependency question at all.
+    expect(Rack.parse(load('KD.adg')).plugins).toEqual([]);
+  });
+
   test('the plugin chain still round-trips, 77KB of opaque state included', () => {
     const rack = Rack.parse(load('BS-VST3.adg'));
     const before = rack.chains.map((c) => c.devices.map((d) => d.type));
