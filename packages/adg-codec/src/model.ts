@@ -20,6 +20,7 @@
  */
 import { child, childValue, elementChildren, parseXmlDoc, pathOf, resolvePath, serializeXmlDoc } from './dom';
 import { compress, decompress } from './gzip';
+import { uidFromFields } from './vst3';
 
 export const MACRO_SLOTS = 16;
 
@@ -38,6 +39,19 @@ function parameterName(target: Element): string {
     return childValue(target.parentElement, `MacroDisplayNames.${index}`) || `Macro ${index + 1}`;
   }
   return childValue(target, 'Name') ?? target.tagName;
+}
+
+/** A plugin preset: a sibling of `AbletonDevicePreset` with no `Device` child (SCHEMA.md Q17). */
+const VST3_PRESET = 'Vst3Preset';
+
+/** `Uid/Fields.0-3`, the four ints of a VST3 class id (SCHEMA.md Q18). */
+const UID_FIELDS = [0, 1, 2, 3];
+
+/** The chain element at or above `el`: `InstrumentBranchPreset`, `AudioBranchPreset`, `DrumBranchPreset`. */
+function nearestBranchPreset(el: Element | null): Element | null {
+  let node = el;
+  while (node && !node.tagName.endsWith('BranchPreset')) node = node.parentElement;
+  return node;
 }
 
 /** The `GroupDevicePreset` at or above `el` - the element a rack device hangs off (SCHEMA.md Q2). */
@@ -116,6 +130,33 @@ export interface Chain {
   colorIndex: number | null;
   /** `AutoColored` - Live picked the colour rather than the user. */
   autoColored: boolean;
+}
+
+/**
+ * One plugin instance a rack needs in order to load (doc/PLAN.md 4.1).
+ *
+ * `Vst3Preset` is the only plugin wrapper any evidence here shows (SCHEMA.md
+ * Q17). VST2 and Audio Unit presets are certainly other tags; nothing has
+ * recorded which, so nothing here looks for them, and a rack using one reports
+ * no plugins rather than a guess.
+ */
+export interface PluginRef {
+  /** Path to the preset element, relative to this rack's `GroupDevicePreset`. */
+  path: string;
+  /** The preset's own tag, `Vst3Preset`. */
+  type: string;
+  /**
+   * The VST3 class id: `Uid/Fields.0-3` big-endian and concatenated, 32 hex
+   * characters (SCHEMA.md Q18). The file carries NO plugin name, so this is
+   * the whole identity of the dependency until something resolves it.
+   */
+  uid: string;
+  /**
+   * Name of the chain the plugin sits in - the only human-readable string the
+   * file puts anywhere near it (SCHEMA.md Q17), and the user's own typing.
+   * Empty when the chain is unnamed.
+   */
+  chainName: string;
 }
 
 export interface Variation {
@@ -240,6 +281,28 @@ export class Rack {
   get chains(): Chain[] {
     const bp = this.branchPresetsEl;
     return bp ? this.walkChains(bp) : [];
+  }
+
+  /**
+   * Every plugin instance in the rack, nested racks included, in document
+   * order. One entry per instance: the same plugin twice is two entries, and
+   * grouping them by `uid` is the caller's job.
+   *
+   * Not part of `chains`, where a plugin already appears as a device with zero
+   * parameters (SCHEMA.md Q17): the dependency question is about the whole
+   * file, and the answer has to reach into nested racks that a chain walk only
+   * descends lazily.
+   */
+  get plugins(): PluginRef[] {
+    return Array.from(this.root.getElementsByTagName(VST3_PRESET)).map((preset) => {
+      const uid = child(preset, 'Uid');
+      return {
+        path: this.pathOf(preset),
+        type: preset.tagName,
+        uid: uid ? uidFromFields(UID_FIELDS.map((i) => Number(childValue(uid, `Fields.${i}`)))) : '',
+        chainName: childValue(nearestBranchPreset(preset), 'Name') ?? '',
+      };
+    });
   }
 
   // --- internals, exported for mutate.ts (same package, not part of the public API) ---
