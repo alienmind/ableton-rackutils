@@ -126,10 +126,11 @@ export function MacroKnob(props: MacroKnobProps) {
         </span>
       )}
 
-      {/* Only on a macro there is something to undo: an untouched slot has
-          nothing to reset, and the control would be noise on all sixteen. */}
+      {/* Only where there is something to undo: an untouched slot has nothing
+          to reset, and the control would be noise on all sixteen. It sits over
+          the slot number and appears on hover - see editor.css. */}
       {(mapped || label !== `Macro ${macro.index + 1}` || macro.color >= 0) && (
-        <button type="button" className="macro-knob-reset" onClick={onReset} title="Unbind this macro and reset its name and colour">
+        <button type="button" className="macro-knob-reset" onClick={onReset} title={`Unbind macro ${macro.index + 1} and reset its name and colour`}>
           x<span className="sr-only">{` reset macro ${macro.index + 1}`}</span>
         </button>
       )}

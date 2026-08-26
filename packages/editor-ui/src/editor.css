@@ -95,6 +95,17 @@
   cursor: default;
 }
 
+/* A collapsed panel is a title strip, and the width is what animates. */
+.panel.collapsed {
+  max-width: 24px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    transition: none;
+  }
+}
+
 /* --- Macro Variations, to the left of the macros as Live places it --- */
 
 .variations-panel {
@@ -179,6 +190,16 @@
   flex: 0 0 auto;
   height: 100%;
   display: flex;
+  /*
+   * Opening and closing a panel is a move, not a cut. `max-width` rather than
+   * `width` because a panel is sized by its contents and CSS cannot animate to
+   * `auto`; the cap sweeps past the content width and the panel follows it.
+   * The cables watch for these transitions and swing with them
+   * (`MappingCables`).
+   */
+  max-width: 460px;
+  overflow: hidden;
+  transition: max-width 0.2s ease;
   flex-direction: column;
   background: var(--edit-panel);
   border: 1px solid var(--edit-line);
@@ -1024,6 +1045,38 @@
   color: var(--edit-accent);
 }
 
+/*
+ * The message line. Its height is reserved whether it has anything to say or
+ * not: a warning that pushes the rack down moves every control the user was
+ * about to click.
+ */
+.editor-messages {
+  display: flex;
+  align-items: center;
+  min-height: 20px;
+  margin-bottom: 4px;
+  padding: 0 2px;
+  overflow: hidden;
+  font-size: 11px;
+}
+
+.editor-messages .warnings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin: 0;
+  padding: 1px 6px;
+  border-left: 3px solid #ff9f45;
+  background: #241f18;
+  color: #ffd9ad;
+  border-radius: 2px;
+  list-style: none;
+  /* One line high, whatever the codec has to say. The full text is in the
+     title, and the row does not grow. */
+  max-height: 18px;
+  overflow: hidden;
+}
+
 /* A parameter only invites a drag while Map is on. Outside it, it is text. */
 .param.mappable { cursor: grab; }
 .macro-knob.map-source .macro-knob-dial { cursor: grab; }
@@ -1104,34 +1157,6 @@
   background: #101116;
   border: 1px solid var(--edit-line);
   border-radius: 3px;
-}
-
-/* Saving sits with the name, because they are the same thought: the rack is
-   called this, and this is the file it becomes. */
-.contract-save {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  color: var(--edit-text);
-  background: transparent;
-  border: 1px solid var(--edit-line);
-  border-radius: 3px;
-  cursor: pointer;
-}
-
-.contract-save:hover { border-color: var(--edit-accent); color: var(--edit-accent); }
-
-.contract-save svg {
-  width: 15px;
-  height: 15px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 
 .contract-io {
@@ -1223,10 +1248,21 @@
 }
 
 .contract-entry-state {
-  font-size: 9px;
+  flex: 0 0 auto;
+  font-size: 8px;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  opacity: 0.75;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+  opacity: 0.85;
+}
+
+/* A mounted feature the rack does not actually have yet says so out loud: the
+   two states are separate and the list shows both. */
+.contract-entry-state.absent {
+  background: #7a3434;
+  opacity: 1;
 }
 
 /* The colour chip an editor puts beside a colour value, same idea here. */
@@ -1426,21 +1462,49 @@
 /* --- per-knob reset --- */
 
 .macro-knob-reset {
+  /* Over the slot number, top left: the number is the least useful thing on a
+     knob and the corner was already taken by the colour swatch on the right,
+     which the reset overlapped. */
   position: absolute;
-  top: 1px;
-  right: 13px;
-  width: 11px;
-  height: 11px;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
   padding: 0;
-  font-size: 8px;
+  font-size: 9px;
+  font-weight: 700;
   line-height: 1;
-  color: var(--edit-dim);
-  background: transparent;
-  border: none;
+  color: #f4f5f8;
+  background: #4a4f5c;
+  border: 1px solid #101116;
+  border-radius: 50%;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
   cursor: pointer;
+  /* Hidden until the pointer is on the knob: sixteen little x's is a rack that
+     looks like a form. Not `display: none` - it has to be able to fade. */
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease;
 }
 
-.macro-knob-reset:hover { color: #ff6b6b; }
+.macro-knob:hover .macro-knob-reset,
+.macro-knob-reset:focus-visible {
+  opacity: 1;
+}
+
+.macro-knob-reset:hover {
+  background: #ff6b6b;
+  color: #101116;
+}
+
+/* The number gets out of the way rather than sitting under the button. */
+.macro-knob:hover .macro-knob-reset + .macro-knob-dial .macro-knob-slot,
+.macro-knob:hover .macro-knob-dial .macro-knob-slot {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
 
 /* --- collapsed mapping groups --- */
 
