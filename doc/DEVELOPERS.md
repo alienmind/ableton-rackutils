@@ -32,6 +32,11 @@ Rules that keep the pieces honest:
   whether it is present.
 - `apps/site` must never import from `apps/m4l-device`. The site has to build
   and deploy with the device removed entirely.
+- Browser-only APIs live where they belong: the plugin folder scan and the
+  `uid -> name` cache are in `editor-ui` beside the strip that uses them, and
+  the file handle the site saves through is in `apps/site`. Both are feature
+  detected, never assumed - `showDirectoryPicker` and `showOpenFilePicker` are
+  Chromium's today, and the fallbacks are the file input and the download.
 - The build stays a pure static build. No SSR, no API routes, nothing that
   assumes a Node process at runtime.
 
@@ -60,11 +65,18 @@ pointer back to the file it came from, so the user must pick the file).
 
 ## Current state
 
-v0.2.0 released, 0.3.0 on the branch. The codec is built and tested, the site renders the editor through
-`packages/editor-ui` with the rack features strip on top of it, and the device
-carries the same editor offline. Racks it edited - and racks the contract
-authored - have been loaded back into Live by hand. Full detail, and what to do
-next, is in [`PLAN.md`](PLAN.md#current-state).
+v0.3.0, beta. The codec is built and tested, the site renders the editor
+through `packages/editor-ui` with the rack features strip and the plugin strip
+on top of it, and the device carries the same editor offline. Racks it edited -
+and racks the contract authored - have been loaded back into Live and played,
+the device has been installed and opened, and the plugin scan has resolved a
+real plugin from a real VST3 folder.
+
+Two things to know before changing anything: a drum rack's chain selector stops
+selecting when it is applied alongside several other features (bisected, not
+fixed), and the list of what has and has not been confirmed BY HAND is the
+first thing to read in [`PLAN.md`](PLAN.md#confirmed-and-not). Full detail, and
+what to do next, is in [`PLAN.md`](PLAN.md#current-state).
 
 ## Setup
 
@@ -131,12 +143,17 @@ Playwright - and it would have failed for anyone who flicks a knob quickly.
 Add a spec here whenever a change touches DOM serialization, pointer handling,
 or layout that must not overflow.
 
-Of the codec's 167, most are synthetic and always run, 42 run against the
+Of the codec's 189, most are synthetic and always run, 88 run against the
 donor racks committed in `packages/adg-codec/donors/` - real Ableton-saved
 files that ship with the repo, so they run in CI too - and a handful run
 against `packages/adg-codec/tests/fixtures/*.adg`, which are gitignored and
-skip cleanly when absent. Four of `editor-ui`'s tests use those same
-fixtures.
+skip cleanly when absent. Several of `editor-ui`'s tests use those same
+fixtures, and its heaviest mount `donors/KD.adg` itself.
+
+Both suites run on worker threads, one file at a time
+(`vitest.config.ts`). They are minutes of solid jsdom work, and over a forked
+process's IPC vitest's own worker-to-main RPC hit its 60 second deadline and
+threw - a red CI build in which every test had passed.
 
 **Test every mutation against the real fixtures, not only synthetic ones.**
 Three real bugs so far were invisible to the synthetic suite: a macro driving
