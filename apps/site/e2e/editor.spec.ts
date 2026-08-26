@@ -934,19 +934,20 @@ test('the rack name is one name: renaming it anywhere renames it everywhere', as
  * file input filters differently, and the row that scrolls sideways is made
  * of the same knobs a drag starts on.
  */
-test('on a touch screen the file input offers everything, not just .adg', async ({ browser }) => {
-  const context = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 412, height: 915 } });
-  const page = await context.newPage();
+test('the file input offers every file, so Android can reach a rack at all', async ({ page }) => {
   await page.goto('/');
-  // Android's picker filters by MIME type and knows no `.adg`, so every rack
-  // in Downloads greyed out. The gzip check refuses anything else anyway.
-  await expect(page.locator('input[type=file]')).not.toHaveAttribute('accept', /.+/);
-  await context.close();
+  // Android's picker filters by MIME type, derived from `accept`, and knows no
+  // `.adg` - every rack in Downloads greyed out. Restricting the attribute to
+  // desktop by `(pointer: coarse)` did not fix it either: that query does not
+  // match on a Pixel. The gzip check refuses anything that is not a rack.
+  await expect(page.locator('input[type=file]')).not.toHaveAttribute('accept', /.*/);
 });
 
-test('a desktop file input still filters to .adg', async ({ page }) => {
+test('a file that is not a rack is refused by its bytes, with a message', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('input[type=file]')).toHaveAttribute('accept', '.adg');
+  const notARack = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'package.json');
+  await page.setInputFiles('input[type=file]', notARack);
+  await expect(page.locator('.error')).toContainText('not a gzipped .adg file');
 });
 
 test('the rack row can be scrolled sideways from a knob', async ({ browser }) => {

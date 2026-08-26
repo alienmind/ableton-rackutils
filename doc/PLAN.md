@@ -128,9 +128,17 @@ templates. The rest was walked in Live on 2026-08-26, and stands as:
   - **A rack could not be opened at all.** The file input carried
     `accept=".adg"`, and Android's picker filters by MIME type, which it
     derives from `accept`: `.adg` maps to nothing it knows, so every rack in
-    Downloads greyed out. Renaming to `.adg.gz` was the only way in. On a
-    coarse pointer the input now offers everything and the gzip check does the
-    filtering, which it did anyway.
+    Downloads greyed out. Renaming to `.adg.gz` was the only way in.
+
+    **Fixed twice.** The first fix dropped `accept` on a coarse pointer, and
+    the phone reported the same fault with that build deployed: the query does
+    not match on a Pixel running stock Chrome. So the attribute is gone on
+    every platform. What it bought was a tidier file dialog; what it cost was a
+    platform that could not open a file. The gzip check does the filtering
+    either way, and always did.
+
+    The lesson is the one this project keeps relearning: a fix confirmed by a
+    test in a touch CONTEXT is not a fix confirmed on a phone.
   - **The rack row could not be scrolled.** It is one row that scrolls
     sideways and it is made of knobs, and a knob carried `touch-action: none`
     for its drag - so a finger on one moved neither the knob nor the rack. The
