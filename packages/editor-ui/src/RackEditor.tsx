@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Rack, bindParameter, type MutationResult } from '@rackutils/adg-codec';
 import { RackPanel } from './RackPanel';
 import { EditorProvider, resolveRackPath, type ArmedParam, type RackPath } from './context';
@@ -12,8 +12,6 @@ export interface RackEditorProps {
   /** The loaded rack, owned by the host so it can decide how a file is opened (picker, drop, M4L path). */
   rack: Rack | null;
   onChange: (rack: Rack) => void;
-  /** Save the rack to a file. The editor does not own the file, its host does - so the button is here and the doing is there. */
-  onSave?: () => void;
   /** Live macro values from the M4L device, root rack only, display only - never written to the file. */
   liveValues?: Record<number, number>;
 }
@@ -27,7 +25,7 @@ export interface RackEditorProps {
  * derived from the current handle on each render rather than mirrored into
  * React state (doc/PLAN.md Part 5).
  */
-export function RackEditor({ rack, onChange, onSave, liveValues }: RackEditorProps) {
+export function RackEditor({ rack, onChange, liveValues }: RackEditorProps) {
   const [undo, setUndo] = useState<Rack[]>([]);
   const [redo, setRedo] = useState<Rack[]>([]);
   const [armed, setArmed] = useState<ArmedParam | null>(null);
@@ -102,9 +100,12 @@ export function RackEditor({ rack, onChange, onSave, liveValues }: RackEditorPro
     [undo, redo, rack, onChange],
   );
 
+  const scroller = useRef<HTMLDivElement>(null);
+  const openBudget = useOpenBudget(scroller);
+
   const context = useMemo(
-    () => ({ root: rack!, mapping, setMapping, armed, arm: setArmed, apply, liveValues, paramDrag, startParamDrag, history }),
-    [rack, mapping, setMapping, armed, apply, liveValues, paramDrag, startParamDrag, history],
+    () => ({ root: rack!, mapping, setMapping, armed, arm: setArmed, apply, liveValues, openBudget, paramDrag, startParamDrag, history }),
+    [rack, mapping, setMapping, armed, apply, liveValues, openBudget, paramDrag, startParamDrag, history],
   );
 
   if (!rack) return null;
@@ -112,37 +113,44 @@ export function RackEditor({ rack, onChange, onSave, liveValues }: RackEditorPro
   return (
     <EditorProvider value={context}>
       <div className="rack-editor">
-        <div className="editor-toolbar">
-          {mapping && !armed && (
-            <span className="mapping-note">
-              Map mode - drag any parameter, or a nested rack's knob, onto a macro knob. Moving macros
-              around is off until you leave it.
-            </span>
-          )}
-          {armed && (
+        {/*
+          * One message line, always there.
+          *
+          * Warnings used to appear and disappear above the rack, which moved
+          * everything under them by however many lines the codec had to say -
+          * so the thing you were about to click was somewhere else by the time
+          * you clicked it. The row keeps its height whether or not it has
+          * anything in it, and it carries the mode notes too, since they are
+          * the same kind of message.
+          */}
+        <div className={`editor-messages${warnings.length > 0 ? ' has-warning' : ''}`} role="status" aria-live="polite">
+          {warnings.length > 0 ? (
+            <ul className="warnings" title={warnings.join('\n')}>
+              {warnings.map((w) => (
+                <li key={w}>{w}</li>
+              ))}
+            </ul>
+          ) : armed ? (
             <span className="armed-note">
               <strong>{armed.param.name}</strong> armed - click a macro knob in the same rack to bind it
               <button type="button" className="cancel-arm" onClick={() => setArmed(null)}>
                 cancel
               </button>
             </span>
-          )}
+          ) : mapping ? (
+            <span className="mapping-note">
+              Map mode - drag any parameter, or a nested rack's knob, onto a macro knob. Moving macros around
+              is off until you leave it.
+            </span>
+          ) : null}
         </div>
-
-        {warnings.length > 0 && (
-          <ul className="warnings">
-            {warnings.map((w) => (
-              <li key={w}>{w}</li>
-            ))}
-          </ul>
-        )}
 
         {/* The rack first and as wide as the window allows, then the two
             panels that read it, side by side under it - and stacked instead
             when there is not enough width for both. Only the rack needs the
             whole monitor; a feature list and a table of mappings are worse
             for being stretched across one. */}
-        <div className="rack-editor-scroll">
+        <div className="rack-editor-scroll" ref={scroller}>
           <div className="rack-row">
             <RackPanel rack={rack} rackPath={[]} depth={0} />
             {/* The empty slots a rack has room for. Live draws them too, and
@@ -155,7 +163,7 @@ export function RackEditor({ rack, onChange, onSave, liveValues }: RackEditorPro
         </div>
 
         <div className="editor-panels">
-          <ContractStrip rack={rack} onSave={onSave} />
+          <ContractStrip rack={rack} />
           <MappingTable rack={rack} />
         </div>
 
@@ -168,4 +176,38 @@ export function RackEditor({ rack, onChange, onSave, liveValues }: RackEditorPro
       </div>
     </EditorProvider>
   );
+}
+
+/**
+ * How many devices the row has room to show open, from the width it has.
+ *
+ * A rack is a row that scrolls sideways and every open device is about 210px
+ * of it, so on a laptop a chain of six opened flat is mostly off screen. The
+ * budget folds the ones that do not fit - from the right, so the devices
+ * nearest the rack survive - and unfolds them again as the window grows.
+ *
+ * Deliberately a heuristic on a typical width rather than a measurement of
+ * each panel: measuring means opening them all to see how wide they would be,
+ * which is the thing being avoided. Getting it slightly wrong costs a
+ * scrollbar, which is where this started.
+ */
+const RACK_PANEL_WIDTH = 560;
+const OPEN_DEVICE_WIDTH = 210;
+
+function useOpenBudget(ref: React.RefObject<HTMLElement | null>): number {
+  const [width, setWidth] = useState(0);
+
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    setWidth(element.clientWidth);
+    // ResizeObserver rather than the window's resize event: the row also
+    // changes width when the panels under it wrap, and that is not a resize.
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [ref]);
+
+  return Math.max(0, Math.floor((width - RACK_PANEL_WIDTH) / OPEN_DEVICE_WIDTH));
 }

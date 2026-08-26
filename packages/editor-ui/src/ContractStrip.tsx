@@ -33,6 +33,14 @@ import {
  * Rack features: the contract, as two lists and a settings column above the
  * rack (doc/PLAN.md 4.3.1).
  *
+ * **A feature is MOUNTED or not; where its devices physically land is a
+ * separate question.** Mounting Utility Gain on a drum rack puts a Utility at
+ * the end of every pad's chain and nothing in the drum rack itself - which is
+ * the design, and left a user looking for something that was never going to be
+ * there. So the right-hand list is the mounted set, kept whatever the rack
+ * turns out to look like, and each entry says what the rack actually has: in
+ * the rack, partly there, or nothing yet. The two are never folded into one.
+ *
  * Left is what the rack could have, right is what it has, and the arrows move
  * a feature between them. Putting one in adds the device at the end of every
  * chain (or reuses one already there), binds one macro to every instance,
@@ -63,6 +71,12 @@ export interface ContractStripProps {
 const sameDevice = (a: ContractDevice, b: ContractDevice) =>
   a.deviceTag === b.deviceTag && a.parameter === b.parameter && a.targetRack === b.targetRack;
 
+/** Two words for what the rack physically has, next to a feature that is mounted either way. */
+function stateBadge(status: ContractStatus | undefined): string {
+  if (!status || status.state === 'absent') return 'not applied';
+  return status.state === 'satisfied' ? 'in rack' : 'partly';
+}
+
 /** A nested rack a targeted feature can point at: one per chain that holds one. */
 interface RackTarget {
   path: string;
@@ -70,7 +84,7 @@ interface RackTarget {
   name: string;
 }
 
-export function ContractStrip({ rack, onSave }: ContractStripProps) {
+export function ContractStrip({ rack }: ContractStripProps) {
   const { apply } = useEditor();
   const [library, setLibrary] = useState<Library>(() => loadLibrary());
   const [rackName, setRackName] = useState(rack.name);
@@ -115,7 +129,6 @@ export function ContractStrip({ rack, onSave }: ContractStripProps) {
    */
   const materialise = useCallback(
     (next: Template) => {
-      const previous = library;
       const before = devicesOf(template);
       const after = devicesOf(next);
       setLibrary((lib) => ({ ...lib, templates: lib.templates.map((t) => (t.id === next.id ? next : t)) }));
@@ -146,13 +159,14 @@ export function ContractStrip({ rack, onSave }: ContractStripProps) {
         if (after.length === 0) return evenMacroCount(r);
         return applyContract(r, after, { name: rackName || undefined });
       });
-      // Put the list back when the codec refuses - a rack with no room for
-      // another macro, a drum rack asked for a chain selector of its own. A
-      // feature listed as being in the rack when it is not is the one thing
-      // this strip must never show.
-      if (!applied) setLibrary(previous);
+      // A refusal - no room for another macro, a drum rack asked for a chain
+      // selector of its own - leaves the feature MOUNTED and unapplied rather
+      // than silently un-mounting it. The message row says why and the entry
+      // says the rack does not have it; taking it back out is the user's call,
+      // not something to do behind them.
+      void applied;
     },
-    [apply, library, template, rackName],
+    [apply, template, rackName],
   );
 
   const patch = (key: string, changes: Partial<Feature>) =>
@@ -260,16 +274,6 @@ export function ContractStrip({ rack, onSave }: ContractStripProps) {
             }}
           />
         </label>
-        {onSave && (
-          <button type="button" className="contract-save" onClick={onSave} title="Save a copy">
-            <svg viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M8 2v8M4.5 6.5 8 10l3.5-3.5" />
-              <path d="M2.5 11.5v2h11v-2" />
-            </svg>
-            <span className="sr-only">Save a copy</span>
-          </button>
-        )}
-
         <div className="contract-templates">
           <label>
             Template
@@ -377,6 +381,9 @@ export function ContractStrip({ rack, onSave }: ContractStripProps) {
                   >
                     <span className="contract-entry-slot">{i + 1}</span>
                     <span className="contract-entry-name">{entryLabel(optionSpec(f.option)!, f, name)}</span>
+                    {/* Mounted is one thing, and what the rack physically has
+                        is another. This is the second one. */}
+                    <span className={`contract-entry-state ${status?.state ?? 'absent'}`}>{stateBadge(status)}</span>
                   </button>
                 </li>
               );
