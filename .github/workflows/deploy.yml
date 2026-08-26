@@ -1,7 +1,13 @@
 # Adapted from alienmind/trackster's deploy.yml. Kept: the VITE_BASE +
-# repository.name pattern, pnpm/action-setup@v4, node 22, the pages
-# permissions/concurrency block. Added: the codec test gate, and a filtered
-# build since this is a workspace with multiple apps.
+# repository.name pattern, pnpm/action-setup@v4, node 22. Added: the codec test
+# gate, and a filtered build since this is a workspace with multiple apps.
+#
+# Publishes to the `gh-pages` BRANCH rather than uploading a Pages artifact.
+# An artifact replaces the whole site on every deploy, which is fine for one
+# site and impossible for a site plus the beta previews that live under
+# /preview/ (see beta.yml). Publishing to a branch with `keep_files` lets the
+# two coexist: main owns the root, a beta owns its own folder, and neither
+# deletes the other.
 
 name: Deploy to GitHub Pages
 
@@ -11,19 +17,16 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
+# Shared with beta.yml: both push to `gh-pages`, and two at once means one is
+# rejected mid-run.
 concurrency:
-  group: "pages"
-  cancel-in-progress: true
+  group: 'gh-pages'
+  cancel-in-progress: false
 
 jobs:
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,9 +46,13 @@ jobs:
         env:
           VITE_BASE: /${{ github.event.repository.name }}/
 
-      - uses: actions/configure-pages@v4
-      - uses: actions/upload-pages-artifact@v3
+      - name: Publish
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: './apps/site/dist'
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./apps/site/dist
+          # Previews under /preview/ are not this build's to delete. The cost
+          # is that a file main stops shipping lingers; Vite hashes its assets,
+          # so what lingers is unreferenced rather than stale.
+          keep_files: true
+          commit_message: 'site from ${{ github.sha }}'

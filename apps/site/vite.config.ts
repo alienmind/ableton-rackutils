@@ -10,15 +10,27 @@ const base = process.env.VITE_BASE || '/';
 // than typed into the markup. The site went out reading v0.2.0 while the repo
 // had moved on, because a literal in a header is a fact nobody remembers to
 // update; a release bump moves this on its own.
-const version = JSON.parse(
+const version = (JSON.parse(
   readFileSync(fileURLToPath(new URL('../../package.json', import.meta.url)), 'utf8'),
-).version as string;
+).version ?? '') as string;
+
+// A beta preview says which build it is rather than which release it came
+// after: two testers on two previews of the same version otherwise cannot tell
+// their pages apart.
+const label = process.env.VITE_VERSION_LABEL || version;
 
 // The device bundle ships the same dist/ from disk. Two things follow: a
 // service worker there solves nothing bundling has not already solved and can
 // serve a stale UI after a device update (doc/PLAN.md 4.5), and the UI drops
 // its landing chrome for the small device window (4.7).
 const embedded = process.env.VITE_EMBED === '1';
+
+// A beta preview is served UNDER the deployed site's path, and the deployed
+// site's service worker is scoped to that path - so an installed PWA would
+// serve its own cached shell over the preview and the tester would review the
+// wrong build. A preview ships without a worker of its own and asks the
+// browser for every file.
+const noServiceWorker = process.env.VITE_NO_SW === '1';
 
 // base comes from an env var, not from GITHUB_ACTIONS sniffing or a hardcoded
 // path, so the same config serves local dev ('/'), GitHub Pages
@@ -32,11 +44,11 @@ export default defineConfig({
   },
   define: {
     'import.meta.env.VITE_EMBED': JSON.stringify(process.env.VITE_EMBED ?? ''),
-    __APP_VERSION__: JSON.stringify(version),
+    __APP_VERSION__: JSON.stringify(label),
   },
   plugins: [
     react(),
-    ...(embedded
+    ...(embedded || noServiceWorker
       ? []
       : [
           VitePWA({

@@ -1,0 +1,92 @@
+# A beta build of any branch, served from the Pages site under
+# /preview/<tag>/, for testing on a real phone before a change reaches main.
+#
+# UNLISTED, NOT PRIVATE. This repository is public, so its Pages site is
+# world-readable: nothing links to a preview and nobody is told it exists,
+# and that is the whole of the protection. Do not put anything in a beta that
+# could not be in the repository.
+#
+# Tag-triggered, so a preview URL names a BUILD rather than a moving branch:
+#
+#   git tag v0.5.0-beta.1 && git push origin v0.5.0-beta.1
+#   -> https://alienmind.github.io/ableton-rackutils/preview/v0.5.0-beta.1/
+#
+# It publishes main to the site root as well as the preview to its own folder.
+# That is one extra build per beta tag, and it means this workflow can create
+# the `gh-pages` branch from nothing: whichever of the two workflows runs
+# first leaves a complete site behind.
+
+name: Beta preview
+
+on:
+  push:
+    tags: ['*-beta*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Never two publishes to the same branch at once: they push to `gh-pages` and
+# the loser would be rejected mid-run.
+concurrency:
+  group: 'gh-pages'
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+
+      # The same gate main's deploy uses. A beta is for reviewing a change, not
+      # for finding out the codec is broken.
+      - run: pnpm --filter @rackutils/adg-codec test
+
+      - name: Build the beta
+        run: pnpm --filter @rackutils/site build
+        env:
+          VITE_BASE: /${{ github.event.repository.name }}/preview/${{ github.ref_name }}/
+          # No worker of its own: the deployed site's is scoped to the path
+          # above this one and would serve its cached shell here.
+          VITE_NO_SW: '1'
+          VITE_VERSION_LABEL: ${{ github.ref_name }}
+
+      - name: Publish the beta
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./apps/site/dist
+          destination_dir: preview/${{ github.ref_name }}
+          keep_files: true
+          commit_message: 'beta preview ${{ github.ref_name }}'
+
+      - name: Build main, so the site root is whole
+        run: |
+          git fetch origin main
+          git checkout FETCH_HEAD
+          pnpm install --frozen-lockfile
+          pnpm --filter @rackutils/site build
+        env:
+          VITE_BASE: /${{ github.event.repository.name }}/
+
+      - name: Publish main to the root
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./apps/site/dist
+          keep_files: true
+          commit_message: 'site root, alongside beta ${{ github.ref_name }}'
+
+      - name: Say where it is
+        run: |
+          echo "### Beta preview" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/preview/${{ github.ref_name }}/" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Unlisted, not private: this repository is public." >> "$GITHUB_STEP_SUMMARY"

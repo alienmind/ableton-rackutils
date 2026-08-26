@@ -223,13 +223,51 @@ no service worker. See `apps/m4l-device/scripts/check-site-bundle.mjs` and
 | Workflow | Trigger | Does |
 |---|---|---|
 | `ci.yml` | PR, push to main | lint, typecheck, codec and UI tests, plus a `browser` job running the Playwright specs in Chromium |
-| `deploy.yml` | push to main | codec tests, then build and deploy to Pages |
+| `deploy.yml` | push to main | codec tests, then build and publish the site to the `gh-pages` branch |
+| `beta.yml` | a `*-beta*` tag | the same, for one tag, published under `/preview/<tag>/` |
 | `release-device.yml` | push to main, `v*` tag | build the device and its bundled site, guard the bundle, publish the zip - to the rolling `latest-device` prerelease on main, and to the tag's own release on a `v*` tag |
+
+**Pages is served from the `gh-pages` BRANCH, not from an uploaded artifact.**
+An artifact replaces the whole site on every deploy, and a beta preview has to
+survive main deploying. Both workflows publish to that branch with
+`keep_files: true`, so main owns the root and a beta owns its folder. They
+share one concurrency group, because two pushes to one branch means one of them
+is rejected mid-run.
 
 Codec tests gate the deploy. A broken codec corrupts racks silently, which is
 worse than the site being down. The site's device download reads the releases
 list live via the GitHub API and offers the newest `vX.Y.Z` carrying a device
 zip - see `PLAN.md` D5 and D7.
+
+## Beta previews
+
+A build of any branch, on the real site, for testing on a real phone before the
+change reaches main:
+
+```bash
+git tag v0.5.0-beta.1
+git push origin v0.5.0-beta.1
+# -> https://alienmind.github.io/ableton-rackutils/preview/v0.5.0-beta.1/
+```
+
+**Unlisted, not private.** This repository is public, so its Pages site is
+world-readable. Nothing links to a preview and nobody is told it exists, and
+that is the whole of the protection.
+
+Three things a preview does differently:
+
+- **It carries no service worker** (`VITE_NO_SW=1`). The deployed site's worker
+  is scoped to `/ableton-rackutils/`, which INCLUDES every preview path under
+  it, so an installed PWA would serve its own cached shell over the preview and
+  the tester would be reviewing the wrong build.
+- **Its version badge is the tag**, not `package.json`, so two previews of the
+  same version are told apart at a glance.
+- **It publishes main to the site root too.** One extra build per beta tag, and
+  it means either workflow can create `gh-pages` from nothing: whichever runs
+  first leaves a complete site behind.
+
+A preview stays until its folder is deleted from `gh-pages`. They cost nothing
+but clutter; delete the folder when the branch is merged.
 
 ## Prior art
 
