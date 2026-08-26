@@ -84,10 +84,10 @@ Run all four of `lint`, `typecheck`, `test`, `build` clean before committing.
 ## Testing the codec
 
 ```bash
-pnpm test                                  # everything headless, 246 tests
+pnpm test                                  # everything headless, 249 tests
 pnpm --filter @rackutils/adg-codec test    # 189 codec tests
-pnpm --filter @rackutils/editor-ui test    # 57 UI tests
-pnpm test:e2e                              # 48 browser specs, needs Chromium
+pnpm --filter @rackutils/editor-ui test    # 60 UI tests
+pnpm test:e2e                              # 49 browser specs, needs Chromium
 ```
 
 The first time, install the browser: `pnpm --filter @rackutils/site exec

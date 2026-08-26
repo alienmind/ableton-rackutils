@@ -57,10 +57,10 @@ editing, batch library operations - is out. See Parked.
   tests, 88 of them against the committed donor racks.
 - **`packages/editor-ui`** - built. Reproduces Live's layout, plus the rack
   features strip, the plugin strip, feature templates, Map mode and the cable
-  layer. 57 tests.
+  layer. 60 tests.
 - **`apps/site`** - the editor under a landing page that is two controls and
   two question marks, deployed to Pages. Installable, offline, and laid out for
-  a phone as well as an ultra-wide. 48 Playwright specs against real Chromium
+  a phone as well as an ultra-wide. 49 Playwright specs against real Chromium
   in CI.
 - **`tools/adg-tool`** - `unpack`/`diff`/`mappings`/`move`/`move-mapping`, plus
   `adg-palette` and `adg-harvest`.
@@ -107,13 +107,20 @@ templates. The rest was walked in Live on 2026-08-26, and stands as:
   partition, same `ChainSelector` KeyMidi, same range - and differs only in
   which root slot drives it.
 
-  **Bisected once: each half works alone.** `tmp/KD-selector-only.adg` (the
-  selector and nothing else) sweeps correctly, and `tmp/KD-no-selector.adg`
-  (the devices, the original selector macro untouched) keeps working. So the
-  fault is in the COMBINATION, which points at the macro shift rather than at
-  either feature. Waiting on the next bisect: `tmp/KD-sel-gain.adg`,
-  `tmp/KD-sel-gate.adg` and `tmp/KD-sel-eq.adg`, the selector plus one feature
-  each.
+  **Bisected twice.** Each half works alone - `tmp/KD-selector-only.adg` sweeps
+  correctly and `tmp/KD-no-selector.adg` keeps the original selector working -
+  and so does the selector plus any ONE feature (`KD-sel-gain`, `KD-sel-gate`,
+  `KD-sel-eq`, all three confirmed). Only the full set fails. So it is neither
+  feature and neither half: it is a function of how many, which points at the
+  MACRO SHIFT or at the bank size the shift produces (six features take the
+  visible count to 16, where one takes it to 12).
+
+  Waiting on the third bisect, which separates those two:
+  `tmp/KD-sel-three.adg` (three features, twelve macros) and
+  `tmp/KD-sel-16macros.adg` (ONE feature, then the bank widened by hand to 16).
+  If the 16-macro one fails, the count is the fault and this belongs in
+  SCHEMA.md Q19 beside the odd-count finding; if the three-feature one fails,
+  it is the shift.
 - **The device is installed and its window opens.**
 - **The PWA has not been installed on a phone**, and the knob drag has not been
   tried with a finger. Both wait on Pages: the install prompt needs HTTPS. If
@@ -396,7 +403,10 @@ same thought: the rack is called this, and this is the file it becomes.
 
 **One name, everywhere.** It reaches the rack, every macro the contract adds,
 every device it inserts, and the saved file, so a rack is identifiable from any
-one of them. A device already in the chain keeps whatever its owner called it -
+one of them. There are two ways to type it - the rack's title bar and the
+strip's box - and they are the same name: the box reads the rack rather than
+keeping a copy it took when it mounted, and a rename from either relabels every
+feature. A device already in the chain keeps whatever its owner called it -
 renaming someone else's device is not this tool's job.
 
 The name is the RACK's name, in full, and a feature's label is its own field:
@@ -424,6 +434,11 @@ asks - "KICK GAIN on macro 10 already does this. Reuse it as KD GAIN?" - and:
   parameter moves to the new macro and theirs is left as it falls.
 - The answer is stored on the feature, so re-applying the template does not ask
   again.
+- **The same offer appears in the settings column** of a feature that is
+  already mounted. A template carried over from the last rack arrives with its
+  features in the list, so the arrow - and its question - is never pressed, and
+  the offer has to be reachable without taking the feature out and putting it
+  back.
 
 The tell for "theirs" is the NAME, the same one `removeContractOption` uses on
 devices: the contract writes `{name} GAIN` and never renames what it did not
